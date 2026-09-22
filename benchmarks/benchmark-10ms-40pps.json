@@ -1,0 +1,41 @@
+{
+  "name": "intetrigence-vs-cold-clear-2-development-profile",
+  "upstream_repository": "https://github.com/MinusKelvin/cold-clear-2",
+  "upstream_commit": "ed8b19327b6bd1410ddd873d8611485bd45d8fae",
+  "upstream_config": "vendor/cold-clear-2/src/default.json",
+  "engine_config": "engine/src/default.json",
+  "rust_toolchain": "1.96.0",
+  "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+  "cpu_model": "AMD Ryzen 7 5700U with Radeon Graphics",
+  "logical_cpus": 16,
+  "hardware_threads": 1,
+  "binary_sha256": "1af66cd9878c9b31fab5ba1395dd688141a231943999699e63a747c8cdf017e9",
+  "thinking_time_ms": 10,
+  "pieces_per_second": 40,
+  "games": 100,
+  "seed_start": 3001,
+  "turn_limit": 1000,
+  "pairing": "two games per seed with player assignment exchanged",
+  "command": "./target/release/intetrigence arena --games 100 --seed 3001 --ms 10 --pps 40 --turns 1000 --output results/benchmark-10ms-40pps-100.json --replay results/benchmark-10ms-40pps-100.jsonl",
+  "rules": {
+    "board_columns": 10,
+    "board_rows": 40,
+    "visible_rows": 20,
+    "randomizer": "seven_bag",
+    "hold": true,
+    "rotation": "SRS",
+    "drop": "hard_drop_placement",
+    "garbage": "fixed_turn_based_versus_profile"
+  },
+  "result": "results/benchmark-10ms-40pps-100.json",
+  "replay": "results/benchmark-10ms-40pps-100.jsonl",
+  "replay_verification": "./target/release/intetrigence verify-replay --input results/benchmark-10ms-40pps-100.jsonl",
+  "result_summary": {
+    "wins": 83,
+    "losses": 17,
+    "draws": 0,
+    "victory_rate": 0.83,
+    "paired_one_sided_95_lower": 0.6569181617397715
+  },
+  "status": "development evidence against the fixed pinned-default profile; not a claim about an undefined unlimited strongest preset"
+}

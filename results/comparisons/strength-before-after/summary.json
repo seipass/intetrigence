@@ -1,0 +1,58 @@
+{
+  "before_revision": "90837bb9a91849a9f5042bc4a9d54c90820e10b9",
+  "after_revision": "565abbc59fd264916c1409ec7377253cfd36033f",
+  "protocol": {
+    "command": "battle",
+    "rules": "arena",
+    "games_per_condition": 20,
+    "side_swap": false,
+    "piece_limit": 1000,
+    "clock_hz": 60,
+    "replay_version": 3
+  },
+  "cold_clear_2": {
+    "seed_range": [1300001, 1300020],
+    "budget": { "milliseconds": 20, "strict_external_time": false },
+    "before": {
+      "wins": 20,
+      "losses": 0,
+      "draws": 0,
+      "average_frames": 939.65,
+      "intetrigence_attack": 525,
+      "intetrigence_pieces": 838,
+      "intetrigence_attack_per_piece": 0.6264916468
+    },
+    "after": {
+      "wins": 20,
+      "losses": 0,
+      "draws": 0,
+      "average_frames": 1040.15,
+      "intetrigence_attack": 584,
+      "intetrigence_pieces": 943,
+      "intetrigence_attack_per_piece": 0.6193001060
+    }
+  },
+  "hoiko": {
+    "seed_range": [1400001, 1400020],
+    "budget": { "milliseconds": 0, "iterations": 30 },
+    "before": {
+      "wins": 20,
+      "losses": 0,
+      "draws": 0,
+      "average_frames": 1413.70,
+      "intetrigence_attack": 672,
+      "intetrigence_pieces": 1321,
+      "intetrigence_attack_per_piece": 0.5087055261
+    },
+    "after": {
+      "wins": 20,
+      "losses": 0,
+      "draws": 0,
+      "average_frames": 1469.85,
+      "intetrigence_attack": 709,
+      "intetrigence_pieces": 1376,
+      "intetrigence_attack_per_piece": 0.5152616279
+    }
+  },
+  "interpretation": "All four samples finished 20-0, so this sample detects no win-rate change. Attack-per-piece decreased 1.15% against Cold Clear 2 and increased 1.29% against Hoiko. Search contains randomness, and Cold Clear 2 used the requested non-strict external timing, so secondary metrics are descriptive rather than causal proof."
+}

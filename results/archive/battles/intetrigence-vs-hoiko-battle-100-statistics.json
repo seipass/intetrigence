@@ -1,0 +1,75 @@
+{
+  "conditions": {
+    "games": 100,
+    "independent_seed_pairs": 50,
+    "seeds": "2001-2050",
+    "side_swap": true,
+    "iterations": 30,
+    "piece_limit": 120,
+    "clock_hz": 60,
+    "rules": "arena"
+  },
+  "result": {
+    "intetrigence_wins": 86,
+    "hoiko_wins": 0,
+    "draws": 14,
+    "intetrigence_overall_rate": 0.86,
+    "intetrigence_decisive_rate": 1.0,
+    "paired_victory_bound": {
+      "above_half": true,
+      "independent_pairs": 50,
+      "method": "Hoeffding across seed pairs; draws are non-wins; fixed sample size required",
+      "one_sided_95_lower": 0.6869181617397715,
+      "victory_rate": 0.86
+    },
+    "descriptive_decisive_wilson95": [
+      0.9572418027142576,
+      0.9999999999999999
+    ]
+  },
+  "agents": {
+    "intetrigence": {
+      "wins": 86,
+      "losses": 0,
+      "draws": 14,
+      "pieces": 7400,
+      "attack": 3546,
+      "lines": 4319,
+      "seconds": 2560.5,
+      "player0_games": 50,
+      "player1_games": 50,
+      "pps": 2.890060535051748,
+      "apm": 83.09314586994728,
+      "lpm": 101.20679554774458,
+      "average_pieces_per_game": 74.0,
+      "average_attack_per_game": 35.46,
+      "average_lines_per_game": 43.19
+    },
+    "hoiko": {
+      "wins": 0,
+      "losses": 86,
+      "draws": 14,
+      "pieces": 7890,
+      "attack": 3073,
+      "lines": 3363,
+      "seconds": 2560.5,
+      "player0_games": 50,
+      "player1_games": 50,
+      "pps": 3.0814294083186877,
+      "apm": 72.00937316930288,
+      "lpm": 78.804920913884,
+      "average_pieces_per_game": 78.9,
+      "average_attack_per_game": 30.73,
+      "average_lines_per_game": 33.63
+    }
+  },
+  "duration": {
+    "total_frames": 153630,
+    "total_simulated_seconds": 2560.5,
+    "mean_frames": 1536.3,
+    "median_frames": 1481.5,
+    "min_frames": 349,
+    "max_frames": 2403,
+    "p90_frames": 2313
+  }
+}

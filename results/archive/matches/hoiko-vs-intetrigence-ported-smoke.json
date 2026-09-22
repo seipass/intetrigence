@@ -1,0 +1,78 @@
+{
+  "command": "match",
+  "decisive_wilson95_descriptive_only": [
+    0.0,
+    0.6576197724933469
+  ],
+  "draws": 0,
+  "first_agent": "hoiko",
+  "iterations": 100,
+  "losses": 2,
+  "matches": [
+    {
+      "first_agent": "hoiko",
+      "first_won": false,
+      "player0": "hoiko",
+      "player1": "intetrigence",
+      "result": {
+        "attack": [
+          14,
+          29
+        ],
+        "lines": [
+          12,
+          18
+        ],
+        "pieces": [
+          27,
+          28
+        ],
+        "seed": 2000101,
+        "swapped": false,
+        "turns": 28,
+        "winner": 1
+      },
+      "second_agent": "intetrigence"
+    },
+    {
+      "first_agent": "hoiko",
+      "first_won": false,
+      "player0": "intetrigence",
+      "player1": "hoiko",
+      "result": {
+        "attack": [
+          62,
+          49
+        ],
+        "lines": [
+          63,
+          54
+        ],
+        "pieces": [
+          100,
+          99
+        ],
+        "seed": 2000101,
+        "swapped": true,
+        "turns": 100,
+        "winner": 0
+      },
+      "second_agent": "intetrigence"
+    }
+  ],
+  "ms": 0,
+  "opponent": null,
+  "opponent_config": null,
+  "paired_victory_bound_for_first_agent": {
+    "above_half": false,
+    "independent_pairs": 1,
+    "method": "Hoeffding across seed pairs; draws are non-wins; fixed sample size required",
+    "one_sided_95_lower": 0.0,
+    "victory_rate": 0.0
+  },
+  "pps": null,
+  "rules": "arena",
+  "second_agent": "intetrigence",
+  "strict_external_time": false,
+  "wins": 0
+}

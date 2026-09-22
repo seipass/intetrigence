@@ -1,0 +1,28 @@
+[package]
+name = "intetrigence"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[features]
+# The local referee, TBP client, and search engine do not require a network
+# service or this protocol. Build the adapter explicitly when a server is
+# available; TLS is a second opt-in for wss:// endpoints.
+default = []
+battle-bot = []
+battle-wss = ["battle-bot", "dep:rustls", "dep:webpki-roots"]
+
+[dependencies]
+intetrigence-engine = { path = "engine" }
+cold-clear-2 = { path = "vendor/cold-clear-2" }
+enumset = "1"
+rand = "0.8"
+rand_chacha = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rustls = { version = "0.23.43", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "1.0.9", optional = true }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

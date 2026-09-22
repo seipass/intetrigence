@@ -1,0 +1,57 @@
+{
+  "name": "intetrigence-vs-cold-clear-2-guideline-external-strict-equal-window-100",
+  "upstream_repository": "https://github.com/MinusKelvin/cold-clear-2",
+  "upstream_commit": "ed8b19327b6bd1410ddd873d8611485bd45d8fae",
+  "opponent_executable": "vendor/cold-clear-2/target/release/cold-clear-2",
+  "opponent_binary_sha256": "344d3e4c1ca5f0564b59e17646a926dd2adeab24f3c22185bc6f08e74a8b061e",
+  "opponent_config": null,
+  "opponent_config_source": "vendor/cold-clear-2/src/default.json (compiled default; no --opponent-config override)",
+  "opponent_config_sha256": "9de091a9dfe69175ff59e3ea7f830230f0f12e419bf30d948e0dd7c7306fc561",
+  "referee_binary_sha256": "dabfce43dc4cacc0f9f8df85f69ede907b70ee0439d8efe705cc325325a08176",
+  "rust_toolchain": "1.96.0",
+  "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+  "cpu_model": "AMD Ryzen 7 5700U with Radeon Graphics",
+  "logical_cpus": 16,
+  "hardware_threads": 1,
+  "thinking_time_ms": 10,
+  "pieces_per_second": 40,
+  "games": 100,
+  "seed_start": 24001,
+  "turn_limit": 1000,
+  "pairing": "two games per seed with player assignment exchanged",
+  "command": "./target/release/intetrigence external-arena --rules guideline --strict-external-time --opponent vendor/cold-clear-2/target/release/cold-clear-2 --games 100 --seed 24001 --ms 10 --pps 40 --turns 1000 --output results/external-guideline-strict-10ms-40pps-100.json --replay results/external-guideline-strict-10ms-40pps-100.jsonl",
+  "time_accounting": "strict alternating wall-clock windows; external process is suspended during local search and receives one 10ms window before suggestion",
+  "opponent_strength_profile": {
+    "name": "pinned-public-maximal-single-worker-default",
+    "config": "vendor/cold-clear-2/src/default.json (compiled default)",
+    "workers": 1,
+    "basis": "pinned source src/lib.rs hardcodes spawn_workers to 0..1 and the commit contains only src/default.json; no stronger public preset or worker/depth selector is exposed"
+  },
+  "referee_profile": {
+    "rules": "guideline",
+    "weights": "built-in public Guideline attack table",
+    "search_policy": "top 64 engine candidates re-ranked with attack, cancellation, and post-lock board state"
+  },
+  "rules": {
+    "board_columns": 10,
+    "board_rows": 40,
+    "visible_rows": 20,
+    "randomizer": "seven_bag",
+    "hold": true,
+    "rotation": "SRS",
+    "drop": "hard_drop_placement",
+    "garbage": "public_guideline_attack_table_and_eight_appearing_row_hole_blocks"
+  },
+  "state_sync": "retain_tree_through_play_new_piece_restart_after_garbage_rise",
+  "result": "results/external-guideline-strict-10ms-40pps-100.json",
+  "replay": "results/external-guideline-strict-10ms-40pps-100.jsonl",
+  "replay_verification": "./target/strict/release/intetrigence verify-replay --input results/external-guideline-strict-10ms-40pps-100.jsonl",
+  "result_summary": {
+    "wins": 69,
+    "losses": 31,
+    "draws": 0,
+    "victory_rate": 0.69,
+    "paired_one_sided_95_lower": 0.5169181617397715
+  },
+  "status": "strict equal-window evidence for the fixed pinned-public profile under the public Guideline attack and garbage rules; not a claim about an undefined unlimited strongest preset"
+}

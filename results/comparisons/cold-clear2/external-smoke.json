@@ -1,0 +1,60 @@
+{
+  "decisive_wilson95_descriptive_only": [
+    0.20654931437723745,
+    1.0
+  ],
+  "draws": 1,
+  "iterations": 0,
+  "losses": 0,
+  "matches": [
+    {
+      "attack": [
+        46,
+        41
+      ],
+      "lines": [
+        46,
+        52
+      ],
+      "pieces": [
+        80,
+        80
+      ],
+      "seed": 7001,
+      "swapped": false,
+      "turns": 80,
+      "winner": null
+    },
+    {
+      "attack": [
+        20,
+        37
+      ],
+      "lines": [
+        22,
+        28
+      ],
+      "pieces": [
+        46,
+        47
+      ],
+      "seed": 7001,
+      "swapped": true,
+      "turns": 47,
+      "winner": 1
+    }
+  ],
+  "ms": 10,
+  "note": "external TBP opponent; state is restarted each turn so incoming garbage is synchronized",
+  "opponent": "vendor/cold-clear-2/target/release/cold-clear-2",
+  "opponent_config": null,
+  "paired_victory_bound": {
+    "above_half": false,
+    "independent_pairs": 1,
+    "method": "Hoeffding across seed pairs; draws are non-wins; fixed sample size required",
+    "one_sided_95_lower": 0.0,
+    "victory_rate": 0.5
+  },
+  "pps": 40.0,
+  "wins": 1
+}

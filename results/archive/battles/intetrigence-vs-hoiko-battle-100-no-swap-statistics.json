@@ -1,0 +1,64 @@
+{
+  "conditions": {
+    "games": 100,
+    "seeds": "4001-4100",
+    "side_swap": false,
+    "player0": "intetrigence",
+    "player1": "hoiko",
+    "iterations": 30,
+    "piece_limit": 500,
+    "clock_hz": 60,
+    "rules": "arena"
+  },
+  "result": {
+    "intetrigence_wins": 98,
+    "hoiko_wins": 2,
+    "draws": 0,
+    "intetrigence_win_rate": 0.98,
+    "wilson95": [
+      0.929988209271456,
+      0.9944980324498376
+    ]
+  },
+  "agents": {
+    "intetrigence": {
+      "wins": 98,
+      "losses": 2,
+      "draws": 0,
+      "pieces": 8303,
+      "attack": 3876,
+      "lines": 4901,
+      "seconds": 2853.017,
+      "pps": 2.910252890215619,
+      "apm": 81.51371939642833,
+      "lpm": 103.06985004176863,
+      "average_pieces_per_game": 83.03,
+      "average_attack_per_game": 38.76,
+      "average_lines_per_game": 49.01
+    },
+    "hoiko": {
+      "wins": 2,
+      "losses": 98,
+      "draws": 0,
+      "pieces": 8762,
+      "attack": 3416,
+      "lines": 3825,
+      "seconds": 2853.017,
+      "pps": 3.0711352311296225,
+      "apm": 71.83974857022682,
+      "lpm": 80.44117045700163,
+      "average_pieces_per_game": 87.62,
+      "average_attack_per_game": 34.16,
+      "average_lines_per_game": 38.25
+    }
+  },
+  "duration": {
+    "total_frames": 171181,
+    "total_simulated_seconds": 2853.016666666667,
+    "mean_frames": 1711.81,
+    "median_frames": 1358.0,
+    "min_frames": 418,
+    "max_frames": 5176,
+    "p90_frames": 2961
+  }
+}

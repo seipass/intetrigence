@@ -1,0 +1,41 @@
+[package]
+name = "cold-clear-2"
+version = "0.1.0"
+authors = ["MinusKelvin <mark.carlson@minuskelvin.net>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ahash = "0.7.4"
+bumpalo-herd = "0.1.1"
+enum-map = "1.1.1"
+enum_dispatch = "0.3.7"
+enumset = "1.0.6"
+futures = "0.3.15"
+nohash = "0.2.0"
+once_cell = "1.7.2"
+ordered-float = "2.5.0"
+ouroboros = "0.13.0"
+parking_lot = "0.11.1"
+puffin = { version = "0.10.0" }
+puffin_http = { version = "0.7.0", optional = true }
+rand = "0.8.3"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.64"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+structopt = "0.3.25"
+
+[features]
+
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "movegen"
+harness = false
