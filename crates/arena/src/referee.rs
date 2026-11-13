@@ -18,8 +18,6 @@
 
 use std::collections::BTreeMap;
 
-use intetrigence_core::PieceKind;
-
 use crate::agent::{Agent, AgentAudit, Commit, RoundContext};
 use crate::audit::{
     FirstChoiceAudit, GameAudit, ScoringAudit, StartResendAudit, ThinkStats, attax_audit,
@@ -49,7 +47,7 @@ impl RoundConfig {
             turn_cap: 1000,
             frames_per_turn: 12,
             rules: "docs/s2-spec.md@v1.3.4".into(),
-            protocol: "docs/s2-referee-protocol.md@v1".into(),
+            protocol: "docs/s2-referee-protocol.md@v1.1".into(),
             started_at: String::new(),
         }
     }
@@ -152,15 +150,9 @@ pub fn run_round(
         engine.begin_turn();
         turns_played = t + 1;
 
-        let seat_one_piece = engine.players[engine.order[0]]
-            .game
-            .active()
-            .map(|piece| piece.kind)
-            .unwrap_or(PieceKind::I);
         let mut turn_record = TurnRecord {
             t,
             frame: engine.frame,
-            piece: piece_name(seat_one_piece).to_string(),
             placements: Vec::new(),
         };
         let mut garbage_records: Vec<GarbageRecord> = Vec::new();

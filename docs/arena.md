@@ -65,7 +65,7 @@ cargo run --release -p intetrigence-arena --bin arena -- report scripts/evidence
 | §6.1 トップアウト | `Game::lock` / `insert_garbage` の後 `Game::is_over()`。seat 1 が死んだらその turn の seat 2 は打たない |
 | §6.3 turn cap | 受信ゴミ少 → 送信多 → 引き分け |
 | §7 エラー | bot のエラーは forfeit、レフェリーの不変条件違反はマッチ中断(`RoundError::Referee`) |
-| §8.1 replay | `replay.rs`。header / turn / garbage / hash / result |
+| §8.1 replay | `replay.rs`。header / turn / garbage / hash / result。`placement.piece` 必須(v1.1) |
 | §8.2 盤面ハッシュ | 各 turn の終わりに両者の盤面(occupied + garbage)の FNV-1a |
 | §8.3 verify-replay | `verify_replay`。着手を再適用し、spin / lines / events / sent / cancelled / hash / result を比較 |
 | §8.4 監査 | `audit.rs` + `GameAudit` |
@@ -85,14 +85,12 @@ protocol §2.2 は「共有 7-bag から `bag[t]` を取り、両者に同じピ
   「hold / preview は各プレイヤーが独立に持つ」(protocol §2.2)を満たす唯一の読み方。
   単一の共有袋にすると、片方の hold が相手の将来のピースを変えてしまう。
 
-**replay への影響**: protocol §8.1 の例は turn に 1 つの `piece` を持つが、hold 後は
-両者のピースがずれる。そこで **placement ごとに `piece` を記録**し、verify は
-placement の `piece` を使う(turn の `piece` は seat 1 の開始時ピースとして残す)。
-これはスキーマへの追加であって、既存フィールドの意味は変えない。
-
-> **要確認**: この読みでよいか s2-spec-lead / manager に確認中。protocol を
-> 「単一の共有袋 + hold で共有袋を追加消費」に変える場合は、core に
-> 「指定ピースを spawn する」API が必要になる(現状の `Game` には無い)。
+**replay への影響**: per-player bag では turn 単位のピースが定義できないので、
+**placement ごとに `piece` を記録**し、verify は placement の `piece` を使う。
+protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂され、
+§8.1 の `turn.piece` は削除・`placement.piece` が必須になった。実装は v1.1 に一致する。
+s2-spec §11-U7 の「ピース袋は 1 本」も「`piece_seed` は 1 本、袋のインスタンスは
+プレイヤーごと」に修正された(v1.3.5、ルール値の変更なし)。
 
 ### D2. 着手の適用は「BFS のパス再生」
 
@@ -208,6 +206,9 @@ scripts/m0-match.sh
    知らないので、採点オーディットの不一致は想定内。`cellsAboveRow20` は監査で監視する。
 3. **実時間ペーシングなし**(D8)。状態は frame のみで決まる。
 4. **stderr はプロセス終了時にファイルへ書く**。長時間走行中の tail はできない。
-5. **D1 の共有袋の読み**は s2-spec-lead の確認待ち。
+5. **movegen の一本化**(bot-dev 提案): `crates/bot::Movegen` に `Placement.actions` /
+   `generate_from` / `reachable_states` があり、`crates/arena::movegen` を差し替え可能。
+   bot のコミットがこの worktree に入った時点で、`(board, kind) -> BTreeSet<(rotation, x, y)>`
+   のクロスチェックを固定してから差し替える(現状は独立実装)。
 6. `verify-replay` は着手列の再実行であって探索の再現ではない(PLAN §3.3 のとおり)。
 7. forfeit は負けとして集計する(protocol §7 の P2 暫定)。

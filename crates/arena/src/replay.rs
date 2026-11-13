@@ -78,9 +78,8 @@ impl From<&BotDescriptor> for BotRecord {
 pub struct TurnRecord {
     pub t: u32,
     pub frame: u64,
-    /// Seat 1's piece at the start of the turn (protocol field).
-    pub piece: String,
-    /// Placements in seat order.
+    /// Placements in seat order. Each placement carries its own `piece`
+    /// (protocol v1.1 §8.1: per-player bags make a turn-level piece undefined).
     pub placements: Vec<PlacementRecord>,
 }
 

@@ -348,7 +348,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 turn_cap: config.turn_cap,
                 frames_per_turn: config.frames_per_turn,
                 rules: "docs/s2-spec.md@v1.3.4".into(),
-                protocol: "docs/s2-referee-protocol.md@v1".into(),
+                protocol: "docs/s2-referee-protocol.md@v1.1".into(),
                 started_at: config.started_at.clone(),
             };
 
