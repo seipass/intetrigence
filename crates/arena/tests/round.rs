@@ -14,7 +14,7 @@ fn config(seed: u64, sheet: Sheet, turn_cap: u32) -> RoundConfig {
         turn_cap,
         frames_per_turn: 12,
         rules: "docs/s2-spec.md@v1.3.7".into(),
-        protocol: "docs/s2-referee-protocol.md@v1.3".into(),
+        protocol: "docs/s2-referee-protocol.md@v1.4".into(),
         started_at: "test".into(),
     }
 }

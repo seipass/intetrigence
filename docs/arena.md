@@ -1,7 +1,7 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.3
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.4
 **ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.7
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
@@ -119,6 +119,12 @@ protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂�
 - 合法手集合は**セル集合で 1 個**に畳む。I/O/S/Z は同一セルを複数 rotation で表し、
   回転由来かどうか(`spin_entry`)が異なることがあるため、**最強の spin ラベルを残す**
   (最初の BFS 順で残すと Mini を落とす。bot-dev の 27edb70 と同じ規則)。
+  protocol v1.4 §4.2.1 で `spin(cells) = max over paths p of spin_type(cells, last_action(p), kick(p))`
+  として明文化された。
+- **TETR.IO との差(重要)**: この「経路の最大 spin」規則は、実機の「実際に回して置いたか」より
+  **寛容**。回転せずに置いた配置でも、回転経由の経路が存在すればスピンとして採点され得る。
+  両者に同じ規則を適用するので**強さの比較は公平**だが、**TETR.IO のスコアとは一致しない**。
+  最終レポートにはこの解釈差を明記する(protocol v1.4 §4.2.1)。
 
 ### D3. TBP の hold 推論
 
@@ -187,16 +193,16 @@ sleep を足すだけで、状態には影響しない。
 
 | seed | sheet | 勝者 | 理由 | turns | replay | think median (ms) intetrigence / attax | first-choice | spin 一致 |
 |---|---|---|---|---|---|---|---|---|
-| 1001 | A | attax | TopOut | 51 | OK | 1.0 / 29.7 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1001 | B | attax | TopOut | 51 | OK | 1.0 / 28.1 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 28.2 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1002 | B | attax | TopOut | 58 | OK | 0.8 / 29.2 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 30.5 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1003 | B | attax | TopOut | 48 | OK | 0.7 / 30.6 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 28.9 | 1.00 / 1.00 | 1.00 / 0.97 |
-| 1004 | B | attax | TopOut | 94 | OK | 0.8 / 29.3 | 1.00 / 1.00 | 1.00 / 0.99 |
-| 1005 | A | attax | TopOut | 131 | OK | 0.4 / 29.7 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1005 | B | attax | TopOut | 92 | OK | 0.6 / 28.4 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1001 | A | attax | TopOut | 51 | OK | 1.0 / 28.0 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1001 | B | attax | TopOut | 51 | OK | 1.0 / 28.6 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 28.3 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1002 | B | attax | TopOut | 58 | OK | 0.7 / 28.6 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 29.3 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1003 | B | attax | TopOut | 48 | OK | 0.7 / 29.8 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 27.9 | 1.00 / 1.00 | 1.00 / 0.97 |
+| 1004 | B | attax | TopOut | 94 | OK | 0.8 / 28.5 | 1.00 / 1.00 | 1.00 / 0.99 |
+| 1005 | A | attax | TopOut | 131 | OK | 0.5 / 28.9 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1005 | B | attax | TopOut | 92 | OK | 0.6 / 28.7 | 1.00 / 1.00 | 1.00 / 1.00 |
 
 - **replay 検証: 10/10 成功**(`arena verify scripts/evidence/m0`)。
 - 監査: 到達可能性拒否 0、queue 不変条件違反 0、hold 推論の不一致 0、
@@ -220,7 +226,7 @@ sleep を足すだけで、状態には影響しない。
 - **勝敗は参考値**: 0 勝 10 敗。ベースラインが攻撃を作れず(51 手で攻撃 6 行)、
   attax(23 行)にゴミで押し切られた。配管・監査・replay の証明が目的。
 - 証拠: `scripts/evidence/m0/{summary.json,summary.md,audit/*.json,replays/*.jsonl,logs/*}`。
-- header の版: この証拠は `docs/s2-spec.md@v1.3.7` / `docs/s2-referee-protocol.md@v1.3`。
+- header の版: この証拠は `docs/s2-spec.md@v1.3.7` / `docs/s2-referee-protocol.md@v1.4`。
   `arena match` は既定で `+<short HEAD>` を付ける(`git show <commit>:<path>` で当時の文書を復元)。
   この証拠は統合前の worktree で生成したため、dangling hash を避けて版のみを記録している。
   統合コミット後に `scripts/m0-match.sh` を再実行すると `+<commit>` 付きになる。
@@ -250,3 +256,6 @@ scripts/m0-match.sh
    差し替え後もクロスチェックは残す(FRONT 表バグと同じ二重実装リスクの検出)。
 6. `verify-replay` は着手列の再実行であって探索の再現ではない(PLAN §3.3 のとおり)。
 7. forfeit は負けとして集計する(protocol §7 の P2 暫定)。
+8. **スピン判定は TETR.IO より寛容**(protocol v1.4 §4.2.1)。セル集合に到達する経路のうち
+   最大の spin ラベルを採るため、回転せずに置いた配置もスピンになり得る。両者に同じ規則なので
+   強さの比較は公平だが、TETR.IO のリプレイ・スコアとは一致しない。
