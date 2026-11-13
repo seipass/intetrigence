@@ -360,16 +360,72 @@ fn block_out_ends_the_game() {
 }
 
 #[test]
-fn lock_out_ends_the_game() {
+fn locking_above_the_visible_field_is_not_a_lock_out() {
+    // S2 TL has lock-out disabled. O at the far left locks entirely in the
+    // buffer, but the next spawn (columns 3-5) is still free.
     let active = ActivePiece {
         kind: PieceKind::O,
         rotation: Rotation::Zero,
-        x: 4,
+        x: 0,
         y: 20,
     };
     let mut game = Game::from_position(0, Board::new(), active).unwrap();
 
     let result = game.lock().unwrap();
+    assert!(!result.topped_out);
+    assert!(!game.is_over());
+    assert!(game.active().is_some());
+    assert_eq!(game.check_invariants(), Ok(()));
+}
+
+#[test]
+fn clutch_clear_pushes_the_next_piece_up() {
+    // Row 0 clears; the block at (3, 22) shifts to (3, 21) and blocks L's
+    // normal spawn. Clutch pushes L to y = 21.
+    let mut board = Board::new();
+    for x in 4..10 {
+        board.set_cell(x, 0, Cell::Block);
+    }
+    board.set_cell(3, 22, Cell::Block);
+
+    let active = ActivePiece {
+        kind: PieceKind::I,
+        rotation: Rotation::Zero,
+        x: 0,
+        y: -2,
+    };
+    let mut game = Game::from_position(0, board, active).unwrap();
+
+    let result = game.lock().unwrap();
+    assert_eq!(result.clear.lines, 1);
+    assert!(!result.topped_out);
+    assert_eq!(game.active().unwrap().kind, PieceKind::L);
+    assert_eq!(game.active().unwrap().y, 21);
+    assert_eq!(game.check_invariants(), Ok(()));
+}
+
+#[test]
+fn clutch_clear_fails_when_no_push_up_position_is_free() {
+    let mut board = Board::new();
+    for x in 4..10 {
+        board.set_cell(x, 0, Cell::Block);
+    }
+    for y in 20..40 {
+        for x in 3..=5 {
+            board.set_cell(x, y, Cell::Block);
+        }
+    }
+
+    let active = ActivePiece {
+        kind: PieceKind::I,
+        rotation: Rotation::Zero,
+        x: 0,
+        y: -2,
+    };
+    let mut game = Game::from_position(0, board, active).unwrap();
+
+    let result = game.lock().unwrap();
+    assert_eq!(result.clear.lines, 1);
     assert!(result.topped_out);
     assert!(game.is_over());
     assert_eq!(game.check_invariants(), Ok(()));

@@ -168,7 +168,7 @@ impl Game {
             last_clear: None,
         };
         let first = game.bag.next_piece();
-        let spawned = game.spawn(first);
+        let spawned = game.spawn(first, false);
         debug_assert!(spawned, "an empty board must accept the first spawn");
         game
     }
@@ -203,25 +203,47 @@ impl Game {
         })
     }
 
-    fn spawn(&mut self, kind: PieceKind) -> bool {
+    /// Spawns `kind` at the standard position.
+    ///
+    /// When `clutch` is true (the previous lock cleared at least one line) and
+    /// the standard position is blocked, the piece is pushed up one row at a
+    /// time until a legal position is found (`docs/s2-spec.md` §2.3). If none
+    /// exists, the game tops out.
+    fn spawn(&mut self, kind: PieceKind, clutch: bool) -> bool {
         let (x, y) = kind.spawn_position();
-        let piece = ActivePiece {
+        let mut piece = ActivePiece {
             kind,
             rotation: Rotation::Zero,
             x,
             y,
         };
+
         if self
             .board
             .can_place(piece.kind, piece.rotation, piece.x, piece.y)
         {
             self.active = Some(piece);
-            true
-        } else {
-            self.active = None;
-            self.topped_out = true;
-            false
+            return true;
         }
+
+        if clutch {
+            let mut y = piece.y + 1;
+            while y < Board::HEIGHT as i32 {
+                piece.y = y;
+                if self
+                    .board
+                    .can_place(piece.kind, piece.rotation, piece.x, piece.y)
+                {
+                    self.active = Some(piece);
+                    return true;
+                }
+                y += 1;
+            }
+        }
+
+        self.active = None;
+        self.topped_out = true;
+        false
     }
 
     pub fn board(&self) -> &Board {
@@ -373,9 +395,10 @@ impl Game {
 
     /// Locks the active piece, clears lines, and spawns the next bag piece.
     ///
-    /// Lock-out (every cell locks above the visible field) and block-out (the
-    /// next spawn collides) both end the game. The returned result records the
-    /// piece and clear even when the game ends.
+    /// S2 TETRA LEAGUE has lock-out disabled: locking entirely above the
+    /// visible field does not end the game. A block-out (the next spawn has no
+    /// legal position, including the Clutch push-up search after a clear) does.
+    /// The returned result records the piece and clear even when the game ends.
     pub fn lock(&mut self) -> Option<LockResult> {
         let piece = self.active.take()?;
         self.board
@@ -389,22 +412,8 @@ impl Game {
         self.last_clear = Some(clear);
         self.hold.reset_after_lock();
 
-        let lock_out = piece
-            .cells()
-            .iter()
-            .all(|&(_, y)| y >= Board::VISIBLE_HEIGHT as i32);
-        if lock_out {
-            self.topped_out = true;
-            self.active = None;
-            return Some(LockResult {
-                piece,
-                clear,
-                topped_out: true,
-            });
-        }
-
         let next = self.bag.next_piece();
-        let spawned = self.spawn(next);
+        let spawned = self.spawn(next, clear.lines > 0);
         Some(LockResult {
             piece,
             clear,
@@ -432,7 +441,7 @@ impl Game {
             Some(kind) => kind,
             None => self.bag.next_piece(),
         };
-        self.spawn(kind)
+        self.spawn(kind, false)
     }
 
     /// Inserts garbage rows at the bottom and pushes the stack (and the active

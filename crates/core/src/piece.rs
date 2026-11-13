@@ -23,9 +23,10 @@
 //!
 //! # Spawn
 //!
-//! Every piece spawns with its lowest occupied cell in row 20, the first hidden
-//! row above the 20 visible rows. The box corner is therefore `(3, 18)` for I,
-//! `(4, 20)` for O, and `(3, 19)` for JLSTZ.
+//! Every piece spawns with its lowest occupied cell in row 21, the second
+//! hidden row above the 20 visible rows (TETR.IO S2, `docs/s2-spec.md` §2.2.1).
+//! The box corner is therefore `(3, 19)` for I, `(4, 21)` for O, and `(3, 20)`
+//! for JLSTZ.
 
 /// The seven tetromino kinds.
 ///
@@ -88,11 +89,14 @@ impl PieceKind {
     }
 
     /// Bottom-left corner of the bounding box at spawn.
+    ///
+    /// The lowest occupied cell is row 21 for every piece
+    /// (`docs/s2-spec.md` §2.2.1).
     pub const fn spawn_position(self) -> (i32, i32) {
         match self {
-            PieceKind::I => (3, 18),
-            PieceKind::O => (4, 20),
-            _ => (3, 19),
+            PieceKind::I => (3, 19),
+            PieceKind::O => (4, 21),
+            _ => (3, 20),
         }
     }
 
@@ -233,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn spawn_lowest_cell_is_row_twenty() {
+    fn spawn_lowest_cell_is_row_twenty_one() {
         for kind in ALL_PIECES {
             let (x, y) = kind.spawn_position();
             let lowest = kind
@@ -242,7 +246,7 @@ mod tests {
                 .map(|&(_, cy)| y + cy)
                 .min()
                 .unwrap();
-            assert_eq!(lowest, 20, "{kind:?} spawn row");
+            assert_eq!(lowest, 21, "{kind:?} spawn row");
             assert!((0..10).contains(&x));
         }
     }

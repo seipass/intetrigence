@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use intetrigence_core::{ALL_PIECES, PieceKind, Rotation};
+use intetrigence_core::{ALL_PIECES, Board, PieceKind, Rotation};
 
 fn render(kind: PieceKind, rotation: Rotation) -> String {
     let size = kind.box_size() as usize;
@@ -99,7 +99,7 @@ fn rotation_centers_are_the_true_srs_centers() {
 }
 
 #[test]
-fn spawn_lowest_occupied_row_is_hidden_row_20() {
+fn spawn_lowest_occupied_row_is_hidden_row_21() {
     for kind in ALL_PIECES {
         let (_, y) = kind.spawn_position();
         let lowest = kind
@@ -108,6 +108,39 @@ fn spawn_lowest_occupied_row_is_hidden_row_20() {
             .map(|&(_, cy)| y + cy)
             .min()
             .unwrap();
-        assert_eq!(lowest, 20, "{kind:?}");
+        assert_eq!(lowest, 21, "{kind:?}");
     }
+}
+
+#[test]
+fn visible_rows_full_do_not_block_spawn() {
+    let mut board = Board::new();
+    for y in 0..Board::VISIBLE_HEIGHT {
+        board.set_row(y, Board::FULL_ROW);
+    }
+
+    for kind in ALL_PIECES {
+        let (x, y) = kind.spawn_position();
+        assert!(
+            board.can_place(kind, Rotation::Zero, x, y),
+            "{kind:?} must spawn above a full visible field"
+        );
+    }
+}
+
+#[test]
+fn block_at_row_21_blocks_spawn() {
+    let mut board = Board::new();
+    // (3, 21) is a T spawn cell (T at (3, 20) occupies rows 21-22).
+    board.set_row(21, 1 << 3);
+    assert!(!board.can_place(PieceKind::T, Rotation::Zero, 3, 20));
+}
+
+#[test]
+fn block_at_row_20_does_not_block_spawn() {
+    let mut board = Board::new();
+    // Row 20 is below the T spawn cells; with the old row-20 spawn this would
+    // have blocked the piece.
+    board.set_row(20, 1 << 3);
+    assert!(board.can_place(PieceKind::T, Rotation::Zero, 3, 20));
 }
