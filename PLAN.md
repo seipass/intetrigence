@@ -184,4 +184,5 @@ intetrigence/
 ## 8. 進捗ログ
 
 - **2026-11-13 Wave 1 完了・受理**: docs/s2-spec.md v1.2 凍結(PC B2B +1、ゴミ cap 8/遅延 20f、TL messiness 1.0、surge 3 分割 [r,r,S-2r] を決着。18 fixture を独立 2 実装で検証)。attax を 7b38f51 に固定(bun 1.4.0、build/test 緑)、TBP smoke 14/14 成功(エビデンス scripts/evidence/attax-tbp-smoke/)、docs/attax-integration.md + docs/attax-analysis.md 作成(敵の重み・特徴量を記録)。crates/core 基盤 + テスト 105 緑(commits 5f54c1a, 07aaa24)。仕様監査で core の spawn 行バグ(row 20 → 正 21)を発見 → Wave 2 で修正。
-- **Wave 2(進行中)**: core-engine = S2 採点(scoring/opener/garbage)+ fixture 18/18 照合(spawn 修正は a97e630 で完了済み)。s2-spec-lead = U1〜U9 の暫定自決と仕様 v1.3 化。bot-dev(新設)= exact movegen。harness-dev(新設)= S2 レフェリー + TBP host + M0 ゲート(現行 attax と 10 ゲーム、replay 検証)。**作者連携は廃止**(公開 I/F のみ)。
+- **Wave 2 完了・受理**: core = S2 採点・opener・ゴミキュー・spin 分類・FRONT 修正・U7 derive_seeds・7-bag MINSTD(dd20cda, 08e883e、151 tests、fixture 18/18 + RNG 4/4)。bot = exact movegen(f0376d6〜b3b33eb、spin 分類を core に一本化、workspace 168 tests 緑)。仕様 v1.3.4(U1〜U9 決定・監査記録・変異テスト要求)。**M1 の残ピースはレフェリー(crates/arena)のみ**。
+- **Wave 3(進行中)**: harness-dev(新設)= S2 レフェリー + TBP host + M0 ゲート(現行 attax と 10 ゲーム、replay 検証)。s2-spec-lead = docs/s2-referee-protocol.md 起草(ターン/frame 規約は「arena がターン管理・core は frame 引数」を採用)。bot-dev = M2 前半(anytime 探索: beam ≥96 / depth ≥8 → transposition グラフ + T-slot cutout、100ms 予算・スレッド 8 上限)。

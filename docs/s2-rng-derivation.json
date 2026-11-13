@@ -1,0 +1,36 @@
+{
+  "schema": "intetrigence/s2-rng-derivation/1",
+  "spec": "docs/s2-spec.md §11-U7",
+  "notes": "MINSTD (Park-Miller). base state = seed mod M (0 -> M-1). piece_seed = base.state; garbage_seed(0) = base.next(); garbage_seed(1) = base.next(). slot 0 = intetrigence, slot 1 = attax.",
+  "constants": {
+    "modulus": 2147483647,
+    "multiplier": 16807,
+    "maxFloat": 2147483646
+  },
+  "cases": [
+    {
+      "seed": 1,
+      "pieceSeed": 1,
+      "garbageSeed0": 16807,
+      "garbageSeed1": 282475249
+    },
+    {
+      "seed": 12345,
+      "pieceSeed": 12345,
+      "garbageSeed0": 207482415,
+      "garbageSeed1": 1790989824
+    },
+    {
+      "seed": 123456789,
+      "pieceSeed": 123456789,
+      "garbageSeed0": 469049721,
+      "garbageSeed1": 2053676357
+    },
+    {
+      "seed": 2147483646,
+      "pieceSeed": 2147483646,
+      "garbageSeed0": 2147466840,
+      "garbageSeed1": 1865008398
+    }
+  ]
+}
