@@ -3,9 +3,11 @@
 //! # Determinism
 //!
 //! `Game` is a pure function of `(seed, action sequence)`: the 7-bag uses a
-//! fixed SplitMix64/Fisher-Yates protocol, and no operation reads wall-clock
-//! time or OS randomness. Replays therefore do not need to reproduce search;
-//! they only need the seed and the recorded actions.
+//! fixed MINSTD/Fisher-Yates protocol, and no operation reads wall-clock time
+//! or OS randomness. Replays therefore do not need to reproduce search; they
+//! only need the seed and the recorded actions. [`rng::derive_seeds`] splits a
+//! round seed into the shared piece seed and two per-bot garbage seeds
+//! (`docs/s2-spec.md` v1.3.1 §11-U7).
 //!
 //! # Coordinate system
 //!
@@ -18,17 +20,18 @@
 //!
 //! Implemented: piece states, bitboard, SRS+ and 180-degree kicks
 //! (`docs/s2-spec.md` §3.1/§3.2, isolated in [`kick`]), 7-bag, hold,
-//! movement/rotation/drop/lock, garbage-row insertion, line clearing.
+//! movement/rotation/drop/lock, garbage-row insertion, line clearing,
+//! All-Mini+ spin classification, attack scoring/combo/B2B/surge, opener
+//! phase, and the garbage queue.
 //!
-//! Pending `docs/s2-spec.md`: attack scoring, combo, B2B charging/surge,
-//! All-Mini+ spin classification, opener phase, and the garbage queue policy.
-//! The pending pieces are present as types with `TODO(s2-spec)` methods, not as
-//! guessed arithmetic.
+//! The `docs/s2-attack-examples.json` fixtures are the reference test for
+//! [`scoring::compute_attack`].
 
 #![forbid(unsafe_code)]
 
 pub mod bag;
 pub mod board;
+pub mod constants;
 pub mod game;
 pub mod garbage;
 pub mod hold;
@@ -47,10 +50,13 @@ pub use game::{
     Action, ActionResult, ActivePiece, Game, GameInvariantError, GameStateError, HardDropResult,
     LockResult, RotationResult, Stats,
 };
-pub use garbage::{GarbageEntry, GarbageQueue};
+pub use garbage::{CancelResult, GarbagePacket, GarbageQueue};
 pub use hold::Hold;
 pub use kick::{Kick, is_fin_or_tst_kick, kicks};
 pub use opener::{OPENER_PIECES, OpenerPhase};
 pub use piece::{ALL_PIECES, PieceKind, RotateDirection, Rotation};
-pub use rng::SplitMix64;
-pub use scoring::{Attack, ClearEvent, S2Scoring, ScoreState, ScoringEngine, SpinType, SurgeState};
+pub use rng::{MinStd, SeedDerivation, SplitMix64, derive_seeds};
+pub use scoring::{
+    Attack, ClearInput, GarbageMultiplier, S2Scoring, ScoreState, ScoringEngine, SpinType,
+    SurgeState, base_attack, compute_attack, split_surge, surge_charge_from_streak,
+};

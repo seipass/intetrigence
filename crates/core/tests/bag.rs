@@ -48,20 +48,20 @@ fn known_seed_zero_sequence_is_stable() {
     assert_eq!(
         sequence,
         vec![
-            PieceKind::L,
-            PieceKind::S,
-            PieceKind::O,
-            PieceKind::J,
-            PieceKind::Z,
             PieceKind::I,
-            PieceKind::T,
             PieceKind::S,
-            PieceKind::I,
-            PieceKind::L,
-            PieceKind::J,
             PieceKind::Z,
             PieceKind::T,
             PieceKind::O,
+            PieceKind::J,
+            PieceKind::L,
+            PieceKind::T,
+            PieceKind::S,
+            PieceKind::Z,
+            PieceKind::I,
+            PieceKind::J,
+            PieceKind::O,
+            PieceKind::L,
         ]
     );
 }

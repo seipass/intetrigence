@@ -83,17 +83,33 @@ fn garbage_insertion_shifts_the_stack_and_sets_holes() {
     // The existing block moved up by two rows.
     assert_eq!(board.cell(0, 2), Cell::Block);
 
-    // Row 0 has its hole at column 3; row 1 has its hole at column 7.
+    // Insertion order is bottom-up: the first hole (3) is pushed to the top
+    // row, the last hole (7) stays on the bottom row.
     assert_eq!(board.cell(0, 0), Cell::Garbage);
-    assert_eq!(board.cell(3, 0), Cell::Empty);
-    assert_eq!(board.cell(4, 0), Cell::Garbage);
-    assert_eq!(board.cell(7, 1), Cell::Empty);
-    assert_eq!(board.cell(4, 1), Cell::Garbage);
+    assert_eq!(board.cell(7, 0), Cell::Empty);
+    assert_eq!(board.cell(3, 0), Cell::Garbage);
+    assert_eq!(board.cell(3, 1), Cell::Empty);
+    assert_eq!(board.cell(7, 1), Cell::Garbage);
 
     assert_eq!(board.height(), 3);
     assert_eq!(board.count_blocks(), 1 + 2 * 9);
     assert_eq!(board.garbage_count(), 2 * 9);
     assert_eq!(board.check_invariants(), Ok(()));
+}
+
+#[test]
+fn garbage_batch_hole_order_matches_one_by_one_insertion() {
+    let mut board = Board::new();
+    board.insert_garbage(&[1, 2, 3]).unwrap();
+
+    // The last inserted row (hole 3) is at the bottom; the first (hole 1) was
+    // pushed to the top.
+    assert_eq!(board.cell(3, 0), Cell::Empty);
+    assert_eq!(board.cell(2, 1), Cell::Empty);
+    assert_eq!(board.cell(1, 2), Cell::Empty);
+    assert_eq!(board.cell(1, 0), Cell::Garbage);
+    assert_eq!(board.cell(2, 0), Cell::Garbage);
+    assert_eq!(board.cell(3, 1), Cell::Garbage);
 }
 
 #[test]
@@ -110,13 +126,19 @@ fn garbage_insertion_preserves_existing_garbage_markers() {
 }
 
 #[test]
-fn garbage_overflow_is_atomic() {
+fn garbage_overflow_discards_rows_above_39() {
     let mut board = Board::new();
     board.set_cell(0, 39, Cell::Block);
-    let before = board.clone();
 
-    assert_eq!(board.insert_garbage(&[0]), Err(GarbageError::Overflow));
-    assert_eq!(board, before);
+    board.insert_garbage(&[0]).unwrap();
+
+    // The old row 39 is pushed out and discarded; the new row 0 is garbage
+    // with its hole at column 0.
+    assert_eq!(board.cell(0, 39), Cell::Empty);
+    assert_eq!(board.cell(0, 0), Cell::Empty);
+    assert_eq!(board.cell(1, 0), Cell::Garbage);
+    assert_eq!(board.garbage_count(), 9);
+    assert_eq!(board.check_invariants(), Ok(()));
 }
 
 #[test]

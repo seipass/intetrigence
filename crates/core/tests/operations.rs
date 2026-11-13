@@ -3,7 +3,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use intetrigence_core::{
-    ALL_PIECES, Action, ActivePiece, Board, Cell, Game, PieceKind, Rotation, SplitMix64,
+    ALL_PIECES, Action, ActivePiece, Bag, Board, Cell, Game, PieceKind, Rotation, SplitMix64,
 };
 
 #[test]
@@ -380,13 +380,23 @@ fn locking_above_the_visible_field_is_not_a_lock_out() {
 
 #[test]
 fn clutch_clear_pushes_the_next_piece_up() {
-    // Row 0 clears; the block at (3, 22) shifts to (3, 21) and blocks L's
-    // normal spawn. Clutch pushes L to y = 21.
+    // Row 0 clears; a block shifts to row 21 and blocks the next piece's
+    // normal spawn. Clutch pushes it up one row.
+    let next = Bag::new(0).next_piece();
+    let (spawn_x, spawn_y) = next.spawn_position();
+    let (cell_x, _) = next
+        .cells(Rotation::Zero)
+        .iter()
+        .find(|&&(_, cell_y)| spawn_y + cell_y == 21)
+        .copied()
+        .expect("every piece has a spawn cell on row 21");
+    let block_x = (spawn_x + cell_x) as usize;
+
     let mut board = Board::new();
     for x in 4..10 {
         board.set_cell(x, 0, Cell::Block);
     }
-    board.set_cell(3, 22, Cell::Block);
+    board.set_cell(block_x, 22, Cell::Block);
 
     let active = ActivePiece {
         kind: PieceKind::I,
@@ -399,19 +409,22 @@ fn clutch_clear_pushes_the_next_piece_up() {
     let result = game.lock().unwrap();
     assert_eq!(result.clear.lines, 1);
     assert!(!result.topped_out);
-    assert_eq!(game.active().unwrap().kind, PieceKind::L);
-    assert_eq!(game.active().unwrap().y, 21);
+    assert_eq!(game.active().unwrap().kind, next);
+    assert_eq!(game.active().unwrap().y, spawn_y + 1);
     assert_eq!(game.check_invariants(), Ok(()));
 }
 
 #[test]
 fn clutch_clear_fails_when_no_push_up_position_is_free() {
+    // Seed 1's next piece is T (two rows). With rows 19..38 blocked after the
+    // clear, T cannot fit even at the freed top row. (Seed 0 would spawn a
+    // horizontal I, which does fit on row 39.)
     let mut board = Board::new();
     for x in 4..10 {
         board.set_cell(x, 0, Cell::Block);
     }
     for y in 20..40 {
-        for x in 3..=5 {
+        for x in 3..=6 {
             board.set_cell(x, y, Cell::Block);
         }
     }
@@ -422,7 +435,7 @@ fn clutch_clear_fails_when_no_push_up_position_is_free() {
         x: 0,
         y: -2,
     };
-    let mut game = Game::from_position(0, board, active).unwrap();
+    let mut game = Game::from_position(1, board, active).unwrap();
 
     let result = game.lock().unwrap();
     assert_eq!(result.clear.lines, 1);

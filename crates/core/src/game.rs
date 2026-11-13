@@ -446,9 +446,9 @@ impl Game {
 
     /// Inserts garbage rows at the bottom and pushes the stack (and the active
     /// piece) up by the same amount.
-    ///
-    /// The board operation is atomic. If the active piece is pushed out of the
-    /// board, the game tops out and `Ok(())` is returned with `is_over() == true`.
+    /// Rows pushed past row 39 are discarded (`docs/s2-spec.md` §11-U6). If the
+    /// active piece is pushed out of the board, the game tops out and `Ok(())`
+    /// is returned with `is_over() == true`.
     pub fn insert_garbage(&mut self, holes: &[u8]) -> Result<(), GarbageError> {
         let count = holes.len();
         self.board.insert_garbage(holes)?;

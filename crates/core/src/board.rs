@@ -10,6 +10,7 @@
 //! garbage?" without a separate per-cell object.
 
 use crate::piece::{PieceKind, Rotation};
+use crate::scoring::SpinType;
 
 pub const WIDTH: usize = 10;
 pub const HEIGHT: usize = 40;
@@ -43,8 +44,6 @@ pub enum GarbageError {
     TooManyRows(usize),
     /// Hole column outside `0..WIDTH`.
     InvalidHole(u8),
-    /// Shifting the stack up would push an occupied cell past row 39.
-    Overflow,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,6 +197,93 @@ impl Board {
         Ok(())
     }
 
+    /// True when every one-cell move (left, right, up, down) is illegal.
+    ///
+    /// Used for non-T All-Mini+ spins (`docs/s2-spec.md` §4.2). The board is
+    /// the pre-lock board; the piece itself is not placed on it.
+    pub fn is_immobile(&self, kind: PieceKind, rotation: Rotation, x: i32, y: i32) -> bool {
+        !self.can_place(kind, rotation, x - 1, y)
+            && !self.can_place(kind, rotation, x + 1, y)
+            && !self.can_place(kind, rotation, x, y + 1)
+            && !self.can_place(kind, rotation, x, y - 1)
+    }
+
+    /// Returns `(filled_corners, filled_front_corners)` for a T piece.
+    ///
+    /// `(x, y)` is the piece's bounding-box bottom-left corner, the same point
+    /// `PieceKind::spawn_position` returns. Corners are `(x+1+dx, y+1+dy)`.
+    /// The four corners are the 3x3 box corners around the T rotation center.
+    /// Left/right walls and the floor count as filled; the open top does not.
+    pub fn t_spin_corners(&self, rotation: Rotation, x: i32, y: i32) -> (u8, u8) {
+        const CORNERS: [(i32, i32); 4] = [(-1, -1), (1, -1), (1, 1), (-1, 1)];
+        // Front corners are on the side the nub points to. This is the
+        // y-flipped form of S7's cornerTable (spec v1.3.1 §4.3).
+        const FRONT: [[Rotation; 2]; 4] = [
+            [Rotation::Two, Rotation::L],  // (-1,-1) bottom-left: 2, 3
+            [Rotation::R, Rotation::Two],  // (+1,-1) bottom-right: 1, 2
+            [Rotation::Zero, Rotation::R], // (+1,+1) top-right: 0, 1
+            [Rotation::L, Rotation::Zero], // (-1,+1) top-left: 3, 0
+        ];
+
+        let mut corners = 0;
+        let mut front = 0;
+        for (index, &(dx, dy)) in CORNERS.iter().enumerate() {
+            let cx = x + 1 + dx;
+            let cy = y + 1 + dy;
+            if self.corner_filled(cx, cy) {
+                corners += 1;
+                if FRONT[index].contains(&rotation) {
+                    front += 1;
+                }
+            }
+        }
+        (corners, front)
+    }
+
+    /// Classifies a spin for scoring (`docs/s2-spec.md` §4).
+    ///
+    /// `last_action_was_rotation` must be true for any spin. `fin_or_tst` is
+    /// the §3.3 5th-kick predicate from the movegen/rotation result. The board
+    /// must be the pre-lock board and the placement must already be legal.
+    pub fn spin_type(
+        &self,
+        kind: PieceKind,
+        rotation: Rotation,
+        x: i32,
+        y: i32,
+        last_action_was_rotation: bool,
+        fin_or_tst: bool,
+    ) -> SpinType {
+        if !last_action_was_rotation {
+            return SpinType::None;
+        }
+
+        if kind == PieceKind::T {
+            let (corners, front) = self.t_spin_corners(rotation, x, y);
+            if corners < 3 {
+                SpinType::None
+            } else if front == 2 || fin_or_tst {
+                SpinType::Full
+            } else {
+                SpinType::Mini
+            }
+        } else if self.is_immobile(kind, rotation, x, y) {
+            SpinType::Mini
+        } else {
+            SpinType::None
+        }
+    }
+
+    fn corner_filled(&self, x: i32, y: i32) -> bool {
+        if x < 0 || x >= WIDTH as i32 || y < 0 {
+            return true;
+        }
+        if y >= HEIGHT as i32 {
+            return false;
+        }
+        self.occupied_at(x as usize, y as usize)
+    }
+
     /// Removes all full rows, shifting rows above them down.
     pub fn clear_lines(&mut self) -> ClearInfo {
         let mut cleared = 0u8;
@@ -233,8 +319,11 @@ impl Board {
 
     /// Inserts garbage rows at the bottom, pushing the existing stack up.
     ///
-    /// `holes[i]` is the hole column of the i-th inserted row (row `i` from the
-    /// bottom). The operation is atomic: on error the board is unchanged.
+    /// `holes[i]` is the i-th row inserted, in insertion order. One-by-one
+    /// insertion pushes earlier rows upward, so the **last** hole is the
+    /// bottom row and the first hole ends up on top. Rows pushed past row 39
+    /// are discarded (`docs/s2-spec.md` §11-U6, decided in v1.3.1: a plain
+    /// 40-row board). Validation errors leave the board unchanged.
     pub fn insert_garbage(&mut self, holes: &[u8]) -> Result<(), GarbageError> {
         if holes.is_empty() {
             return Ok(());
@@ -249,17 +338,16 @@ impl Board {
         }
 
         let n = holes.len();
-        for y in (HEIGHT - n)..HEIGHT {
-            if self.occupied[y] != 0 {
-                return Err(GarbageError::Overflow);
+        for y in (0..HEIGHT).rev() {
+            if y >= n {
+                self.occupied[y] = self.occupied[y - n];
+                self.garbage[y] = self.garbage[y - n];
+            } else {
+                self.occupied[y] = 0;
+                self.garbage[y] = 0;
             }
         }
-
-        for y in (n..HEIGHT).rev() {
-            self.occupied[y] = self.occupied[y - n];
-            self.garbage[y] = self.garbage[y - n];
-        }
-        for (i, &hole) in holes.iter().enumerate() {
+        for (i, &hole) in holes.iter().rev().enumerate() {
             let row = FULL_ROW & !(1u16 << hole);
             self.occupied[i] = row;
             self.garbage[i] = row;

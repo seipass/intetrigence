@@ -2,11 +2,11 @@
 //!
 //! # Seed protocol
 //!
-//! `Bag::new(seed)` seeds a [`SplitMix64`] and shuffles [`ALL_PIECES`] with a
-//! Fisher-Yates pass. Each bag is a permutation of all seven pieces. The
-//! algorithm, the piece order and the RNG are all fixed: changing any of them
-//! changes every seeded replay. The protocol is covered by a known-sequence
-//! test below.
+//! `Bag::new(seed)` seeds a [`MinStd`] with the **piece seed** from
+//! [`crate::rng::derive_seeds`] and shuffles [`ALL_PIECES`] with a descending
+//! Fisher-Yates pass using `floor(next_float() * (i + 1))`. Each bag is a
+//! permutation of all seven pieces. The algorithm, piece order and RNG are
+//! fixed: changing any of them changes every seeded replay.
 //!
 //! `peek` may generate whole bags ahead of time, but it never consumes pieces,
 //! so previewing does not alter the sequence.
@@ -14,11 +14,11 @@
 use std::collections::VecDeque;
 
 use crate::piece::{ALL_PIECES, PieceKind};
-use crate::rng::SplitMix64;
+use crate::rng::MinStd;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bag {
-    rng: SplitMix64,
+    rng: MinStd,
     queue: VecDeque<PieceKind>,
     bags_generated: u64,
 }
@@ -26,7 +26,7 @@ pub struct Bag {
 impl Bag {
     pub fn new(seed: u64) -> Self {
         let mut bag = Self {
-            rng: SplitMix64::new(seed),
+            rng: MinStd::new(seed),
             queue: VecDeque::with_capacity(14),
             bags_generated: 0,
         };
@@ -37,7 +37,7 @@ impl Bag {
     fn refill(&mut self) {
         let mut pieces = ALL_PIECES;
         for i in (1..pieces.len()).rev() {
-            let j = self.rng.below((i + 1) as u64) as usize;
+            let j = (self.rng.next_float() * (i + 1) as f64).floor() as usize;
             pieces.swap(i, j);
         }
         self.queue.extend(pieces);
@@ -72,26 +72,26 @@ mod tests {
 
     #[test]
     fn known_seed_zero_sequence() {
-        // Locks the seed protocol: SplitMix64 + Fisher-Yates over ALL_PIECES.
+        // Locks the seed protocol: MINSTD + descending Fisher-Yates.
         let mut bag = Bag::new(0);
         let sequence: Vec<PieceKind> = (0..14).map(|_| bag.next_piece()).collect();
         assert_eq!(
             sequence,
             vec![
-                PieceKind::L,
-                PieceKind::S,
-                PieceKind::O,
-                PieceKind::J,
-                PieceKind::Z,
                 PieceKind::I,
-                PieceKind::T,
                 PieceKind::S,
-                PieceKind::I,
-                PieceKind::L,
-                PieceKind::J,
                 PieceKind::Z,
                 PieceKind::T,
                 PieceKind::O,
+                PieceKind::J,
+                PieceKind::L,
+                PieceKind::T,
+                PieceKind::S,
+                PieceKind::Z,
+                PieceKind::I,
+                PieceKind::J,
+                PieceKind::O,
+                PieceKind::L,
             ]
         );
     }

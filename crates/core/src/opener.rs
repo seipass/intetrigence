@@ -1,30 +1,59 @@
-//! Opener phase interface.
+//! Opener Phase: the first 14 placements cancel twice as much garbage.
 //!
-//! **Status: interface only.** PLAN.md §3.1 fixes the window (the first 14
-//! pieces) and the effect (attack cancellation ×2), but the exact accounting
-//! waits for `docs/s2-spec.md`.
+//! Reference: `docs/s2-spec.md` v1.3.1 §7.4. The opener does **not** double the
+//! sent attack; it adds an extra cancellation budget equal to the attack.
 
-/// Number of pieces in the opener phase (PLAN.md §3.1).
-pub const OPENER_PIECES: u8 = 14;
+pub use crate::constants::OPENER_PIECES;
 
-/// Tracks the opener window for one player.
+use crate::constants::OPENER_QUEUE_GE_SENT;
+
+/// Tracks the opener window and the cumulative sent total for one player.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OpenerPhase {
-    pub pieces_placed: u8,
+    /// Placements before the current one. Hold does not increment this.
+    pub pieces_placed: u32,
+    /// Rows actually sent to the opponent this round (cancelled rows excluded).
+    pub sent_total: u32,
 }
 
 impl OpenerPhase {
     pub const fn new() -> Self {
-        Self { pieces_placed: 0 }
+        Self {
+            pieces_placed: 0,
+            sent_total: 0,
+        }
     }
 
-    /// True while the player is still inside the opener window.
+    /// True for placements 1 through 14 (the placement about to happen).
     pub const fn is_active(&self) -> bool {
         self.pieces_placed < OPENER_PIECES
     }
 
-    /// TODO(s2-spec): attack multiplier during the opener phase.
-    pub fn attack_multiplier(&self) -> u32 {
-        todo!("TODO(s2-spec): opener phase attack multiplier")
+    /// Call once per locked piece. Hold does not count as a placement.
+    pub fn on_piece_placed(&mut self) {
+        self.pieces_placed += 1;
+    }
+
+    /// Record rows that were actually sent by one attack event.
+    pub fn on_sent(&mut self, lines: u32) {
+        self.sent_total += lines;
+    }
+
+    /// Additional cancellation budget for one attack event.
+    ///
+    /// The caller's total cancellation is `attack + cancel_budget(attack, ..)`,
+    /// i.e. `2 * attack` while the opener condition holds. U5 provisional:
+    /// `queue_total >= sent_total`.
+    pub fn cancel_budget(&self, attack: u32, queue_total: u32) -> u32 {
+        let queue_ok = if OPENER_QUEUE_GE_SENT {
+            queue_total >= self.sent_total
+        } else {
+            queue_total > self.sent_total
+        };
+        if self.is_active() && queue_ok {
+            attack
+        } else {
+            0
+        }
     }
 }
