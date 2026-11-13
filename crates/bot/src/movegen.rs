@@ -172,6 +172,40 @@ impl Placement {
     }
 }
 
+/// Drops placements that occupy exactly the same cells as an earlier one.
+///
+/// The generator emits one placement per `(rotation, x, y)`, but the
+/// 180-degree-symmetric pieces reach the same cell set in two rotations (O in
+/// all four). On an empty board the counts are
+///
+/// | piece | placements | unique cells |
+/// |---|---|---|
+/// | I | 34 | 17 |
+/// | O | 36 | 9 |
+/// | S, Z | 34 | 17 |
+/// | T, J, L | 34 | 34 |
+///
+/// A referee that identifies candidates by their cells — the protocol in
+/// `docs/s2-referee-protocol.md` §4.1 does — needs this adapter so the same
+/// placement is not offered twice.
+///
+/// The search does not need it: two placements with the same cells also have
+/// the same transposition key and collapse during the merge.
+pub fn unique_by_cells(placements: &[Placement]) -> Vec<Placement> {
+    let mut unique: Vec<Placement> = Vec::with_capacity(placements.len());
+    let mut seen: Vec<[(i32, i32); 4]> = Vec::with_capacity(placements.len());
+    for placement in placements {
+        let mut cells = placement.cells();
+        cells.sort_unstable();
+        if seen.contains(&cells) {
+            continue;
+        }
+        seen.push(cells);
+        unique.push(*placement);
+    }
+    unique
+}
+
 /// The standard spawn piece for `kind` (`docs/s2-spec.md` §2.2.1).
 pub fn spawn_piece(kind: PieceKind) -> ActivePiece {
     let (x, y) = kind.spawn_position();
@@ -678,6 +712,39 @@ mod tests {
                 assert_eq!(drop.distance, 0, "{kind:?} {:?}", placement.key());
                 assert_eq!(drop.lock.piece, placement.piece, "{kind:?}");
             }
+        }
+    }
+
+    /// O reaches the same cells in all four rotations; the referee adapter
+    /// must collapse them, and nothing else may change.
+    #[test]
+    fn unique_by_cells_collapses_only_cell_identical_placements() {
+        let board = Board::new();
+        for kind in ALL_PIECES {
+            let placements = generate(&board, kind);
+            let unique = unique_by_cells(&placements);
+            assert!(unique.len() <= placements.len());
+            let mut keys: Vec<_> = unique.iter().map(Placement::key).collect();
+            keys.sort_unstable();
+            keys.dedup();
+            assert_eq!(keys.len(), unique.len(), "{kind:?}: duplicate placements");
+            for placement in &unique {
+                assert!(placements.iter().any(|other| other == placement));
+            }
+        }
+        // The 180-degree-symmetric pieces collapse; T, J and L do not.
+        for (kind, placements, unique) in [
+            (PieceKind::I, 34, 17),
+            (PieceKind::O, 36, 9),
+            (PieceKind::S, 34, 17),
+            (PieceKind::Z, 34, 17),
+            (PieceKind::T, 34, 34),
+            (PieceKind::J, 34, 34),
+            (PieceKind::L, 34, 34),
+        ] {
+            let all = generate(&board, kind);
+            assert_eq!(all.len(), placements, "{kind:?} placements");
+            assert_eq!(unique_by_cells(&all).len(), unique, "{kind:?} unique");
         }
     }
 

@@ -28,7 +28,7 @@ pub mod search;
 pub use eval::{EvalContext, Features, Reward, Weights, apply_placement, features, leaf_value};
 pub use movegen::{
     ActionSeq, Arrival, Movegen, Placement, State, generate, generate_from, reachable_states,
-    spawn_piece,
+    spawn_piece, unique_by_cells,
 };
 pub use play::{GameReport, play_game};
 pub use search::{
