@@ -1,0 +1,149 @@
+{
+  "seed": 1001,
+  "sheet": "B",
+  "started_at": "unix:1794591243",
+  "winner": 1,
+  "reason": "TopOut",
+  "detail": null,
+  "turns": 51,
+  "totals": [
+    {
+      "sent_total": 3,
+      "received_total": 19,
+      "attack_total": 6,
+      "pieces_placed": 51
+    },
+    {
+      "sent_total": 24,
+      "received_total": 1,
+      "attack_total": 26,
+      "pieces_placed": 51
+    }
+  ],
+  "think": [
+    {
+      "count": 51,
+      "median_ms": 0.87,
+      "p95_ms": 1.136,
+      "max_ms": 1.179,
+      "mean_ms": 0.801
+    },
+    {
+      "count": 51,
+      "median_ms": 27.652,
+      "p95_ms": 35.863,
+      "max_ms": 39.189,
+      "mean_ms": 28.101
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 51,
+      "accepted_first": 51,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 51,
+      "accepted_first": 51,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 51,
+      "spin_checked": 51,
+      "spin_matches": 51,
+      "spin_mismatches": 0,
+      "attack_checked": 51,
+      "attack_matches": 51,
+      "attack_mismatches": 0,
+      "declared_total": 6,
+      "recomputed_total": 6,
+      "examples": []
+    },
+    {
+      "placements": 51,
+      "spin_checked": 51,
+      "spin_matches": 49,
+      "spin_mismatches": 2,
+      "attack_checked": 51,
+      "attack_matches": 51,
+      "attack_mismatches": 0,
+      "declared_total": 26,
+      "recomputed_total": 26,
+      "examples": [
+        {
+          "turn": 26,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 36,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 16445339246710592169,
+      "turn": 29
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m0\\logs\\seed-1001-sheet-B-attax.jsonl",
+    "decisions_logged": 51,
+    "nodes_total": 499114,
+    "extra_ms_total": 1393.5,
+    "suggestions_with_stats": 51,
+    "cells_above_row20": false,
+    "hold_matches": 51,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence-baseline",
+      "version": "m0-placeholder",
+      "args": [
+        "--in-process",
+        "--baseline"
+      ]
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ]
+    }
+  ],
+  "replay": "replays/seed-1001-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 1001,
+    "sheet": "B",
+    "turns": 51,
+    "placements": 102,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0
+}

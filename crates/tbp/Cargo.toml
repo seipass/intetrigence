@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Tetris Bot Protocol message interface (skeleton)"
+description = "Tetris Bot Protocol host: line-delimited JSON process I/O and state mirror"
 
 [dependencies]
+intetrigence-core.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
