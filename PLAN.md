@@ -34,8 +34,8 @@
 | 旧 intetrigence (guideline, 100ms/5PPS) | **100–0** |
 | clys (MCTS beam, width 500) | 88–12 |
 
-### attax の S2 対応(作者確認済み・詳細は調整中)
-- 攻撃テーブル / surge / opener / all-spin 等の S2 メカニクス対応、ゴミキュー可視、180° 対応がどこまで入るかは**作者とすり合わせる**(対応範囲が attax の S2 実力を決める)
+### attax の S2 対応(作者言及済み・連携は前提としない)
+- S2 対応の範囲(攻撃テーブル / surge / opener / all-spin / ゴミキュー / 180°)は**公開された実装を見てから確定する**。作者とのすり合わせは行わない(個人プロジェクト・AGPL 利用許可のみ取得済み)
 - **S2 対応 attax は guideline 時より強くなる**(特にゴミキューが danger 特徴量に乗る)。90% のハードルは「ハンディ付き attax」より上がるが、それこそが取りたい主張
 - 残る可能性がある構造的制約: 下 20 段視野, bag 無視, 固定重み 1 セット, 固定仕事量 (median ~35ms), ponder なし
 
@@ -63,7 +63,7 @@
 | Opener Phase | 最初の 14 ピース、相殺 ×2 |
 | ゴミ | change-on-attack(TL は messiness_change = 1.0、攻撃間で必ず列を引き直し。×2.5 は QUICK PLAY の記述)。**キュー + 遅延挿入(遅延 20 frame、cap 8 行/ロック)**、送信攻撃はキュー相殺が優先 |
 | 回転 | **SRS+**(I の kick 修正)+ **180° 回転**(独自 kick) |
-| 盤面 | 10×20 可視(内部 40 行)、block-out / lock-out |
+| 盤面 | 10×20 可視(内部 40 行)、block-out のみ(lock-out 無効)、**Clutch Clear 有効**(docs/s2-spec.md §2.3) |
 | ランダマイザー | 7-bag, 両者同一 seed。5 preview + hold |
 | ペース | 5 PPS(ペアド ターン), 1000 turn cap |
 | 思考時間 | intetrigence `--ms 100`(マルチスレッド可), attax は S2 版デフォルト設定(作者と合意) |
@@ -72,11 +72,11 @@
 
 **合格条件(確定)**: 新規 held-out seeds 50 個 × 両シート = **100 ゲームで 90 勝以上**(点推定 ≥ 90%)。Wilson 95% CI も併記
 
-**数値定数の正は docs/s2-spec.md(v1.2 凍結・18 fixture を独立 2 実装で検証済み)**。未確定 9 件(U1〜U9)は同 §11:要実機確認 U1/U2/U4/U6/U8、attax 作者確認 U3/U5/U7。
+**数値定数の正は docs/s2-spec.md(v1.2 凍結・18 fixture を独立 2 実装で検証済み)**。未確定 9 件(U1〜U9)は同 §11:要実機確認 U1/U2/U4/U6/U8、**U3/U5/U7 は自決**(作者確認は任意・非ブロッキング)。
 
 ### 3.2 仕様の一次ソース(v1.2 でフリーズ済み → docs/s2-spec.md)
 
-- **attax 作者との合意仕様(最優先)**: 両者が同一のテーブル・定数・seed 仕様を使う。M0 で共有ドキュメント化
+- **docs/s2-spec.md が唯一の正**(自前仕様)。未確定項目は我々が暫定自決し、新情報が得られたら更新する
 - tetrio.wiki.gg(Mechanics / Spins / TETRA LEAGUE)
 - tetris.wiki「TETR.IO」(Multiplier コンボ / B2B Charging / All-Mini+)
 - tetr.io patch notes(定数: ゴミ遅延・cap・surge 分割)
@@ -85,13 +85,13 @@
 
 ### 3.3 対戦ハーネスと公平性
 
-- レフェリーは intetrigence 自前(S2 実装)。前回マッチ同様、**attax 作者の監査を受ける前提**で以下を最初から実装:
+- レフェリーは intetrigence 自前(S2 実装)。**作者監査は前提としない**が、公開時の信頼性のため以下を最初から実装:
   1. **飢死防止**: レフェリーはボットの回答を待つ
   2. **思考時間記録**: 両者の median / p95 think time を毎ゲーム記録
   3. **first-choice acceptance ログ**: attax の第 1 候補採用率(フォールバック 0 を確認)
   4. **verify-replay**: 全ゲームを replay から再実行して一致検証
   5. **採点一致オーディット**: suggestion が予測した攻撃とレフェリー実採点の一致検証
-- **attax S2 版の接続 I/F は作者と調整**(TBP 拡張 / 独自プロトコル / fighter 直接呼び出し)。ゴミキュー・surge 溜め・opener 残数などの S2 状態を過不足なく渡す
+- **attax S2 版は公開された I/F(TBP が基本)で接続する**(作者との事前合意は不要・利用許可済み)。S2 状態(ゴミキュー等)は I/F が運べる範囲で渡す。公開版が出るまで現行 TBP 版で配管を先に作る
 - 暫定運用: 現行 TBP 版 attax を S2 レフェリーに接続して配管テスト(ハンディありの参考値)
 - intetrigence の探索は anytime のため非決定論になりうる。verify-replay は**記録された着手列の再実行**で検証する(探索の再現は不要)。seed + 着手列があれば盤面進行は完全再現可能
 
@@ -124,7 +124,7 @@ intetrigence/
 ### M0: 計測基盤(完全自作)
 - S2 レフェリー実装(§3.1 の条件 + §3.3 の監査機能)
 - TBP host 実装 → 現行 attax を `attax-tbp.sh` 経由で接続、スモークテスト(配管確認)
-- **作者とすり合わせ**: 確定済みの仕様(S2 TL デフォルト相当)と計測プロトコル(100 ゲーム・90 勝)を共有。残調整は接続 I/F のみ
+- **連携前提を廃止**: 仕様は docs/s2-spec.md に自決して固定。attax S2 版は公開 I/F 経由で接続
 - **合否条件**: attax との 10 ゲームが replay 検証付きで回り、シート入れ替え・seed 固定・監査ログが機能すること
 
 ### M1: S2 コアエンジン(仕様フリーズ)
@@ -160,7 +160,7 @@ intetrigence/
 |---|---|
 | S2 ルール再現のバグが勝敗を歪める | §3.2 ソース突き合わせ + s2-bot-lab 相互検証 + 採点オーディットを M1 で先に固める |
 | S2 対応 attax は guideline 時より強く、90% はさらに厳しい | M2 で 5 割 → M3 で 85% の段階ゲートで早期検証。旧 0–100 の再燃は S2 ネイティブ評価設計で回避 |
-| attax S2 対応の範囲・時期・I/F が未確定 | M0 から作者と仕様・I/F・時期をすり合わせ。現行 TBP 版で配管を先行 |
+| attax S2 対応の範囲・時期・I/F が未確定 | 公開されたら公開 I/F で接続。現行 TBP 版で配管を先行。対応範囲は公開版の実装から読み取る |
 | 90% は野心的(attax に勝った bot は現状 0) | M2 で 5 割 → M3 で 85% と段階ゲートで早期発見 |
 | attax への過学習 | tuning と held-out の厳密分離 + S2 対戦プール |
 | 計算資源の非対称への批判 | 思考時間・スレッド数を毎ゲーム記録・公開 |
@@ -169,13 +169,14 @@ intetrigence/
 ## 7. 決定事項と残件
 
 ### 確定
-1. **ルール**: TETR.IO Season 2(TETRA LEAGUE デフォルト相当: B2B Charging, All-Mini+, Opener Phase 有効, Multiplier コンボ)。attax 作者と共有仕様として固定
+1. **ルール**: TETR.IO Season 2(TETRA LEAGUE デフォルト相当: B2B Charging, All-Mini+, Opener Phase 有効, Multiplier コンボ)。**仕様は docs/s2-spec.md に自前で固定**(作者との共有仕様は前提としない)
 2. **attax S2 版**: フル S2 デフォルト対応(攻撃テーブル / surge / opener / all-spin / ゴミキュー / 180°)を期待。接続 I/F と時期は実装時に柔軟に決定
 3. **合格条件**: 新規 held-out seeds 50 個 × 両シート = 100 ゲームで **90 勝以上**(点推定 ≥ 90%)。Wilson 95% CI も併記
 4. **ベンチ環境**: ローカル機(AMD Ryzen 7 3700X, 8C/16T, 16GB, Windows 11)。intetrigence のスレッド上限はデフォルト 8(物理コア数)
 5. **評価関数**: まず手特徴量 + SPSA。NN 系(NNUE / 自己対戦)は M3 ゲート未達時の拡張枠
 6. **attax の利用**: 作者許可済み。AGPL 準拠でソース参照・コード移植ともに可(由来コードを含める場合は AGPL-3.0 で公開)
 7. **ライセンス**: intetrigence は AGPL-3.0 で公開。ハーネス周り(レフェリー/TBP host/監査)に attax コードを利用可(作者許可済み)、本体(bot)は独自実装
+8. **作者との関係**: 個人プロジェクトとして AGPL 利用許可のみ取得。連携・監査・事前合意・進捗共有は行わない。attax は公開リポジトリ・公開 I/F 経由で使用し、未確定仕様は自決して文書化する
 
 ### 残件
 - 期限(未定でもマイルストーン駆動で進行可)
@@ -183,4 +184,4 @@ intetrigence/
 ## 8. 進捗ログ
 
 - **2026-11-13 Wave 1 完了・受理**: docs/s2-spec.md v1.2 凍結(PC B2B +1、ゴミ cap 8/遅延 20f、TL messiness 1.0、surge 3 分割 [r,r,S-2r] を決着。18 fixture を独立 2 実装で検証)。attax を 7b38f51 に固定(bun 1.4.0、build/test 緑)、TBP smoke 14/14 成功(エビデンス scripts/evidence/attax-tbp-smoke/)、docs/attax-integration.md + docs/attax-analysis.md 作成(敵の重み・特徴量を記録)。crates/core 基盤 + テスト 105 緑(commits 5f54c1a, 07aaa24)。仕様監査で core の spawn 行バグ(row 20 → 正 21)を発見 → Wave 2 で修正。
-- **Wave 2(進行中)**: core-engine = spawn 修正 + S2 採点(scoring/opener/garbage)+ fixture 18/18 照合。s2-spec-lead = attax 作者への確認事項ドキュメント(U3/U5/U7)。bot-dev(新設)= exact movegen。harness-dev(新設)= S2 レフェリー + TBP host + M0 ゲート(現行 attax と 10 ゲーム、replay 検証)。
+- **Wave 2(進行中)**: core-engine = S2 採点(scoring/opener/garbage)+ fixture 18/18 照合(spawn 修正は a97e630 で完了済み)。s2-spec-lead = U1〜U9 の暫定自決と仕様 v1.3 化。bot-dev(新設)= exact movegen。harness-dev(新設)= S2 レフェリー + TBP host + M0 ゲート(現行 attax と 10 ゲーム、replay 検証)。**作者連携は廃止**(公開 I/F のみ)。
