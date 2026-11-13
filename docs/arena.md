@@ -1,7 +1,7 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.4
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.5
 **ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.7
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
@@ -168,6 +168,17 @@ protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので�
 主張でき、超過があれば正直に書ける。実時間の 5 PPS 演出が必要になったら `run_round` に
 sleep を足すだけで、状態には影響しない。
 
+### D8.1. 計測の定義(レポートで使う)
+
+| 項目 | 定義 |
+|---|---|
+| `think_ms` | レフェリーが `suggest` を送信してから `suggestion` を受信するまでの**実時間**(ホスト側)。ボットの自己申告ではない |
+| `extra_ms`(attax) | `move_info.extra` の自己申告値。参考として別に記録し、`think_ms` とは混ぜない |
+| `board_hash` | 各 turn 終了時の盤面。**occupied 40 行 + garbage 40 行**の両方を FNV-1a でハッシュ(穴列の差も検出) |
+| `suggestion` が空 | 合法手なし。`adopt` が `NoLegalCandidate` を返し、そのゲームは **forfeit**(相手の勝ち)。トップアウト扱いにはしない |
+| リトライ | 1 設置につき `suggest` は **1 回だけ**。同じ turn で同じボットに再質問しない |
+| `start` 再送 | 自分のロックでゴミが実際に挿入されたときだけ。combo blocking / due なし / forfeit 時は送らない |
+
 ### D9. 統計
 
 - median: 偶数個は中央 2 つの平均。
@@ -193,15 +204,15 @@ sleep を足すだけで、状態には影響しない。
 
 | seed | sheet | 勝者 | 理由 | turns | replay | think median (ms) intetrigence / attax | first-choice | spin 一致 |
 |---|---|---|---|---|---|---|---|---|
-| 1001 | A | attax | TopOut | 51 | OK | 1.0 / 28.0 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1001 | B | attax | TopOut | 51 | OK | 1.0 / 28.6 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 28.3 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1002 | B | attax | TopOut | 58 | OK | 0.7 / 28.6 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 29.3 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1003 | B | attax | TopOut | 48 | OK | 0.7 / 29.8 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 27.9 | 1.00 / 1.00 | 1.00 / 0.97 |
-| 1004 | B | attax | TopOut | 94 | OK | 0.8 / 28.5 | 1.00 / 1.00 | 1.00 / 0.99 |
-| 1005 | A | attax | TopOut | 131 | OK | 0.5 / 28.9 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1001 | A | attax | TopOut | 51 | OK | 1.0 / 31.0 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1001 | B | attax | TopOut | 51 | OK | 0.9 / 29.2 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 30.9 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1002 | B | attax | TopOut | 58 | OK | 0.8 / 28.4 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 30.7 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1003 | B | attax | TopOut | 48 | OK | 0.8 / 29.7 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 28.2 | 1.00 / 1.00 | 1.00 / 0.97 |
+| 1004 | B | attax | TopOut | 94 | OK | 0.8 / 28.1 | 1.00 / 1.00 | 1.00 / 0.99 |
+| 1005 | A | attax | TopOut | 131 | OK | 0.4 / 28.5 | 1.00 / 1.00 | 1.00 / 0.98 |
 | 1005 | B | attax | TopOut | 92 | OK | 0.6 / 28.7 | 1.00 / 1.00 | 1.00 / 1.00 |
 
 - **replay 検証: 10/10 成功**(`arena verify scripts/evidence/m0`)。
