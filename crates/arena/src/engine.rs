@@ -288,7 +288,15 @@ pub struct Adopted {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AdoptError {
     NoActivePiece,
-    NoLegalCandidate { candidates: usize },
+    /// The bot returned no reachable candidate, but the referee's movegen has
+    /// at least one legal placement: the bot's movegen is broken (forfeit).
+    NoLegalCandidate {
+        candidates: usize,
+    },
+    /// The referee's movegen has no legal placement at all: the board is stuck
+    /// (top-out). This is defensive; a live active piece is itself a reachable
+    /// grounded state, so it should not fire in practice.
+    NoMoves,
 }
 
 impl std::fmt::Display for AdoptError {
@@ -298,6 +306,7 @@ impl std::fmt::Display for AdoptError {
             AdoptError::NoLegalCandidate { candidates } => {
                 write!(f, "none of the {candidates} candidates is reachable")
             }
+            AdoptError::NoMoves => write!(f, "the referee has no legal placement"),
         }
     }
 }
@@ -411,9 +420,41 @@ impl Engine {
                 });
             }
         }
-        Err(AdoptError::NoLegalCandidate {
-            candidates: suggestion.candidates.len(),
-        })
+        // Two-stage decision (protocol v1.6 §7): if the referee has any legal
+        // placement, the bot's empty/unreachable suggestion is a forfeit;
+        // otherwise the board is stuck and the round ends as a top-out.
+        if self.has_legal_move(slot) {
+            Err(AdoptError::NoLegalCandidate {
+                candidates: suggestion.candidates.len(),
+            })
+        } else {
+            Err(AdoptError::NoMoves)
+        }
+    }
+
+    /// True when the player has at least one reachable grounded placement with
+    /// the current piece or, if hold is available, with the hold piece.
+    pub fn has_legal_move(&mut self, slot: usize) -> bool {
+        let player = &mut self.players[slot];
+        let Some(active) = player.game.active() else {
+            return false;
+        };
+        let board = player.game.board().clone();
+        if !movegen::generate(&board, active, false).is_empty() {
+            return true;
+        }
+        if player.game.can_hold() {
+            if let Some(kind) = player
+                .game
+                .held_piece()
+                .or_else(|| player.game.preview(1).first().copied())
+            {
+                if !movegen::generate(&board, movegen::spawn_state(kind), true).is_empty() {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Applies one placement: hold, path replay, lock, scoring, cancellation,
@@ -619,6 +660,19 @@ mod tests {
         assert_eq!(a.players[0].garbage, b.players[0].garbage);
         assert_eq!(a.players[1].garbage, b.players[1].garbage);
         assert_ne!(a.players[0].garbage, a.players[1].garbage);
+    }
+
+    #[test]
+    fn empty_suggestion_is_a_forfeit_when_the_referee_has_moves() {
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.begin_turn();
+        assert!(engine.has_legal_move(0));
+        let suggestion = crate::agent::Suggestion::default();
+        let error = engine.adopt(0, &suggestion).unwrap_err();
+        assert!(matches!(
+            error,
+            AdoptError::NoLegalCandidate { candidates: 0 }
+        ));
     }
 
     #[test]

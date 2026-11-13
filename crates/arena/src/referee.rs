@@ -46,8 +46,8 @@ impl RoundConfig {
             sheet,
             turn_cap: 1000,
             frames_per_turn: 12,
-            rules: "docs/s2-spec.md@v1.3.7".into(),
-            protocol: "docs/s2-referee-protocol.md@v1.5".into(),
+            rules: "docs/s2-spec.md@v1.3.8".into(),
+            protocol: "docs/s2-referee-protocol.md@v1.6".into(),
             started_at: String::new(),
         }
     }
@@ -106,9 +106,19 @@ impl std::fmt::Display for RoundError {
 impl std::error::Error for RoundError {}
 
 enum End {
-    TopOut { loser: usize },
+    TopOut {
+        loser: usize,
+    },
+    /// No legal placement with the current piece or hold (protocol v1.6 §7).
+    /// Recorded as a top-out with an explanatory detail.
+    Stuck {
+        loser: usize,
+    },
     TurnCap,
-    Forfeit { slot: usize, detail: String },
+    Forfeit {
+        slot: usize,
+        detail: String,
+    },
 }
 
 pub fn run_round(
@@ -175,6 +185,11 @@ pub fn run_round(
 
             let adopted = match engine.adopt(slot, &suggestion) {
                 Ok(adopted) => adopted,
+                Err(crate::engine::AdoptError::NoMoves) => {
+                    end = Some(End::Stuck { loser: slot });
+                    push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
+                    break 'turns;
+                }
                 Err(error) => {
                     reachability_rejections += 1;
                     end = Some(End::Forfeit {
@@ -293,6 +308,11 @@ pub fn run_round(
     let end = end.unwrap_or(End::TurnCap);
     let (winner, reason, detail) = match &end {
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None),
+        End::Stuck { loser } => (
+            Some(1 - loser),
+            "TopOut".to_string(),
+            Some("no legal placement".to_string()),
+        ),
         End::TurnCap => {
             let a = &engine.players[0];
             let b = &engine.players[1];
