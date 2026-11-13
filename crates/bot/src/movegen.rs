@@ -32,8 +32,6 @@
 
 use intetrigence_core::{Action, ActivePiece, Board, PieceKind, Rotation, SpinType, kick};
 
-use crate::spin;
-
 /// How the piece arrived at a BFS state.
 ///
 /// Only the last accepted input matters for spin detection, so it is part of
@@ -162,8 +160,11 @@ pub fn generate_from(board: &Board, spawn: ActivePiece) -> Vec<Placement> {
             piece,
             spin_entry,
             fin_or_tst: fin_or_tst.is_some(),
-            immobile: spin::is_immobile(board, piece),
-            spin: spin::classify_spin(board, piece, spin_entry, fin_or_tst.is_some()),
+            // The all-spin test and the All-Mini+ classification are the
+            // core engine's (`docs/s2-spec.md` §4); the bot must not keep a
+            // second copy of the corner table.
+            immobile: board.is_immobile(kind, rotation, x, y),
+            spin: board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some()),
             actions,
         });
     }

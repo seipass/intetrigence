@@ -22,8 +22,8 @@ use std::collections::BTreeSet;
 
 use intetrigence_bot::{Placement, generate, reachable_states, spawn_piece};
 use intetrigence_core::{
-    ALL_PIECES, Action, ActivePiece, Board, Game, PieceKind, RotateDirection, Rotation, SpinType,
-    SplitMix64,
+    ALL_PIECES, Action, ActivePiece, Board, ClearInput, Game, PieceKind, RotateDirection, Rotation,
+    SpinType, SplitMix64, base_attack, compute_attack,
 };
 
 type Key = (Rotation, i32, i32);
@@ -66,12 +66,20 @@ fn high_board() -> Board {
 }
 
 /// A T-spin double slot (`docs/s2-spec.md` §4.3): the T can only arrive by
-/// rotating from `R` at the same box position.
+/// rotating from `R` at the same box position, and locking it completes rows 1
+/// and 2.
+///
+/// ```text
+/// row 3: X X X X . . X X X .   <- (3,3) filled, (5,3) empty
+/// row 2: X X X . . . X X X X   <- the T's flat top row
+/// row 1: X X X X . X X X X X   <- the nub hole at column 4
+/// row 0: X X X X X X X X X .
+/// ```
 fn tsd_board() -> Board {
     let mut board = Board::new();
     board.set_row(0, 0x1FF);
-    board.set_row(1, 0x1EF);
-    board.set_row(2, 0x1C7);
+    board.set_row(1, 0x3EF);
+    board.set_row(2, 0x3C7);
     board.set_row(3, 0x1CF);
     board
 }
@@ -409,6 +417,69 @@ fn tsd_is_enumerated_as_a_full_spin() {
             .iter()
             .any(|placement| placement.spin == SpinType::Full)
     );
+}
+
+/// The bot consumes the core engine's corner table, so pin it from the
+/// consumer side too: a flipped `FRONT` must break this suite.
+#[test]
+fn core_spin_table_pins_the_nub_side() {
+    // Only the two lower corners are filled: front for rotation 2 (nub down),
+    // back for rotation 0 (nub up).
+    let mut lower = Board::new();
+    lower.set_row(1, 0x1EF);
+    assert_eq!(lower.t_spin_corners(Rotation::Two, 3, 1), (2, 2));
+    assert_eq!(lower.t_spin_corners(Rotation::Zero, 3, 1), (2, 0));
+
+    // Only the two upper corners: mirrored.
+    let mut upper = Board::new();
+    upper.set_row(3, 0x1EF);
+    assert_eq!(upper.t_spin_corners(Rotation::Two, 3, 1), (2, 0));
+    assert_eq!(upper.t_spin_corners(Rotation::Zero, 3, 1), (2, 2));
+
+    // TSD slot: three corners, both nub-side ones filled -> full.
+    let tsd = tsd_board();
+    assert_eq!(tsd.t_spin_corners(Rotation::Two, 3, 1), (3, 2));
+    assert_eq!(
+        tsd.spin_type(PieceKind::T, Rotation::Two, 3, 1, true, false),
+        SpinType::Full
+    );
+
+    // Three corners with exactly one nub-side corner -> mini. A flipped front
+    // table would turn this into full (the opposite direction to the TSD).
+    let mut one_front = Board::new();
+    one_front.set_row(1, 0x028);
+    one_front.set_row(3, 0x008);
+    assert_eq!(one_front.t_spin_corners(Rotation::Zero, 3, 1), (3, 1));
+    assert_eq!(
+        one_front.spin_type(PieceKind::T, Rotation::Zero, 3, 1, true, false),
+        SpinType::Mini
+    );
+    assert_eq!(
+        one_front.spin_type(PieceKind::T, Rotation::Zero, 3, 1, true, true),
+        SpinType::Full
+    );
+}
+
+/// End to end from the movegen's spin flags to the attack table: the TSD slot
+/// must classify as a full spin and pay the TSD base of 4 (`docs/s2-spec.md`
+/// §6.1).
+#[test]
+fn tsd_pays_the_full_spin_double_base() {
+    let board = tsd_board();
+    let placements = generate(&board, PieceKind::T);
+    let tsd = placements
+        .iter()
+        .find(|placement| placement.key() == (Rotation::Two, 3, 1))
+        .expect("the TSD slot must be reachable");
+    assert!(tsd.spin_entry);
+    assert_eq!(tsd.spin, SpinType::Full);
+
+    let lines = expected_clears(&board, tsd.piece);
+    assert_eq!(lines, 2);
+    assert_eq!(base_attack(tsd.spin, lines), 4);
+
+    let attack = compute_attack(&ClearInput::new(lines, tsd.spin));
+    assert_eq!(attack.total, 4);
 }
 
 #[test]
