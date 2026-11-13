@@ -1,0 +1,179 @@
+{
+  "seed": 1005,
+  "sheet": "A",
+  "started_at": "unix:1794590863",
+  "winner": 1,
+  "reason": "TopOut",
+  "detail": null,
+  "turns": 131,
+  "totals": [
+    {
+      "sent_total": 37,
+      "received_total": 45,
+      "attack_total": 56,
+      "pieces_placed": 131
+    },
+    {
+      "sent_total": 65,
+      "received_total": 17,
+      "attack_total": 85,
+      "pieces_placed": 130
+    }
+  ],
+  "think": [
+    {
+      "count": 131,
+      "median_ms": 0.548,
+      "p95_ms": 1.359,
+      "max_ms": 1.729,
+      "mean_ms": 0.648
+    },
+    {
+      "count": 130,
+      "median_ms": 30.849,
+      "p95_ms": 40.846,
+      "max_ms": 64.641,
+      "mean_ms": 31.358
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 131,
+      "accepted_first": 131,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 130,
+      "accepted_first": 130,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 131,
+      "spin_checked": 131,
+      "spin_matches": 131,
+      "spin_mismatches": 0,
+      "attack_checked": 131,
+      "attack_matches": 131,
+      "attack_mismatches": 0,
+      "declared_total": 56,
+      "recomputed_total": 56,
+      "examples": []
+    },
+    {
+      "placements": 130,
+      "spin_checked": 130,
+      "spin_matches": 128,
+      "spin_mismatches": 2,
+      "attack_checked": 130,
+      "attack_matches": 130,
+      "attack_mismatches": 0,
+      "declared_total": 85,
+      "recomputed_total": 85,
+      "examples": [
+        {
+          "turn": 93,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 117,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 13682805612773635327,
+      "turn": 29
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15695747047346384486,
+      "turn": 32
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10868659471072820346,
+      "turn": 33
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5351804267784880058,
+      "turn": 53
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7382573999324600668,
+      "turn": 54
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13779060760650101545,
+      "turn": 78
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6925942895020551140,
+      "turn": 97
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m0\\logs\\seed-1005-sheet-A-attax.jsonl",
+    "decisions_logged": 130,
+    "nodes_total": 1298874,
+    "extra_ms_total": 3972.4,
+    "suggestions_with_stats": 130,
+    "cells_above_row20": false,
+    "hold_matches": 130,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence-baseline",
+      "version": "m0-placeholder",
+      "args": [
+        "--in-process",
+        "--baseline"
+      ]
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ]
+    }
+  ],
+  "replay": "replays/seed-1005-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 1005,
+    "sheet": "A",
+    "turns": 131,
+    "placements": 261,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0
+}
