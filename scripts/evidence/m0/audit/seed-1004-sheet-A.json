@@ -1,7 +1,7 @@
 {
   "seed": 1004,
   "sheet": "A",
-  "started_at": "unix:1794591243",
+  "started_at": "unix:1794592349",
   "winner": 1,
   "reason": "TopOut",
   "detail": null,
@@ -23,17 +23,21 @@
   "think": [
     {
       "count": 104,
-      "median_ms": 0.684,
-      "p95_ms": 1.062,
-      "max_ms": 1.144,
-      "mean_ms": 0.677
+      "median_ms": 0.7,
+      "p95_ms": 1.274,
+      "p99_ms": 1.416,
+      "max_ms": 1.454,
+      "mean_ms": 0.743,
+      "over_budget": 0
     },
     {
       "count": 103,
-      "median_ms": 25.987,
-      "p95_ms": 31.828,
-      "max_ms": 41.046,
-      "mean_ms": 26.453
+      "median_ms": 28.166,
+      "p95_ms": 35.777,
+      "p99_ms": 38.752,
+      "max_ms": 40.769,
+      "mean_ms": 28.682,
+      "over_budget": 0
     }
   ],
   "first_choice": [
@@ -59,6 +63,8 @@
       "attack_checked": 104,
       "attack_matches": 104,
       "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
       "declared_total": 49,
       "recomputed_total": 49,
       "examples": []
@@ -71,6 +77,8 @@
       "attack_checked": 103,
       "attack_matches": 102,
       "attack_mismatches": 1,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 1,
       "declared_total": 75,
       "recomputed_total": 76,
       "examples": [
@@ -156,10 +164,10 @@
     "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
     "bun_version": "1.4.0",
     "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
-    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m0\\logs\\seed-1004-sheet-A-attax.jsonl",
+    "decision_log": "scripts/evidence/m0\\logs\\seed-1004-sheet-A-attax.jsonl",
     "decisions_logged": 103,
     "nodes_total": 988413,
-    "extra_ms_total": 2650.6,
+    "extra_ms_total": 2880.2,
     "suggestions_with_stats": 103,
     "cells_above_row20": false,
     "hold_matches": 103,

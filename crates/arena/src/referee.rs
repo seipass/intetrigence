@@ -46,8 +46,8 @@ impl RoundConfig {
             sheet,
             turn_cap: 1000,
             frames_per_turn: 12,
-            rules: "docs/s2-spec.md@v1.3.4".into(),
-            protocol: "docs/s2-referee-protocol.md@v1.1".into(),
+            rules: "docs/s2-spec.md@v1.3.7".into(),
+            protocol: "docs/s2-referee-protocol.md@v1.5".into(),
             started_at: String::new(),
         }
     }

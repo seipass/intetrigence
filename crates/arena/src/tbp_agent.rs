@@ -111,6 +111,20 @@ impl TbpAgent {
     }
 }
 
+/// `new_piece` messages needed after a `play`: the tail of the authoritative
+/// six-entry queue starting at the adapter's current queue length.
+///
+/// Normal lock: 1 piece. Hold with an empty slot: 2 pieces (the adapter shifted
+/// the current piece and the swapped-in piece, `docs/attax-integration.md` §5.4).
+pub fn refill_pieces(queue: &[PieceKind], current_len: usize) -> Vec<Piece> {
+    queue
+        .iter()
+        .skip(current_len)
+        .copied()
+        .map(Piece::from_core)
+        .collect()
+}
+
 fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<u8>>> {
     (0..intetrigence_core::Board::HEIGHT)
         .map(|y| {
@@ -233,15 +247,15 @@ impl Agent for TbpAgent {
             self.mirror = Mirror::from_start(&payload);
         } else {
             // Checklist D5: refill until the adapter's queue is six entries.
-            while self.mirror.queue.len() < 6 {
-                let index = self.mirror.queue.len();
-                let Some(piece) = commit.queue.get(index).copied() else {
-                    self.queue_invariant_violations += 1;
-                    break;
-                };
-                host.new_piece(Piece::from_core(piece))
+            // A hold with an empty slot makes the adapter consume two entries,
+            // so this sends two `new_piece` messages in that case.
+            for piece in refill_pieces(&commit.queue, self.mirror.queue.len()) {
+                host.new_piece(piece)
                     .map_err(|error| AgentError::Io(error.to_string()))?;
-                self.mirror.push(Piece::from_core(piece));
+                self.mirror.push(piece);
+            }
+            if self.mirror.queue.len() < 6 {
+                self.queue_invariant_violations += 1;
             }
         }
 
@@ -300,5 +314,71 @@ impl Agent for TbpAgent {
             command_line: Some(self.config.host.command_line()),
             bun_version: self.config.bun_version.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use intetrigence_tbp::{Location, Orientation};
+
+    #[test]
+    fn refill_after_normal_and_hold_locks() {
+        let queue = [
+            PieceKind::I,
+            PieceKind::O,
+            PieceKind::T,
+            PieceKind::S,
+            PieceKind::Z,
+            PieceKind::J,
+        ];
+        assert_eq!(refill_pieces(&queue, 5), vec![Piece::J]);
+        assert_eq!(refill_pieces(&queue, 4), vec![Piece::Z, Piece::J]);
+    }
+
+    #[test]
+    fn hold_turn_refill_restores_the_six_entry_queue() {
+        // Adapter state before the turn: current T, preview I O S Z J.
+        let mut mirror = Mirror::new(
+            vec![Piece::T, Piece::I, Piece::O, Piece::S, Piece::Z, Piece::J],
+            None,
+            0,
+            false,
+        );
+        // Hold with an empty slot: T goes to hold, I is placed, the adapter
+        // consumes two queue entries.
+        let mv = Move {
+            location: Location {
+                kind: Piece::I,
+                orientation: Orientation::North,
+                x: 4,
+                y: 0,
+            },
+            spin: SpinLabel::None,
+        };
+        assert!(mirror.apply_play(&mv));
+        assert_eq!(mirror.queue, vec![Piece::O, Piece::S, Piece::Z, Piece::J]);
+
+        // The referee's authoritative queue after the lock: current O, preview
+        // S Z J L T.
+        let authoritative = [
+            PieceKind::O,
+            PieceKind::S,
+            PieceKind::Z,
+            PieceKind::J,
+            PieceKind::L,
+            PieceKind::T,
+        ];
+        let refill = refill_pieces(&authoritative, mirror.queue.len());
+        assert_eq!(refill, vec![Piece::L, Piece::T]);
+        for piece in &refill {
+            mirror.push(*piece);
+        }
+        let expected: Vec<Piece> = authoritative
+            .iter()
+            .copied()
+            .map(Piece::from_core)
+            .collect();
+        assert_eq!(mirror.queue, expected);
     }
 }

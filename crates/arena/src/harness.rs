@@ -53,6 +53,9 @@ pub struct MatchConfig {
     pub out_dir: PathBuf,
     pub attax: Option<AttaxConfig>,
     pub started_at: String,
+    /// Provenance string recorded in every replay header.
+    pub rules: String,
+    pub protocol: String,
 }
 
 impl MatchConfig {
@@ -65,7 +68,51 @@ impl MatchConfig {
             out_dir: out_dir.into(),
             attax: None,
             started_at: now_stamp(),
+            rules: version_string("docs/s2-spec.md", "v1.3.7"),
+            protocol: version_string("docs/s2-referee-protocol.md", "v1.5"),
         }
+    }
+}
+
+/// Repository root (the arena crate lives at `<root>/crates/arena`).
+pub fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn git_output(root: &Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// `docs/...@vX.Y.Z+<short head>[-dirty]`.
+///
+/// The commit suffix is the snapshot the run used, so
+/// `git show <commit>:<path>` restores the exact document. `-dirty` marks an
+/// uncommitted edit of that document.
+pub fn version_string(path: &str, version: &str) -> String {
+    let root = repo_root();
+    let head = git_output(&root, &["rev-parse", "--short", "HEAD"]);
+    let dirty = git_output(&root, &["status", "--porcelain", "--", path])
+        .map(|status| !status.is_empty())
+        .unwrap_or(false);
+    match head {
+        Some(head) if !head.is_empty() => {
+            let suffix = if dirty { "-dirty" } else { "" };
+            format!("{path}@{version}+{head}{suffix}")
+        }
+        _ => format!("{path}@{version}"),
     }
 }
 
@@ -91,6 +138,9 @@ pub struct GameSummary {
     pub first_choice_rate: [f64; 2],
     pub spin_match_rate: [f64; 2],
     pub attack_match_rate: [f64; 2],
+    pub spin_mismatches: [u32; 2],
+    pub attack_mismatches_same_spin: [u32; 2],
+    pub think_over_budget: [u32; 2],
     pub sent_total: [u32; 2],
     pub received_total: [u32; 2],
     pub attack_total: [u32; 2],
@@ -110,6 +160,21 @@ pub struct AttaxSummary {
     pub command_line: String,
 }
 
+/// Match-level audit totals for one bot. The final report must separate spin
+/// label mismatches from same-spin attack mismatches (protocol v1.3 §8.4).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BotAggregate {
+    pub slot: u8,
+    pub name: String,
+    pub placements: u32,
+    pub spin_checked: u32,
+    pub spin_mismatches: u32,
+    pub attack_checked: u32,
+    pub attack_mismatches: u32,
+    pub attack_mismatches_same_spin: u32,
+    pub think_over_budget: u32,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MatchSummary {
     pub schema: String,
@@ -125,6 +190,7 @@ pub struct MatchSummary {
     pub verified: u32,
     pub verify_failures: u32,
     pub attax: Option<AttaxSummary>,
+    pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
 }
 
@@ -160,6 +226,15 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         first_choice_rate: [audit.first_choice[0].rate, audit.first_choice[1].rate],
         spin_match_rate: [spin_rate(audit, 0), spin_rate(audit, 1)],
         attack_match_rate: [attack_rate(audit, 0), attack_rate(audit, 1)],
+        spin_mismatches: [
+            audit.scoring[0].spin_mismatches,
+            audit.scoring[1].spin_mismatches,
+        ],
+        attack_mismatches_same_spin: [
+            audit.scoring[0].attack_mismatches_same_spin,
+            audit.scoring[1].attack_mismatches_same_spin,
+        ],
+        think_over_budget: [audit.think[0].over_budget, audit.think[1].over_budget],
         sent_total: [audit.totals[0].sent_total, audit.totals[1].sent_total],
         received_total: [
             audit.totals[0].received_total,
@@ -197,6 +272,41 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
             bun_version: attax.bun_version.clone(),
             command_line: attax.command_line.clone(),
         });
+    let bots = [0usize, 1].map(|slot| BotAggregate {
+        slot: slot as u8,
+        name: audits
+            .first()
+            .map(|audit| audit.bots[slot].name.clone())
+            .unwrap_or_default(),
+        placements: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].placements)
+            .sum(),
+        spin_checked: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].spin_checked)
+            .sum(),
+        spin_mismatches: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].spin_mismatches)
+            .sum(),
+        attack_checked: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_checked)
+            .sum(),
+        attack_mismatches: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_mismatches)
+            .sum(),
+        attack_mismatches_same_spin: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_mismatches_same_spin)
+            .sum(),
+        think_over_budget: audits
+            .iter()
+            .map(|audit| audit.think[slot].over_budget)
+            .sum(),
+    });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
         started_at: audits
@@ -214,6 +324,7 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
         verified,
         verify_failures: games.len() as u32 - verified,
         attax,
+        bots,
         notes: vec![
             "M0 gate: plumbing / audit / replay proof. The intetrigence side is the in-process \
              M0 baseline stand-in, not the real bot (crates/bot is still a skeleton)."
@@ -296,6 +407,24 @@ impl MatchSummary {
                 game.start_resends,
             ));
         }
+        text.push_str("\n## Per-bot audit\n\n");
+        text.push_str(
+            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | think > 200ms |\n",
+        );
+        text.push_str("|---|---|---|---|---|---|\n");
+        for bot in &self.bots {
+            text.push_str(&format!(
+                "| {} | {} | {} | {} / {} | {} / {} | {} |\n",
+                bot.slot,
+                bot.name,
+                bot.placements,
+                bot.spin_mismatches,
+                bot.spin_checked,
+                bot.attack_mismatches_same_spin,
+                bot.attack_checked,
+                bot.think_over_budget,
+            ));
+        }
         text.push_str("\n## Notes\n\n");
         for note in &self.notes {
             text.push_str(&format!("- {note}\n"));
@@ -347,8 +476,8 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 sheet,
                 turn_cap: config.turn_cap,
                 frames_per_turn: config.frames_per_turn,
-                rules: "docs/s2-spec.md@v1.3.4".into(),
-                protocol: "docs/s2-referee-protocol.md@v1.1".into(),
+                rules: config.rules.clone(),
+                protocol: config.protocol.clone(),
                 started_at: config.started_at.clone(),
             };
 
@@ -459,6 +588,30 @@ mod tests {
             verified: 0,
             verify_failures: 0,
             attax: None,
+            bots: [
+                BotAggregate {
+                    slot: 0,
+                    name: "a".into(),
+                    placements: 0,
+                    spin_checked: 0,
+                    spin_mismatches: 0,
+                    attack_checked: 0,
+                    attack_mismatches: 0,
+                    attack_mismatches_same_spin: 0,
+                    think_over_budget: 0,
+                },
+                BotAggregate {
+                    slot: 1,
+                    name: "b".into(),
+                    placements: 0,
+                    spin_checked: 0,
+                    spin_mismatches: 0,
+                    attack_checked: 0,
+                    attack_mismatches: 0,
+                    attack_mismatches_same_spin: 0,
+                    think_over_budget: 0,
+                },
+            ],
             notes: vec!["note".into()],
         };
         let markdown = summary.to_markdown();

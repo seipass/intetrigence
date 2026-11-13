@@ -100,6 +100,14 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 bun = value(1)?;
                 index += 2;
             }
+            "--rules" => {
+                config.rules = value(1)?;
+                index += 2;
+            }
+            "--protocol" => {
+                config.protocol = value(1)?;
+                index += 2;
+            }
             "--no-attax" => {
                 no_attax = true;
                 index += 1;
