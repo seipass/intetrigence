@@ -197,13 +197,33 @@ pub fn unique_by_cells(placements: &[Placement]) -> Vec<Placement> {
     for placement in placements {
         let mut cells = placement.cells();
         cells.sort_unstable();
-        if seen.contains(&cells) {
-            continue;
+        match seen.iter().position(|existing| *existing == cells) {
+            Some(index) => {
+                // Cell-identical placements can differ in whether the last
+                // input was a rotation (the horizontal I reaches the same
+                // cells from rotations 0 and 2), and that decides the spin.
+                // Keep the strongest label, not the first one.
+                if spin_strength(placement) > spin_strength(&unique[index]) {
+                    unique[index] = *placement;
+                }
+            }
+            None => {
+                seen.push(cells);
+                unique.push(*placement);
+            }
         }
-        seen.push(cells);
-        unique.push(*placement);
     }
     unique
+}
+
+/// Ordering for [`unique_by_cells`]: a full spin beats a mini beats none, and
+/// a spin entry beats a plain arrival at the same label.
+fn spin_strength(placement: &Placement) -> (u8, bool, bool) {
+    (
+        placement.spin as u8,
+        placement.spin_entry,
+        placement.fin_or_tst,
+    )
 }
 
 /// The standard spawn piece for `kind` (`docs/s2-spec.md` §2.2.1).
@@ -746,6 +766,38 @@ mod tests {
             assert_eq!(all.len(), placements, "{kind:?} placements");
             assert_eq!(unique_by_cells(&all).len(), unique, "{kind:?} unique");
         }
+    }
+
+    /// Cell-identical placements can differ in whether the last input was a
+    /// rotation, so the adapter must keep the strongest label.
+    #[test]
+    fn unique_by_cells_keeps_the_strongest_spin_label() {
+        let board = Board::new();
+        for kind in ALL_PIECES {
+            let placements = generate(&board, kind);
+            for placement in unique_by_cells(&placements) {
+                let mut cells = placement.cells();
+                cells.sort_unstable();
+                let best = placements
+                    .iter()
+                    .filter(|other| {
+                        let mut other_cells = other.cells();
+                        other_cells.sort_unstable();
+                        other_cells == cells
+                    })
+                    .map(spin_strength)
+                    .max()
+                    .expect("the group is non-empty");
+                assert_eq!(spin_strength(&placement), best, "{kind:?}");
+            }
+        }
+        // The horizontal I is reachable as a rotation from state 2 and as a
+        // plain drop from state 0; the kept placement must be the spin one.
+        let kept = unique_by_cells(&generate(&board, PieceKind::I))
+            .into_iter()
+            .find(|placement| placement.key() == (Rotation::Two, 3, -1))
+            .expect("the rotation-2 horizontal I is kept");
+        assert!(kept.spin_entry);
     }
 
     /// Reusing one generator for many boards must give exactly the same

@@ -113,7 +113,10 @@ pub fn play_game(seed: u64, config: &SearchConfig, max_turns: u32) -> GameReport
                 context,
             };
             let start = Instant::now();
-            let result = searcher.search(&root);
+            let Some(result) = searcher.search(&root) else {
+                // No legal placement: the game is over.
+                break;
+            };
             report.think_times.push(start.elapsed());
             (
                 result.best.hold,

@@ -246,7 +246,11 @@ impl Searcher {
     }
 
     /// Runs the anytime loop and returns the best move found.
-    pub fn search(&mut self, root: &RootState) -> SearchResult {
+    ///
+    /// Returns `None` when the current piece has no legal placement at all
+    /// (the spawn is blocked, i.e. the game is already over). A referee should
+    /// check for top-out before asking, but the search never panics on it.
+    pub fn search(&mut self, root: &RootState) -> Option<SearchResult> {
         let start = Instant::now();
         // Leave a small margin for the final merge, which happens after the
         // last deadline check, so the wall-clock time stays inside the budget.
@@ -285,11 +289,12 @@ impl Searcher {
             width = (width * 3 / 2).min(self.config.max_width);
         }
 
-        best.unwrap_or_else(|| self.greedy(root, start))
+        best.or_else(|| self.greedy(root, start))
     }
 
-    /// One-ply fallback that always returns a move.
-    fn greedy(&mut self, root: &RootState, start: Instant) -> SearchResult {
+    /// One-ply fallback that always returns a move unless the piece cannot be
+    /// placed anywhere.
+    fn greedy(&mut self, root: &RootState, start: Instant) -> Option<SearchResult> {
         let sequence = PieceSequence::new(root.current, &root.preview, 2);
         let node = root_record(root);
         let mut children = Vec::new();
@@ -306,15 +311,13 @@ impl Searcher {
         self.movegen = movegen;
         children
             .sort_unstable_by(|a, b| b.value.total_cmp(&a.value).then_with(|| a.key.cmp(&b.key)));
-        let child = children
-            .first()
-            .expect("the search needs at least one legal placement");
+        let child = children.first()?;
         let first = Move {
             hold: child.hold_used,
             piece: child.piece,
             placement: child.placement,
         };
-        SearchResult {
+        Some(SearchResult {
             best: first,
             value: child.value,
             depth: 1,
@@ -326,7 +329,7 @@ impl Searcher {
                 value: child.value,
             }],
             line: vec![first],
-        }
+        })
     }
 
     fn run_sequential(
@@ -798,7 +801,7 @@ mod tests {
     fn search_returns_a_legal_move_on_an_empty_board() {
         let mut searcher = Searcher::new(fast_config());
         let state = root(Board::new(), PieceKind::T, &[PieceKind::I, PieceKind::O]);
-        let result = searcher.search(&state);
+        let result = searcher.search(&state).expect("a move exists");
         assert!(
             result
                 .best
@@ -823,7 +826,7 @@ mod tests {
             weights: Weights::default(),
         });
         let state = root(tsd_board(), PieceKind::T, &[PieceKind::I]);
-        let result = searcher.search(&state);
+        let result = searcher.search(&state).expect("a move exists");
         assert_eq!(result.best.piece, PieceKind::T);
         assert_eq!(result.best.placement.spin, SpinType::Full);
     }
@@ -845,7 +848,7 @@ mod tests {
         });
         let mut state = root(board, PieceKind::S, &[PieceKind::O]);
         state.hold = Some(PieceKind::I);
-        let result = searcher.search(&state);
+        let result = searcher.search(&state).expect("a move exists");
         assert!(result.best.hold, "the I in hold should be used");
         assert_eq!(result.best.piece, PieceKind::I);
     }
@@ -861,12 +864,12 @@ mod tests {
             threads: 1,
             ..fast_config()
         });
-        let a = sequential.search(&state);
+        let a = sequential.search(&state).expect("a move exists");
         let mut parallel = Searcher::new(SearchConfig {
             threads: 4,
             ..fast_config()
         });
-        let b = parallel.search(&state);
+        let b = parallel.search(&state).expect("a move exists");
         assert_eq!(a.best, b.best);
         assert_eq!(a.value, b.value);
         assert_eq!(a.line, b.line);
@@ -883,9 +886,19 @@ mod tests {
             weights: Weights::default(),
         });
         let state = root(Board::new(), PieceKind::I, &[PieceKind::O]);
-        let result = searcher.search(&state);
+        let result = searcher.search(&state).expect("a move exists");
         assert!(!result.line.is_empty());
         assert!(result.elapsed < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn a_blocked_spawn_returns_no_move_instead_of_panicking() {
+        let mut board = Board::new();
+        board.set_row(21, Board::FULL_ROW);
+        board.set_row(22, Board::FULL_ROW);
+        let state = root(board, PieceKind::T, &[PieceKind::I]);
+        let mut searcher = Searcher::new(fast_config());
+        assert!(searcher.search(&state).is_none());
     }
 
     #[test]
