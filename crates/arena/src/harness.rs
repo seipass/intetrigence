@@ -407,6 +407,24 @@ impl MatchSummary {
                 game.start_resends,
             ));
         }
+        text.push_str("\n## Per-bot audit\n\n");
+        text.push_str(
+            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | think > 200ms |\n",
+        );
+        text.push_str("|---|---|---|---|---|---|\n");
+        for bot in &self.bots {
+            text.push_str(&format!(
+                "| {} | {} | {} | {} / {} | {} / {} | {} |\n",
+                bot.slot,
+                bot.name,
+                bot.placements,
+                bot.spin_mismatches,
+                bot.spin_checked,
+                bot.attack_mismatches_same_spin,
+                bot.attack_checked,
+                bot.think_over_budget,
+            ));
+        }
         text.push_str("\n## Notes\n\n");
         for note in &self.notes {
             text.push_str(&format!("- {note}\n"));

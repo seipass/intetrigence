@@ -22,6 +22,13 @@
 | 1005 | A | attax | TopOut | 131 | yes | 0.4 / 28.7 | 1.0 / 33.7 | 1.00 / 1.00 | 1.00 / 0.98 | 7 |
 | 1005 | B | attax | TopOut | 92 | yes | 0.5 / 29.1 | 1.0 / 37.3 | 1.00 / 1.00 | 1.00 / 1.00 | 10 |
 
+## Per-bot audit
+
+| slot | bot | placements | spin mismatch | attack mismatch (same spin) | think > 200ms |
+|---|---|---|---|---|---|
+| 0 | intetrigence-baseline | 735 | 0 / 735 | 0 / 735 | 0 |
+| 1 | Attax | 730 | 12 / 730 | 0 / 730 | 0 |
+
 ## Notes
 
 - M0 gate: plumbing / audit / replay proof. The intetrigence side is the in-process M0 baseline stand-in, not the real bot (crates/bot is still a skeleton).
