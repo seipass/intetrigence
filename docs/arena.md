@@ -1,8 +1,8 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1
-**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.4
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.2
+**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.6
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
 
@@ -65,7 +65,7 @@ cargo run --release -p intetrigence-arena --bin arena -- report scripts/evidence
 | §6.1 トップアウト | `Game::lock` / `insert_garbage` の後 `Game::is_over()`。seat 1 が死んだらその turn の seat 2 は打たない |
 | §6.3 turn cap | 受信ゴミ少 → 送信多 → 引き分け |
 | §7 エラー | bot のエラーは forfeit、レフェリーの不変条件違反はマッチ中断(`RoundError::Referee`) |
-| §8.1 replay | `replay.rs`。header / turn / garbage / hash / result。`placement.piece` 必須(v1.1) |
+| §8.1 replay | `replay.rs`。header / turn / garbage / hash / result。`placement.piece` 必須(v1.1 以降) |
 | §8.2 盤面ハッシュ | 各 turn の終わりに両者の盤面(occupied + garbage)の FNV-1a |
 | §8.3 verify-replay | `verify_replay`。着手を再適用し、spin / lines / events / sent / cancelled / hash / result を比較 |
 | §8.4 監査 | `audit.rs` + `GameAudit` |
@@ -88,9 +88,22 @@ protocol §2.2 は「共有 7-bag から `bag[t]` を取り、両者に同じピ
 **replay への影響**: per-player bag では turn 単位のピースが定義できないので、
 **placement ごとに `piece` を記録**し、verify は placement の `piece` を使う。
 protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂され、
-§8.1 の `turn.piece` は削除・`placement.piece` が必須になった。実装は v1.1 に一致する。
-s2-spec §11-U7 の「ピース袋は 1 本」も「`piece_seed` は 1 本、袋のインスタンスは
-プレイヤーごと」に修正された(v1.3.5、ルール値の変更なし)。
+§8.1 の `turn.piece` は削除・`placement.piece` が必須になった。v1.2 では §6.1 の
+「同一 turn の同時トップアウト → 引き分け」が到達不能と確認され、「トップアウトした瞬間に
+終了、相手の勝ち」に統一された(実装は元からその挙動)。s2-spec §11-U7 の
+「ピース袋は 1 本」も「`piece_seed` は 1 本、袋のインスタンスはプレイヤーごと」に
+修正された(v1.3.5、ルール値の変更なし。v1.3.6 は §12 の監査追記のみ)。
+
+### D1.1. `View` のフィールドの意味(bot 側と合わせる)
+
+| フィールド | 意味 |
+|---|---|
+| `combo` | **この設置で式に入る値**(設置前の combo。0 = チェインなし) |
+| `b2b_streak` | 連続 difficult clear 数 `N`(**0 始まり**。表示 B2B x4 = `N = 5`) |
+| `pending_garbage` | 自分のキュー全体(**到着前のパケットを含む**) |
+| `preview` | 5 枚(現在ピースは含まない) |
+| `active` | 現在ピースの完全な位置(ボックス左下) |
+| `multiplier` | その turn の frame での攻撃倍率(逐次加算値) |
 
 ### D2. 着手の適用は「BFS のパス再生」
 
@@ -168,16 +181,16 @@ protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので�
 
 | seed | sheet | 勝者 | 理由 | turns | replay | think median (ms) intetrigence / attax | first-choice | spin 一致 |
 |---|---|---|---|---|---|---|---|---|
-| 1001 | A | attax | TopOut | 51 | OK | 1.0 / 27.1 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1001 | B | attax | TopOut | 51 | OK | 0.9 / 27.1 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 27.8 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1002 | B | attax | TopOut | 58 | OK | 0.8 / 27.3 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 29.4 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1003 | B | attax | TopOut | 48 | OK | 0.8 / 28.5 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 25.9 | 1.00 / 1.00 | 1.00 / 0.97 |
-| 1004 | B | attax | TopOut | 94 | OK | 0.9 / 29.3 | 1.00 / 1.00 | 1.00 / 0.99 |
-| 1005 | A | attax | TopOut | 131 | OK | 0.5 / 30.8 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1005 | B | attax | TopOut | 92 | OK | 0.6 / 28.2 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1001 | A | attax | TopOut | 51 | OK | 1.1 / 27.2 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1001 | B | attax | TopOut | 51 | OK | 0.9 / 27.6 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 26.9 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1002 | B | attax | TopOut | 58 | OK | 0.7 / 26.1 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 28.6 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1003 | B | attax | TopOut | 48 | OK | 0.7 / 27.5 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 27.0 | 1.00 / 1.00 | 1.00 / 0.97 |
+| 1004 | B | attax | TopOut | 94 | OK | 0.9 / 27.2 | 1.00 / 1.00 | 1.00 / 0.99 |
+| 1005 | A | attax | TopOut | 131 | OK | 0.4 / 26.1 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1005 | B | attax | TopOut | 92 | OK | 0.6 / 26.0 | 1.00 / 1.00 | 1.00 / 1.00 |
 
 - **replay 検証: 10/10 成功**(`arena verify scripts/evidence/m0`)。
 - 監査: 到達可能性拒否 0、queue 不変条件違反 0、hold 推論の不一致 0、
@@ -188,6 +201,10 @@ protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので�
 - **勝敗は参考値**: 0 勝 10 敗。ベースラインが攻撃を作れず(51 手で攻撃 6 行)、
   attax(23 行)にゴミで押し切られた。配管・監査・replay の証明が目的。
 - 証拠: `scripts/evidence/m0/{summary.json,summary.md,audit/*.json,replays/*.jsonl,logs/*}`。
+- header の版: この証拠は `docs/s2-spec.md@v1.3.6` / `docs/s2-referee-protocol.md@v1.2`。
+  `arena match` は既定で `+<short HEAD>` を付ける(`git show <commit>:<path>` で当時の文書を復元)。
+  この証拠は統合前の worktree で生成したため、dangling hash を避けて版のみを記録している。
+  統合コミット後に `scripts/m0-match.sh` を再実行すると `+<commit>` 付きになる。
 
 ### 再現
 
@@ -207,8 +224,9 @@ scripts/m0-match.sh
 3. **実時間ペーシングなし**(D8)。状態は frame のみで決まる。
 4. **stderr はプロセス終了時にファイルへ書く**。長時間走行中の tail はできない。
 5. **movegen の一本化**(bot-dev 提案): `crates/bot::Movegen` に `Placement.actions` /
-   `generate_from` / `reachable_states` があり、`crates/arena::movegen` を差し替え可能。
-   bot のコミットがこの worktree に入った時点で、`(board, kind) -> BTreeSet<(rotation, x, y)>`
-   のクロスチェックを固定してから差し替える(現状は独立実装)。
+   `generate_from` / `reachable_states` / `unique_by_cells` があり、`crates/arena::movegen`
+   を差し替え可能。**I/O/S/Z は同一セルを複数 rotation で表す**ので、クロスチェックは
+   両者をセル集合に畳んでから比較する(`(rotation, x, y)` の集合で比べると個数が食い違う)。
+   差し替え後もクロスチェックは残す(FRONT 表バグと同じ二重実装リスクの検出)。
 6. `verify-replay` は着手列の再実行であって探索の再現ではない(PLAN §3.3 のとおり)。
 7. forfeit は負けとして集計する(protocol §7 の P2 暫定)。

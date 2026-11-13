@@ -53,6 +53,9 @@ pub struct MatchConfig {
     pub out_dir: PathBuf,
     pub attax: Option<AttaxConfig>,
     pub started_at: String,
+    /// Provenance string recorded in every replay header.
+    pub rules: String,
+    pub protocol: String,
 }
 
 impl MatchConfig {
@@ -65,7 +68,51 @@ impl MatchConfig {
             out_dir: out_dir.into(),
             attax: None,
             started_at: now_stamp(),
+            rules: version_string("docs/s2-spec.md", "v1.3.6"),
+            protocol: version_string("docs/s2-referee-protocol.md", "v1.2"),
         }
+    }
+}
+
+/// Repository root (the arena crate lives at `<root>/crates/arena`).
+pub fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn git_output(root: &Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// `docs/...@vX.Y.Z+<short head>[-dirty]`.
+///
+/// The commit suffix is the snapshot the run used, so
+/// `git show <commit>:<path>` restores the exact document. `-dirty` marks an
+/// uncommitted edit of that document.
+pub fn version_string(path: &str, version: &str) -> String {
+    let root = repo_root();
+    let head = git_output(&root, &["rev-parse", "--short", "HEAD"]);
+    let dirty = git_output(&root, &["status", "--porcelain", "--", path])
+        .map(|status| !status.is_empty())
+        .unwrap_or(false);
+    match head {
+        Some(head) if !head.is_empty() => {
+            let suffix = if dirty { "-dirty" } else { "" };
+            format!("{path}@{version}+{head}{suffix}")
+        }
+        _ => format!("{path}@{version}"),
     }
 }
 
@@ -347,8 +394,8 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 sheet,
                 turn_cap: config.turn_cap,
                 frames_per_turn: config.frames_per_turn,
-                rules: "docs/s2-spec.md@v1.3.4".into(),
-                protocol: "docs/s2-referee-protocol.md@v1.1".into(),
+                rules: config.rules.clone(),
+                protocol: config.protocol.clone(),
                 started_at: config.started_at.clone(),
             };
 
