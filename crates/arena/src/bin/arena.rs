@@ -14,9 +14,10 @@ use std::time::Duration;
 
 use intetrigence_arena::engine::Sheet;
 use intetrigence_arena::harness::{
-    AttaxConfig, MatchConfig, load_audits, now_stamp, run_match, summarize, verify_all,
+    AttaxConfig, BotChoice, MatchConfig, load_audits, now_stamp, run_match, summarize, verify_all,
 };
 use intetrigence_arena::replay::verify_replay;
+use intetrigence_bot::SearchConfig;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -52,6 +53,9 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut bun = "bun".to_string();
     let mut timeout = 30u64;
     let mut no_attax = false;
+    let mut bot = "baseline".to_string();
+    let mut ms = 100u64;
+    let mut threads = 8usize;
 
     let mut index = 0;
     while index < args.len() {
@@ -112,6 +116,22 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 no_attax = true;
                 index += 1;
             }
+            "--bot" => {
+                bot = value(1)?;
+                index += 2;
+            }
+            "--ms" => {
+                ms = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--ms: {error}"))?;
+                index += 2;
+            }
+            "--threads" => {
+                threads = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--threads: {error}"))?;
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -137,6 +157,15 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.timeout = Duration::from_secs(timeout);
         config.attax = Some(attax_config);
     }
+    config.bot = match bot.as_str() {
+        "baseline" => BotChoice::Baseline,
+        "search" => BotChoice::Search(Box::new(SearchConfig {
+            budget: Duration::from_millis(ms),
+            threads,
+            ..SearchConfig::default()
+        })),
+        other => return Err(format!("unknown --bot `{other}` (baseline|search)")),
+    };
     config.started_at = now_stamp();
 
     println!(

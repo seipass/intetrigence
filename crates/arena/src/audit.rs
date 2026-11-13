@@ -232,6 +232,10 @@ pub struct GameAudit {
     pub verify: crate::replay::VerifyReport,
     /// Host-side queue invariant violations (must be zero).
     pub queue_invariant_violations: u64,
+    /// intetrigence search calls that used the direct-placement fallback.
+    pub bot_fallbacks: u64,
+    /// intetrigence search nodes summed over the round.
+    pub bot_nodes_total: u64,
 }
 
 impl GameAudit {

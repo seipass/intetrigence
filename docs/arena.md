@@ -39,12 +39,13 @@ cargo run --release -p intetrigence-arena --bin arena -- report scripts/evidence
 | `crates/tbp/src/geometry.rs` | TBP / Cold Clear の `(orientation, 中心 x, y)` ↔ `crates/core` の `(rotation, ボックス左下 x, y)`。**セル集合の一致**で変換するので、ピース表が変わってもずれない |
 | `crates/tbp/src/host.rs` | プロセス spawn、行区切り JSON、`info` タイムアウト、stderr 保存、think time、`quit`(チェックリスト A/B) |
 | `crates/tbp/src/mirror.rs` | attax アダプタの queue/hold 遷移の写し。queue 長 6 の不変条件チェック(D5) |
-| `crates/arena/src/movegen.rs` | 入力空間の BFS(左右・ソフトドロップ・SRS+ 回転 + 180°)。到達可能性検証と、core に「テレポート」API がないための**着手の再現パス**を返す |
+| `crates/arena/src/movegen.rs` | `intetrigence_bot::movegen` のアダプタ。BFS は bot 側の 1 実装を共有し、セル集合キーの `MoveSet` と着手の再現パスを返す |
 | `crates/arena/src/engine.rs` | プレイヤー状態、着手適用、採点、相殺、送信、挿入、盤面ハッシュ |
 | `crates/arena/src/referee.rs` | ペアドターン、席順、第 1 候補採用、replay 記録、監査集計 |
 | `crates/arena/src/replay.rs` | replay レコードと `verify-replay` |
 | `crates/arena/src/audit.rs` | think time(median / p95 / max)、first-choice、採点オーディット、Wilson CI |
 | `crates/arena/src/baseline.rs` | M0 用の**暫定** in-process bot(本物ではない) |
+| `crates/arena/src/bot_agent.rs` | 本物の `intetrigence_bot::Searcher` を `Agent` に接続(`--ms 100`、8 スレッド) |
 | `crates/arena/src/tbp_agent.rs` | 外部 TBP bot(attax)の `Agent` 実装。`start` 再送・queue 補充・hold 推論・監査 |
 | `crates/arena/src/harness.rs` | seed × sheet のマッチ実行、summary |
 
@@ -119,6 +120,9 @@ protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂�
 - 合法手集合は**セル集合で 1 個**に畳む。I/O/S/Z は同一セルを複数 rotation で表し、
   回転由来かどうか(`spin_entry`)が異なることがあるため、**最強の spin ラベルを残す**
   (最初の BFS 順で残すと Mini を落とす。bot-dev の 27edb70 と同じ規則)。
+- **BFS は bot と共有**(`intetrigence_bot::movegen`)。`crates/arena/src/movegen.rs` は
+  アダプタだけで、`(sorted cells, spin)` の集合一致を
+  `crates/arena/tests/movegen_crosscheck.rs` で恒久的に検証する(fixture 5 種 + ランダム 32 盤面)。
   protocol v1.4 §4.2.1 で `spin(cells) = max over paths p of spin_type(cells, last_action(p), kick(p))`
   として明文化された。
 - **TETR.IO との差(重要)**: この「経路の最大 spin」規則は、実機の「実際に回して置いたか」より
@@ -188,6 +192,21 @@ sleep を足すだけで、状態には影響しない。
 - median: 偶数個は中央 2 つの平均。
 - p95: nearest-rank(`sorted[ceil(0.95 n) - 1]`)。
 - Wilson 95% CI: `z = 1.959964`。
+
+### D9.1. 本物の bot の接続(M2)
+
+`crates/arena/src/bot_agent.rs` が `intetrigence_bot::Searcher` を `Agent` に接続する。
+
+- `View` → `RootState`: `current = active.kind`、`preview = 5 preview`、`hold`、
+  `EvalContext { b2b_streak, combo, pieces_placed, incoming = pending_garbage, t_slot = 0 }`。
+- `--ms 100`(既定)、スレッド 8(`MAX_THREADS`)。
+- 検索は**標準 spawn 前提**。ゴミ挿入で active が押し上げられた場合や Clutch では、
+  検索が `None` を返すことがある。その場合は**実際の active からの movegen** で
+  合法手を生成し、簡易評価で並べて候補の末尾に追加する(フォールバック)。
+  フォールバック回数は監査の `bot_fallbacks` に記録する。
+- 検索候補は `SearchResult.candidates`(best 先頭)をそのまま優先順にする。レフェリーは
+  到達可能な最初の候補を採用するので、検索の best が押し上げ後の active から到達不能でも
+  次の候補・フォールバックで合法手が残る。
 
 ### D10. ベースライン bot は M0 の暫定
 

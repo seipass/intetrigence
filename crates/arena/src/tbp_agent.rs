@@ -310,6 +310,7 @@ impl Agent for TbpAgent {
             hold_matches: self.hold_matches,
             hold_mismatches: self.hold_mismatches,
             start_resends: self.start_resends.clone(),
+            clutch_fallbacks: 0,
             queue_invariant_violations: self.queue_invariant_violations,
             command_line: Some(self.config.host.command_line()),
             bun_version: self.config.bun_version.clone(),

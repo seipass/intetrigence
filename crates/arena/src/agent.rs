@@ -138,6 +138,9 @@ pub struct AgentAudit {
     pub hold_mismatches: u64,
     /// `start` resends performed this round.
     pub start_resends: Vec<(String, u64, u32)>,
+    /// Search calls that had to fall back to a direct placement (Clutch or a
+    /// pushed-up spawn, where the search's standard-spawn assumption fails).
+    pub clutch_fallbacks: u64,
     /// Host-side queue invariant violations (must be zero).
     pub queue_invariant_violations: u64,
     /// Host command line (reproducibility).

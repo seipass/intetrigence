@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use intetrigence_bot::SearchConfig;
 use intetrigence_tbp::HostConfig;
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +45,15 @@ impl AttaxConfig {
     }
 }
 
+/// Which bot plays slot 0 (intetrigence).
+#[derive(Clone, Debug)]
+pub enum BotChoice {
+    /// The M0 in-process stand-in (plumbing tests).
+    Baseline,
+    /// The real anytime search from `crates/bot`.
+    Search(Box<SearchConfig>),
+}
+
 #[derive(Clone, Debug)]
 pub struct MatchConfig {
     pub seeds: Vec<u64>,
@@ -56,6 +66,8 @@ pub struct MatchConfig {
     /// Provenance string recorded in every replay header.
     pub rules: String,
     pub protocol: String,
+    /// Slot 0 bot.
+    pub bot: BotChoice,
 }
 
 impl MatchConfig {
@@ -70,6 +82,7 @@ impl MatchConfig {
             started_at: now_stamp(),
             rules: version_string("docs/s2-spec.md", "v1.3.9"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.7"),
+            bot: BotChoice::Baseline,
         }
     }
 }
@@ -116,6 +129,11 @@ pub fn version_string(path: &str, version: &str) -> String {
     }
 }
 
+/// Short HEAD of this checkout, recorded as the bot's commit.
+pub fn git_short_head() -> Option<String> {
+    git_output(&repo_root(), &["rev-parse", "--short", "HEAD"])
+}
+
 pub fn now_stamp() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -138,6 +156,7 @@ pub struct GameSummary {
     pub first_choice_rate: [f64; 2],
     pub spin_match_rate: [f64; 2],
     pub attack_match_rate: [f64; 2],
+    pub attack_per_piece: [f64; 2],
     pub spin_mismatches: [u32; 2],
     pub attack_mismatches_same_spin: [u32; 2],
     pub think_over_budget: [u32; 2],
@@ -173,6 +192,8 @@ pub struct BotAggregate {
     pub attack_mismatches: u32,
     pub attack_mismatches_same_spin: u32,
     pub think_over_budget: u32,
+    pub attack_per_piece: f64,
+    pub received_per_game: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -192,6 +213,14 @@ pub struct MatchSummary {
     pub attax: Option<AttaxSummary>,
     pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
+}
+
+fn ratio(numerator: u32, denominator: u32) -> f64 {
+    if denominator == 0 {
+        0.0
+    } else {
+        (f64::from(numerator) / f64::from(denominator) * 1000.0).round() / 1000.0
+    }
 }
 
 fn rate(matches: u32, checked: u32) -> f64 {
@@ -226,6 +255,10 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         first_choice_rate: [audit.first_choice[0].rate, audit.first_choice[1].rate],
         spin_match_rate: [spin_rate(audit, 0), spin_rate(audit, 1)],
         attack_match_rate: [attack_rate(audit, 0), attack_rate(audit, 1)],
+        attack_per_piece: [
+            ratio(audit.totals[0].attack_total, audit.totals[0].pieces_placed),
+            ratio(audit.totals[1].attack_total, audit.totals[1].pieces_placed),
+        ],
         spin_mismatches: [
             audit.scoring[0].spin_mismatches,
             audit.scoring[1].spin_mismatches,
@@ -306,6 +339,28 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
             .iter()
             .map(|audit| audit.think[slot].over_budget)
             .sum(),
+        attack_per_piece: ratio(
+            audits
+                .iter()
+                .map(|audit| audit.totals[slot].attack_total)
+                .sum(),
+            audits
+                .iter()
+                .map(|audit| audit.totals[slot].pieces_placed)
+                .sum(),
+        ),
+        received_per_game: if audits.is_empty() {
+            0.0
+        } else {
+            (audits
+                .iter()
+                .map(|audit| f64::from(audit.totals[slot].received_total))
+                .sum::<f64>()
+                / audits.len() as f64
+                * 1000.0)
+                .round()
+                / 1000.0
+        },
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
@@ -452,7 +507,15 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
             let log_path = logs.join(format!("{name}-attax.jsonl"));
             let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
 
-            let mut baseline = BaselineBot::new();
+            let mut bot: Box<dyn Agent> = match &config.bot {
+                BotChoice::Baseline => Box::new(BaselineBot::new()),
+                BotChoice::Search(search) => {
+                    let mut bot_config =
+                        crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
+                    bot_config.commit = git_short_head();
+                    Box::new(crate::bot_agent::BotAgent::new(bot_config))
+                }
+            };
             let mut opponent: Box<dyn Agent> = match &config.attax {
                 Some(attax) => {
                     let mut host = HostConfig::new(
@@ -481,7 +544,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 started_at: config.started_at.clone(),
             };
 
-            let mut agents: [&mut dyn Agent; 2] = [&mut baseline, opponent.as_mut()];
+            let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
             let report = run_round(&round_config, &mut agents)
                 .map_err(|error| format!("{name}: {error}"))?;
 
@@ -599,6 +662,8 @@ mod tests {
                     attack_mismatches: 0,
                     attack_mismatches_same_spin: 0,
                     think_over_budget: 0,
+                    attack_per_piece: 0.0,
+                    received_per_game: 0.0,
                 },
                 BotAggregate {
                     slot: 1,
@@ -610,6 +675,8 @@ mod tests {
                     attack_mismatches: 0,
                     attack_mismatches_same_spin: 0,
                     think_over_budget: 0,
+                    attack_per_piece: 0.0,
+                    received_per_game: 0.0,
                 },
             ],
             notes: vec!["note".into()],

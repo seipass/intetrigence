@@ -415,6 +415,8 @@ pub fn run_round(
         replay: String::new(),
         verify: crate::replay::VerifyReport::default(),
         queue_invariant_violations: agent_audits[1].queue_invariant_violations,
+        bot_fallbacks: agent_audits[0].clutch_fallbacks,
+        bot_nodes_total: agent_audits[0].nodes_total,
     };
 
     Ok(RoundReport {
@@ -559,6 +561,8 @@ fn forfeit_report(
         replay: String::new(),
         verify: crate::replay::VerifyReport::default(),
         queue_invariant_violations: 0,
+        bot_fallbacks: 0,
+        bot_nodes_total: 0,
     };
     for agent in agents.iter_mut() {
         let _ = agent.end_round();

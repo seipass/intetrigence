@@ -1,66 +1,35 @@
-//! Exact reachability movegen over the input space.
+//! Reachability movegen adapter over [`intetrigence_bot::movegen`].
 //!
 //! The referee must verify that a bot's placement is reachable from the current
 //! spawn with shift / soft drop / SRS+ rotation (including 180°) and that it is
 //! grounded (`docs/s2-referee-protocol.md` §4.2). It also has to *apply* the
-//! placement through `crates/core` without a "teleport" API, so the same BFS
+//! placement through `crates/core` without a "teleport" API, so the movegen
 //! returns a concrete action path that is replayed with [`Game::apply`].
 //!
-//! Spin classification is a function of the placement **and** the path: a spin
-//! requires the last action to be a rotation (`docs/s2-spec.md` §4.1), and the
-//! 5th-kick FIN/TST predicate depends on the kick used. The BFS therefore
-//! records, for every reachable state, whether some path reaches it with a
-//! rotation as the last action, and takes the maximum spin over those paths.
-//! This is deterministic: live play and `verify-replay` compute the same value
-//! from the same board.
+//! The BFS itself lives in `crates/bot` (bot-dev): one implementation, shared
+//! by the search and the referee, so the two cannot drift. This module only
+//! adapts the bot's `Placement` (per `(rotation, x, y)`) into the referee's
+//! cell-set-keyed [`MoveSet`] and keeps the pre-lock action path.
+//!
+//! Spin classification is the bot's (which delegates to
+//! `Board::spin_type`): a spin requires the last action to be a rotation, and
+//! the 5th-kick FIN/TST predicate depends on the kick used. Cell-identical
+//! placements are collapsed to the strongest label (`unique_by_cells`), per
+//! protocol v1.7 §4.2.1.
 
-use std::collections::{HashMap, VecDeque};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
-use intetrigence_core::{
-    Action, ActivePiece, Board, PieceKind, RotateDirection, Rotation, SpinType, kick,
-};
+use intetrigence_bot::{Movegen, unique_by_cells};
+use intetrigence_core::{Action, ActivePiece, Board, PieceKind, Rotation, SpinType};
 
-/// Action order used by the BFS. Fixed so paths are reproducible.
-const ACTIONS: [Action; 6] = [
-    Action::MoveLeft,
-    Action::MoveRight,
-    Action::SoftDrop,
-    Action::RotateCw,
-    Action::RotateCcw,
-    Action::Rotate180,
-];
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct State {
-    rotation: u8,
-    x: i32,
-    y: i32,
+thread_local! {
+    /// The referee is single-threaded; one reusable generator avoids the
+    /// per-call buffer allocation.
+    static MOVEGEN: RefCell<Movegen> = RefCell::new(Movegen::new());
 }
 
-impl State {
-    fn new(piece: ActivePiece) -> Self {
-        Self {
-            rotation: piece.rotation as u8,
-            x: piece.x,
-            y: piece.y,
-        }
-    }
-
-    fn rotation(self) -> Rotation {
-        Rotation::from_u8(self.rotation).expect("rotation is always 0..=3")
-    }
-
-    fn piece(self, kind: PieceKind) -> ActivePiece {
-        ActivePiece {
-            kind,
-            rotation: self.rotation(),
-            x: self.x,
-            y: self.y,
-        }
-    }
-}
-
-/// One reachable, grounded placement.
+/// One reachable, grounded placement, keyed by its cell set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
     pub kind: PieceKind,
@@ -71,7 +40,7 @@ pub struct Placement {
     pub cells: [(i32, i32); 4],
     /// Best spin achievable for this placement (max over paths).
     pub spin: SpinType,
-    /// Action path from the start state that reproduces the placement.
+    /// Pre-lock action path from the start state (no hard drop).
     pub path: Vec<Action>,
     /// True when the placement requires a hold first.
     pub hold: bool,
@@ -128,37 +97,60 @@ impl MoveSet {
 
 /// Canonical spawn state of `kind`.
 pub fn spawn_state(kind: PieceKind) -> ActivePiece {
-    let (x, y) = kind.spawn_position();
-    ActivePiece {
-        kind,
-        rotation: Rotation::Zero,
-        x,
-        y,
+    intetrigence_bot::spawn_piece(kind)
+}
+
+/// Absolute cells of a core placement, sorted lexicographically.
+pub fn core_cells(kind: PieceKind, rotation: Rotation, x: i32, y: i32) -> [(i32, i32); 4] {
+    let mut cells = kind.cells(rotation).map(|(cx, cy)| (cx + x, cy + y));
+    cells.sort_unstable();
+    cells
+}
+
+fn convert(placement: &intetrigence_bot::Placement, hold: bool) -> Placement {
+    let mut cells = placement.cells();
+    cells.sort_unstable();
+    Placement {
+        kind: placement.piece.kind,
+        rotation: placement.piece.rotation,
+        x: placement.piece.x,
+        y: placement.piece.y,
+        cells,
+        spin: placement.spin,
+        path: placement.pre_lock_actions().to_vec(),
+        hold,
     }
 }
 
-/// Enumerates every grounded placement reachable from `start`.
+/// Every reachable grounded placement, **without** cell-set deduplication.
+///
+/// This is the raw `(rotation, x, y)` result. It is used by the cell-set
+/// invariant tests and by the cross-check against the bot's movegen.
+pub fn generate_all(board: &Board, start: ActivePiece, hold: bool) -> Vec<Placement> {
+    MOVEGEN.with(|cell| {
+        let mut movegen = cell.borrow_mut();
+        movegen
+            .generate_from(board, start)
+            .iter()
+            .map(|placement| convert(placement, hold))
+            .collect()
+    })
+}
+
+/// Enumerates every grounded placement reachable from `start`, one per cell
+/// set (the strongest spin label wins).
 pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
     let kind = start.kind;
-    let mut placements: Vec<Placement> = Vec::new();
-    let mut by_cells: HashMap<[(i32, i32); 4], usize> = HashMap::new();
-    for placement in generate_all(board, start, hold) {
-        match by_cells.get(&placement.cells) {
-            Some(&index) => {
-                // The same cells can be reached with a different last action
-                // (I/O/S/Z are 180-degree symmetric). A non-T spin is
-                // `spin_entry && immobile`, so keeping the first state could
-                // drop a Mini that a rotation entry would earn. Keep the
-                // strongest label; ties keep the first BFS-order placement.
-                if placement.spin.index() > placements[index].spin.index() {
-                    placements[index] = placement;
-                }
-            }
-            None => {
-                by_cells.insert(placement.cells, placements.len());
-                placements.push(placement);
-            }
-        }
+    let unique = MOVEGEN.with(|cell| {
+        let mut movegen = cell.borrow_mut();
+        unique_by_cells(movegen.generate_from(board, start))
+    });
+    let mut placements = Vec::with_capacity(unique.len());
+    let mut by_cells = HashMap::with_capacity(unique.len());
+    for placement in &unique {
+        let converted = convert(placement, hold);
+        by_cells.insert(converted.cells, placements.len());
+        placements.push(converted);
     }
     MoveSet {
         kind,
@@ -166,190 +158,6 @@ pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
         placements,
         by_cells,
     }
-}
-
-/// Every reachable grounded placement, **without** cell-set deduplication.
-///
-/// This is the raw BFS result: one entry per `(rotation, x, y)` state. It is
-/// used by the cell-set invariant tests and by the post-integration cross-check
-/// against `intetrigence_bot::Movegen` (which exposes `unique_by_cells`).
-pub fn generate_all(board: &Board, start: ActivePiece, hold: bool) -> Vec<Placement> {
-    let kind = start.kind;
-    if !board.can_place(kind, start.rotation, start.x, start.y) {
-        // A blocked spawn is a block-out (docs/s2-spec.md §2.3): no placement
-        // exists, and a hypothetical hold must not be offered.
-        return Vec::new();
-    }
-    let first = State::new(start);
-
-    let mut parent: HashMap<State, (Option<State>, Action)> = HashMap::new();
-    let mut order: Vec<State> = Vec::new();
-    let mut queue: VecDeque<State> = VecDeque::new();
-    parent.insert(first, (None, Action::SoftDrop));
-    order.push(first);
-    queue.push_back(first);
-
-    while let Some(state) = queue.pop_front() {
-        for action in ACTIONS {
-            let Some((next, _fin)) = step(board, kind, state, action) else {
-                continue;
-            };
-            if parent.contains_key(&next) {
-                continue;
-            }
-            parent.insert(next, (Some(state), action));
-            order.push(next);
-            queue.push_back(next);
-        }
-    }
-
-    // Precompute every rotation edge once: `next -> [(fin_or_tst, previous,
-    // action)]`. The order follows the BFS order, so the first maximum wins
-    // deterministically.
-    let mut rotation_edges: HashMap<State, Vec<(bool, State, Action)>> = HashMap::new();
-    for &previous in &order {
-        for action in [Action::RotateCw, Action::RotateCcw, Action::Rotate180] {
-            if let Some((next, fin)) = step(board, kind, previous, action) {
-                rotation_edges.entry(next).or_default().push((
-                    fin.unwrap_or(false),
-                    previous,
-                    action,
-                ));
-            }
-        }
-    }
-
-    let mut placements = Vec::new();
-    for &state in &order {
-        if board.can_place(kind, state.rotation(), state.x, state.y - 1) {
-            continue; // not grounded
-        }
-        let piece = state.piece(kind);
-        let cells = sorted_cells(piece.cells());
-        let (spin, path) = best_spin(board, kind, state, &rotation_edges, &parent);
-        placements.push(Placement {
-            kind,
-            rotation: state.rotation(),
-            x: state.x,
-            y: state.y,
-            cells,
-            spin,
-            path,
-            hold,
-        });
-    }
-    placements
-}
-
-fn sorted_cells(mut cells: [(i32, i32); 4]) -> [(i32, i32); 4] {
-    cells.sort_unstable();
-    cells
-}
-
-/// Absolute cells of a core placement, sorted lexicographically.
-pub fn core_cells(kind: PieceKind, rotation: Rotation, x: i32, y: i32) -> [(i32, i32); 4] {
-    sorted_cells(kind.cells(rotation).map(|(cx, cy)| (cx + x, cy + y)))
-}
-
-fn step(
-    board: &Board,
-    kind: PieceKind,
-    state: State,
-    action: Action,
-) -> Option<(State, Option<bool>)> {
-    let rotation = state.rotation();
-    match action {
-        Action::MoveLeft => board
-            .can_place(kind, rotation, state.x - 1, state.y)
-            .then_some((
-                State {
-                    x: state.x - 1,
-                    ..state
-                },
-                None,
-            )),
-        Action::MoveRight => board
-            .can_place(kind, rotation, state.x + 1, state.y)
-            .then_some((
-                State {
-                    x: state.x + 1,
-                    ..state
-                },
-                None,
-            )),
-        Action::SoftDrop => board
-            .can_place(kind, rotation, state.x, state.y - 1)
-            .then_some((
-                State {
-                    y: state.y - 1,
-                    ..state
-                },
-                None,
-            )),
-        Action::RotateCw => rotate(board, kind, state, RotateDirection::Cw),
-        Action::RotateCcw => rotate(board, kind, state, RotateDirection::Ccw),
-        Action::Rotate180 => rotate(board, kind, state, RotateDirection::Half),
-        Action::HardDrop | Action::Hold => None,
-    }
-}
-
-fn rotate(
-    board: &Board,
-    kind: PieceKind,
-    state: State,
-    direction: RotateDirection,
-) -> Option<(State, Option<bool>)> {
-    let from = state.rotation();
-    let to = from.step(direction);
-    for &(dx, dy) in kick::kicks(kind, from, to) {
-        let candidate = State {
-            rotation: to as u8,
-            x: state.x + dx as i32,
-            y: state.y + dy as i32,
-        };
-        if board.can_place(kind, to, candidate.x, candidate.y) {
-            let fin = kick::is_fin_or_tst_kick(from, to, (dx, dy));
-            return Some((candidate, Some(fin)));
-        }
-    }
-    None
-}
-
-/// Maximum spin over all paths into `state`, plus a path that achieves it.
-fn best_spin(
-    board: &Board,
-    kind: PieceKind,
-    state: State,
-    rotation_edges: &HashMap<State, Vec<(bool, State, Action)>>,
-    parent: &HashMap<State, (Option<State>, Action)>,
-) -> (SpinType, Vec<Action>) {
-    let mut best = (SpinType::None, path_to(parent, state));
-    let rotation = state.rotation();
-    let Some(edges) = rotation_edges.get(&state) else {
-        return best;
-    };
-    for &(fin, previous, action) in edges {
-        let spin = board.spin_type(kind, rotation, state.x, state.y, true, fin);
-        if spin.index() > best.0.index() {
-            let mut path = path_to(parent, previous);
-            path.push(action);
-            best = (spin, path);
-        }
-    }
-    best
-}
-
-fn path_to(parent: &HashMap<State, (Option<State>, Action)>, mut state: State) -> Vec<Action> {
-    let mut path = Vec::new();
-    while let Some(&(previous, action)) = parent.get(&state) {
-        let Some(previous) = previous else {
-            break;
-        };
-        path.push(action);
-        state = previous;
-    }
-    path.reverse();
-    path
 }
 
 #[cfg(test)]
@@ -366,7 +174,6 @@ mod tests {
             let moves = generate(&empty_board(), spawn_state(kind), false);
             assert!(!moves.is_empty(), "{kind:?} must have placements");
             for placement in moves.placements() {
-                // Grounded: one row lower must collide or leave the board.
                 assert!(
                     !empty_board().can_place(
                         kind,
@@ -377,110 +184,28 @@ mod tests {
                     "{kind:?} placement {:?} is not grounded",
                     placement.cells
                 );
-                // Every path replays to the same placement.
-                let mut piece = spawn_state(kind);
-                for action in &placement.path {
-                    piece = apply_action(&empty_board(), piece, *action);
-                }
-                assert_eq!(
-                    piece,
-                    ActivePiece {
-                        kind,
-                        rotation: placement.rotation,
-                        x: placement.x,
-                        y: placement.y
-                    }
-                );
             }
-        }
-    }
-
-    fn apply_action(board: &Board, piece: ActivePiece, action: Action) -> ActivePiece {
-        match action {
-            Action::MoveLeft => ActivePiece {
-                x: piece.x - 1,
-                ..piece
-            },
-            Action::MoveRight => ActivePiece {
-                x: piece.x + 1,
-                ..piece
-            },
-            Action::SoftDrop => ActivePiece {
-                y: piece.y - 1,
-                ..piece
-            },
-            Action::RotateCw | Action::RotateCcw | Action::Rotate180 => {
-                let direction = match action {
-                    Action::RotateCw => RotateDirection::Cw,
-                    Action::RotateCcw => RotateDirection::Ccw,
-                    _ => RotateDirection::Half,
-                };
-                let (state, _) = rotate(board, piece.kind, State::new(piece), direction)
-                    .expect("path rotation must be legal");
-                state.piece(piece.kind)
-            }
-            Action::HardDrop | Action::Hold => unreachable!("not a movegen action"),
         }
     }
 
     #[test]
-    fn wall_t_rotation_is_classified_as_a_spin() {
-        // A single block at (1, 0) makes the left wall a 3-corner T-spin slot:
-        // the T rotates from north into R with the (-1, 0) kick, and the last
-        // action is a rotation, so the placement must be a mini T-spin
-        // (docs/s2-spec.md §4.3).
-        let mut board = Board::new();
-        board.set_row(0, 1 << 1);
-        let moves = generate(&board, spawn_state(PieceKind::T), false);
-        let spins = moves
-            .placements()
-            .iter()
-            .filter(|placement| placement.spin != SpinType::None)
-            .collect::<Vec<_>>();
-        assert!(
-            !spins.is_empty(),
-            "expected at least one spin placement, got {:?}",
-            moves.placements()
-        );
-        assert!(
-            spins
-                .iter()
-                .any(|placement| placement.spin == SpinType::Mini),
-            "expected a mini T-spin"
-        );
-        for placement in &spins {
-            assert!(
-                placement.path.last().is_some_and(|action| matches!(
-                    action,
-                    Action::RotateCw | Action::RotateCcw | Action::Rotate180
-                )),
-                "a spin path must end with a rotation"
-            );
+    fn lookup_by_cells_roundtrips() {
+        let moves = generate(&empty_board(), spawn_state(PieceKind::I), false);
+        for placement in moves.placements() {
+            let found = moves.get(&placement.cells).expect("cell key must resolve");
+            assert_eq!(found.cells, placement.cells);
         }
     }
 
     #[test]
     fn blocked_spawn_has_no_placements() {
         let mut board = Board::new();
-        // Fill the whole spawn area (row 21) so every piece blocks out.
         for y in 20..=23 {
             board.set_row(y, Board::FULL_ROW);
         }
         for kind in intetrigence_core::ALL_PIECES {
             let moves = generate(&board, spawn_state(kind), false);
             assert!(moves.is_empty(), "{kind:?} must have no placement");
-        }
-    }
-
-    #[test]
-    fn lookup_by_cells_roundtrips() {
-        // A cell set can be described by more than one rotation (I north/south,
-        // O, S/Z); the move set keeps one canonical placement per cell set, so
-        // only the cells are guaranteed to roundtrip.
-        let moves = generate(&empty_board(), spawn_state(PieceKind::I), false);
-        for placement in moves.placements() {
-            let found = moves.get(&placement.cells).expect("cell key must resolve");
-            assert_eq!(found.cells, placement.cells);
         }
     }
 }
