@@ -1,0 +1,20 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/bot",
+    "crates/arena",
+    "crates/tbp",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+rust-version = "1.85"
+
+[workspace.dependencies]
+intetrigence-core = { path = "crates/core" }
+intetrigence-bot = { path = "crates/bot" }
+intetrigence-arena = { path = "crates/arena" }
+intetrigence-tbp = { path = "crates/tbp" }
