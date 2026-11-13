@@ -18,13 +18,14 @@ use intetrigence_core::{ActivePiece, Board, PieceKind, SpinType};
 /// `(-1,-1), (+1,-1), (+1,+1), (-1,+1)`.
 const T_CORNERS: [(i32, i32); 4] = [(0, 0), (2, 0), (2, 2), (0, 2)];
 
-/// Corner indices that face the direction the T points (the nub side).
+/// Corner indices that face the direction the T points: **front = nub side**.
 ///
-/// `docs/s2-spec.md` §4.3 lists the front corners with `Δy` in the source
-/// implementation's y-down convention (`(-1,-1)` is front for rotations
-/// `L`/`0`, which would make a TSD's nub-side corners its *back* corners).
-/// Normalised to the y-up board convention used everywhere else in the spec,
-/// the nub-side corners are:
+/// Transcription warning: S7's `cornerTable.t` is y-down
+/// (`occupied(x + dx + 1, y - dy - 1)`), so its `dy` must be negated before it
+/// is read in this crate's y-up board. `docs/s2-spec.md` v1.3.1 §4.3 carries
+/// the corrected table; v1.3 and earlier had the un-negated version, which
+/// pointed "front" at the cells *behind* the T and turned every reachable TSD
+/// into a mini.
 ///
 /// | rotation | front corners (relative to the centre) |
 /// |---|---|
@@ -33,10 +34,7 @@ const T_CORNERS: [(i32, i32); 4] = [(0, 0), (2, 0), (2, 2), (0, 2)];
 /// | 2 (South) | `(+1,-1)`, `(-1,-1)` |
 /// | L (West)  | `(-1,-1)`, `(-1,+1)` |
 ///
-/// This is the standard 3-corner rule: a T-spin double, whose nub-side corners
-/// are the two filled ones, is a *full* spin. The inverted reading would make
-/// every reachable TSD a mini and only unreachable positions full, so the
-/// y-up reading is the only self-consistent one.
+/// A T-spin double has both nub-side corners filled, so it is a full spin.
 const T_FRONT_CORNERS: [[usize; 2]; 4] = [[2, 3], [1, 2], [0, 1], [3, 0]];
 
 /// Whether a corner cell counts as filled.
