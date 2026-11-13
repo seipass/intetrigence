@@ -180,8 +180,9 @@ mod tests {
         // The TSD slot: three corners, both nub-side ones filled.
         assert_eq!(t_spin_corners(&tsd_board(), Rotation::Two, 3, 1), (3, 2));
 
-        // Symmetric slot: only the two nub-side corners, so the 3-corner rule
-        // rejects it (a plain T drop, not a spin).
+        // Symmetric slot: the two nub-side corners only. `corners < 3` short
+        // circuits to `None` before `front` is looked at, so this pins the
+        // 3-corner rule, not the front direction.
         let mut symmetric = tsd_board();
         symmetric.set_row(3, 0x1C7);
         assert_eq!(t_spin_corners(&symmetric, Rotation::Two, 3, 1), (2, 2));
@@ -194,6 +195,18 @@ mod tests {
             ),
             SpinType::None
         );
+
+        // Three corners with exactly one nub-side corner: `front` decides the
+        // result here, so a flipped front table turns this `Mini` into `Full`
+        // (the opposite direction to the TSD case above).
+        let mut one_front = Board::new();
+        one_front.set_row(1, 0x028); // (3,1) and (5,1): the lower corners
+        one_front.set_row(3, 0x008); // (3,3): the upper-left corner only
+        assert_eq!(t_spin_corners(&one_front, Rotation::Zero, 3, 1), (3, 1));
+        let t = piece(PieceKind::T, Rotation::Zero, 3, 1);
+        assert!(one_front.can_place(t.kind, t.rotation, t.x, t.y));
+        assert_eq!(classify_spin(&one_front, t, true, false), SpinType::Mini);
+        assert_eq!(classify_spin(&one_front, t, true, true), SpinType::Full);
     }
 
     #[test]
