@@ -18,4 +18,4 @@ pub mod spin;
 pub use movegen::{
     Arrival, Placement, State, generate, generate_from, reachable_states, spawn_piece,
 };
-pub use spin::{classify_spin, is_immobile};
+pub use spin::{classify_spin, is_immobile, t_spin_corners};

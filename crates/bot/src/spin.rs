@@ -11,7 +11,7 @@
 //! replaced by the core engine's implementation once `crates/core` exposes
 //! one; [`intetrigence_core::SpinType`] is already the shared vocabulary.
 
-use intetrigence_core::{ActivePiece, Board, PieceKind, SpinType};
+use intetrigence_core::{ActivePiece, Board, PieceKind, Rotation, SpinType};
 
 /// T corner offsets in box-local coordinates, i.e. the spec's four corners
 /// relative to the T's rotation center `(1, 1)`:
@@ -91,18 +91,7 @@ pub fn classify_spin(
         };
     }
 
-    let front = T_FRONT_CORNERS[piece.rotation as usize];
-    let mut corners = 0u8;
-    let mut front_corners = 0u8;
-    for (index, &(dx, dy)) in T_CORNERS.iter().enumerate() {
-        if corner_filled(board, piece.x + dx, piece.y + dy) {
-            corners += 1;
-            if front.contains(&index) {
-                front_corners += 1;
-            }
-        }
-    }
-
+    let (corners, front_corners) = t_spin_corners(board, piece.rotation, piece.x, piece.y);
     if corners < 3 {
         return SpinType::None;
     }
@@ -113,10 +102,35 @@ pub fn classify_spin(
     }
 }
 
+/// Raw T corner counts for a placement: `(corners, front)`.
+///
+/// `docs/s2-spec.md` §4.3. `front` counts the two corners on the nub side.
+/// `(x, y)` is the bottom-left corner of the 3x3 box, the same convention as
+/// [`intetrigence_core::ActivePiece`], and the board must be the state
+/// *before* the piece is placed.
+///
+/// This mirrors the shape of `Board::t_spin_corners` in the core engine, so
+/// once that lands the two can be compared directly, before any
+/// classification, to separate a coordinate-convention bug from a
+/// classification bug.
+pub fn t_spin_corners(board: &Board, rotation: Rotation, x: i32, y: i32) -> (u8, u8) {
+    let front = T_FRONT_CORNERS[rotation as usize];
+    let mut corners = 0u8;
+    let mut front_corners = 0u8;
+    for (index, &(dx, dy)) in T_CORNERS.iter().enumerate() {
+        if corner_filled(board, x + dx, y + dy) {
+            corners += 1;
+            if front.contains(&index) {
+                front_corners += 1;
+            }
+        }
+    }
+    (corners, front_corners)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intetrigence_core::Rotation;
 
     fn piece(kind: PieceKind, rotation: Rotation, x: i32, y: i32) -> ActivePiece {
         ActivePiece {
@@ -143,6 +157,43 @@ mod tests {
         board.set_row(2, 0x1C7);
         board.set_row(3, 0x1CF);
         board
+    }
+
+    /// The raw `(corners, front)` pair is what the core engine's
+    /// `Board::t_spin_corners` returns, so pinning it here separates a
+    /// coordinate/direction bug from a classification bug.
+    #[test]
+    fn raw_corner_counts_pin_the_nub_side() {
+        // Only the two lower corners are filled: front for rotation 2 (nub
+        // down), back for rotation 0 (nub up).
+        let mut lower = Board::new();
+        lower.set_row(1, 0x1EF);
+        assert_eq!(t_spin_corners(&lower, Rotation::Two, 3, 1), (2, 2));
+        assert_eq!(t_spin_corners(&lower, Rotation::Zero, 3, 1), (2, 0));
+
+        // Only the two upper corners: mirrored.
+        let mut upper = Board::new();
+        upper.set_row(3, 0x1EF);
+        assert_eq!(t_spin_corners(&upper, Rotation::Two, 3, 1), (2, 0));
+        assert_eq!(t_spin_corners(&upper, Rotation::Zero, 3, 1), (2, 2));
+
+        // The TSD slot: three corners, both nub-side ones filled.
+        assert_eq!(t_spin_corners(&tsd_board(), Rotation::Two, 3, 1), (3, 2));
+
+        // Symmetric slot: only the two nub-side corners, so the 3-corner rule
+        // rejects it (a plain T drop, not a spin).
+        let mut symmetric = tsd_board();
+        symmetric.set_row(3, 0x1C7);
+        assert_eq!(t_spin_corners(&symmetric, Rotation::Two, 3, 1), (2, 2));
+        assert_eq!(
+            classify_spin(
+                &symmetric,
+                piece(PieceKind::T, Rotation::Two, 3, 1),
+                true,
+                false
+            ),
+            SpinType::None
+        );
     }
 
     #[test]
