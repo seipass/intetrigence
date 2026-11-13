@@ -29,6 +29,13 @@
 //! rotation over a shift/drop. `spin_entry` reports whether *some* path ends
 //! with a rotation, and the recorded action sequence is that spin path when it
 //! exists.
+//!
+//! # Scratch reuse
+//!
+//! [`Movegen`] owns every buffer the search needs, so a hot loop can generate
+//! placements for thousands of boards without allocating. The free functions
+//! [`generate`] and [`reachable_states`] are convenience wrappers that build a
+//! one-shot `Movegen`.
 
 use intetrigence_core::{Action, ActivePiece, Board, PieceKind, Rotation, SpinType, kick};
 
@@ -60,8 +67,66 @@ pub struct State {
     pub y: i32,
 }
 
+/// Capacity of [`ActionSeq`].
+///
+/// A shortest spawn-to-placement path on a 10x40 board is at most 24 soft
+/// drops + 12 shifts + 3 rotations + the hard drop, so 64 leaves a wide
+/// margin. [`tests::action_sequences_fit_the_inline_buffer`] pins it.
+pub const MAX_ACTIONS: usize = 64;
+
+/// A fixed-capacity input sequence, so [`Placement`] stays `Copy`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ActionSeq {
+    len: u8,
+    buf: [Action; MAX_ACTIONS],
+}
+
+impl ActionSeq {
+    pub const fn new() -> Self {
+        Self {
+            len: 0,
+            buf: [Action::MoveLeft; MAX_ACTIONS],
+        }
+    }
+
+    pub fn as_slice(&self) -> &[Action] {
+        &self.buf[..self.len as usize]
+    }
+
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn last(&self) -> Option<Action> {
+        self.as_slice().last().copied()
+    }
+
+    fn push(&mut self, action: Action) {
+        assert!(
+            (self.len as usize) < MAX_ACTIONS,
+            "action path exceeds the {MAX_ACTIONS}-input inline buffer"
+        );
+        self.buf[self.len as usize] = action;
+        self.len += 1;
+    }
+
+    fn reverse(&mut self) {
+        self.buf[..self.len as usize].reverse();
+    }
+}
+
+impl Default for ActionSeq {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A lockable placement: a resting position plus the inputs that reach it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Placement {
     /// The piece at the position it locks at.
     pub piece: ActivePiece,
@@ -77,7 +142,7 @@ pub struct Placement {
     pub spin: SpinType,
     /// Inputs that drive `Game` from spawn to this lock, ending in
     /// [`Action::HardDrop`].
-    pub actions: Vec<Action>,
+    pub actions: ActionSeq,
 }
 
 impl Placement {
@@ -97,12 +162,13 @@ impl Placement {
     /// element is the rotation that makes the placement a spin entry when
     /// [`Placement::spin_entry`] is set.
     pub fn pre_lock_actions(&self) -> &[Action] {
-        if let Some((last, rest)) = self.actions.split_last() {
+        let actions = self.actions.as_slice();
+        if let Some((last, rest)) = actions.split_last() {
             if *last == Action::HardDrop {
                 return rest;
             }
         }
-        &self.actions
+        actions
     }
 }
 
@@ -119,57 +185,12 @@ pub fn spawn_piece(kind: PieceKind) -> ActivePiece {
 
 /// Every placement reachable from the standard spawn of `kind`.
 pub fn generate(board: &Board, kind: PieceKind) -> Vec<Placement> {
-    generate_from(board, spawn_piece(kind))
+    Movegen::new().generate(board, kind).to_vec()
 }
 
 /// Every placement reachable from an explicit spawn state.
-///
-/// Returns an empty vector when the spawn itself is blocked (block-out). The
-/// order is `(rotation, x, y)` ascending, which makes results easy to compare
-/// between implementations.
 pub fn generate_from(board: &Board, spawn: ActivePiece) -> Vec<Placement> {
-    let Some(exploration) = explore(board, spawn) else {
-        return Vec::new();
-    };
-    let kind = spawn.kind;
-    let mut placements = Vec::with_capacity(exploration.resting.len());
-
-    for &(rotation, x, y) in &exploration.resting {
-        let reached = |arrival| {
-            state_index(rotation, arrival, x, y)
-                .filter(|&index| exploration.parent[index] != UNVISITED)
-        };
-        let moved = reached(Arrival::Moved);
-        let rotated = reached(Arrival::Rotated);
-        let fin_or_tst = reached(Arrival::RotatedFinOrTst);
-        let Some(best) = fin_or_tst.or(rotated).or(moved) else {
-            continue;
-        };
-
-        let spin_entry = fin_or_tst.is_some() || rotated.is_some();
-        let mut actions = exploration.path_to(best);
-        actions.push(Action::HardDrop);
-
-        let piece = ActivePiece {
-            kind,
-            rotation,
-            x,
-            y,
-        };
-        placements.push(Placement {
-            piece,
-            spin_entry,
-            fin_or_tst: fin_or_tst.is_some(),
-            // The all-spin test and the All-Mini+ classification are the
-            // core engine's (`docs/s2-spec.md` §4); the bot must not keep a
-            // second copy of the corner table.
-            immobile: board.is_immobile(kind, rotation, x, y),
-            spin: board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some()),
-            actions,
-        });
-    }
-
-    placements
+    Movegen::new().generate_from(board, spawn).to_vec()
 }
 
 /// Every input-reachable state, including airborne ones, in BFS order.
@@ -178,13 +199,210 @@ pub fn generate_from(board: &Board, spawn: ActivePiece) -> Vec<Placement> {
 /// diagnostics (a completeness check compares it against an independent
 /// reference), not for the search hot path.
 pub fn reachable_states(board: &Board, kind: PieceKind) -> Vec<State> {
-    match explore(board, spawn_piece(kind)) {
-        Some(exploration) => exploration
-            .order
-            .iter()
-            .map(|&index| state_at(index as usize))
-            .collect(),
-        None => Vec::new(),
+    let mut movegen = Movegen::new();
+    if !movegen.explore(board, spawn_piece(kind)) {
+        return Vec::new();
+    }
+    movegen
+        .order
+        .iter()
+        .map(|&index| state_at(index as usize))
+        .collect()
+}
+
+/// Reusable exact movegen.
+///
+/// All buffers are allocated once; [`Movegen::generate`] only clears and
+/// refills them. The returned slice borrows the generator, so callers must
+/// finish with one board's placements before asking for the next board's.
+#[derive(Clone, Debug)]
+pub struct Movegen {
+    root: usize,
+    parent: Vec<u16>,
+    input: Vec<u8>,
+    order: Vec<u16>,
+    expanded: Vec<bool>,
+    resting: Vec<(Rotation, i32, i32)>,
+    placements: Vec<Placement>,
+}
+
+impl Default for Movegen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Movegen {
+    pub fn new() -> Self {
+        Self {
+            root: 0,
+            parent: vec![UNVISITED; STATE_COUNT],
+            input: vec![0u8; STATE_COUNT],
+            order: Vec::with_capacity(STATE_COUNT),
+            expanded: vec![false; POSITION_COUNT],
+            resting: Vec::with_capacity(64),
+            placements: Vec::with_capacity(64),
+        }
+    }
+
+    /// Fills and returns the placements for `kind` from its standard spawn.
+    pub fn generate(&mut self, board: &Board, kind: PieceKind) -> &[Placement] {
+        self.generate_from(board, spawn_piece(kind))
+    }
+
+    /// Fills and returns the placements for an explicit spawn state.
+    ///
+    /// Returns an empty slice when the spawn itself is blocked (block-out).
+    /// The order is `(rotation, x, y)` ascending, which makes results easy to
+    /// compare between implementations.
+    pub fn generate_from(&mut self, board: &Board, spawn: ActivePiece) -> &[Placement] {
+        self.placements.clear();
+        if !self.explore(board, spawn) {
+            return &self.placements;
+        }
+        let kind = spawn.kind;
+
+        for index in 0..self.resting.len() {
+            let (rotation, x, y) = self.resting[index];
+            let reached = |arrival| {
+                state_index(rotation, arrival, x, y)
+                    .filter(|&index| self.parent[index] != UNVISITED)
+            };
+            let moved = reached(Arrival::Moved);
+            let rotated = reached(Arrival::Rotated);
+            let fin_or_tst = reached(Arrival::RotatedFinOrTst);
+            let Some(best) = fin_or_tst.or(rotated).or(moved) else {
+                continue;
+            };
+
+            let spin_entry = fin_or_tst.is_some() || rotated.is_some();
+            let actions = self.path_to(best);
+            let piece = ActivePiece {
+                kind,
+                rotation,
+                x,
+                y,
+            };
+            self.placements.push(Placement {
+                piece,
+                spin_entry,
+                fin_or_tst: fin_or_tst.is_some(),
+                // The all-spin test and the All-Mini+ classification are the
+                // core engine's (`docs/s2-spec.md` §4); the bot must not keep
+                // a second copy of the corner table.
+                immobile: board.is_immobile(kind, rotation, x, y),
+                spin: board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some()),
+                actions,
+            });
+        }
+
+        &self.placements
+    }
+
+    /// Runs the BFS and records the reachable states and resting positions.
+    fn explore(&mut self, board: &Board, spawn: ActivePiece) -> bool {
+        let kind = spawn.kind;
+        let cells = [
+            kind.cells(Rotation::Zero),
+            kind.cells(Rotation::R),
+            kind.cells(Rotation::Two),
+            kind.cells(Rotation::L),
+        ];
+        let fits_at =
+            |rotation: Rotation, x: i32, y: i32| fits(board, &cells[rotation as usize], x, y);
+        if !fits_at(spawn.rotation, spawn.x, spawn.y) {
+            return false;
+        }
+        let Some(root) = state_index(spawn.rotation, Arrival::Moved, spawn.x, spawn.y) else {
+            return false;
+        };
+
+        self.root = root;
+        self.parent.fill(UNVISITED);
+        self.order.clear();
+        self.expanded.fill(false);
+        self.resting.clear();
+        self.parent[root] = root as u16;
+        self.order.push(root as u16);
+
+        // Successors do not depend on how a position was reached, so each
+        // `(rotation, x, y)` is expanded once even when it is reachable with
+        // several arrival kinds. Resting positions are recorded here rather
+        // than re-scanned over the whole board afterwards.
+        let mut head = 0;
+        while head < self.order.len() {
+            let from = self.order[head] as usize;
+            head += 1;
+            let State { rotation, x, y, .. } = state_at(from);
+            let position = position_index(rotation, x, y);
+            if self.expanded[position] {
+                continue;
+            }
+            self.expanded[position] = true;
+            if !fits_at(rotation, x, y - 1) {
+                self.resting.push((rotation, x, y));
+            }
+
+            for (action, dx, dy) in MOVE_INPUTS {
+                if fits_at(rotation, x + dx, y + dy) {
+                    self.push_state(
+                        from,
+                        state_index(rotation, Arrival::Moved, x + dx, y + dy),
+                        action,
+                    );
+                }
+            }
+
+            for (action, to) in [
+                (Action::RotateCw, rotation.cw()),
+                (Action::RotateCcw, rotation.ccw()),
+                (Action::Rotate180, rotation.flip()),
+            ] {
+                // SRS tries the kick candidates in table order and stops at
+                // the first one that fits.
+                for &(dx, dy) in kick::kicks(kind, rotation, to) {
+                    let (nx, ny) = (x + dx as i32, y + dy as i32);
+                    if fits_at(to, nx, ny) {
+                        let arrival = if kick::is_fin_or_tst_kick(rotation, to, (dx, dy)) {
+                            Arrival::RotatedFinOrTst
+                        } else {
+                            Arrival::Rotated
+                        };
+                        self.push_state(from, state_index(to, arrival, nx, ny), action);
+                        break;
+                    }
+                }
+            }
+        }
+
+        self.resting.sort_unstable();
+        true
+    }
+
+    fn push_state(&mut self, from: usize, to: Option<usize>, action: Action) {
+        let Some(to) = to else {
+            return;
+        };
+        if self.parent[to] != UNVISITED {
+            return;
+        }
+        self.parent[to] = from as u16;
+        self.input[to] = action as u8;
+        self.order.push(to as u16);
+    }
+
+    /// Inputs from spawn to `index`, in execution order, plus the hard drop.
+    fn path_to(&self, mut index: usize) -> ActionSeq {
+        let mut actions = ActionSeq::new();
+        while index != self.root {
+            actions.push(
+                Action::from_u8(self.input[index]).expect("recorded inputs are always valid"),
+            );
+            index = self.parent[index] as usize;
+        }
+        actions.reverse();
+        actions.push(Action::HardDrop);
+        actions
     }
 }
 
@@ -239,31 +457,6 @@ fn state_at(index: usize) -> State {
     }
 }
 
-/// The BFS result: a parent pointer and the input that produced each state.
-struct Exploration {
-    root: usize,
-    parent: Vec<u16>,
-    input: Vec<u8>,
-    order: Vec<u16>,
-    /// Reachable resting positions, `(rotation, x, y)` ascending.
-    resting: Vec<(Rotation, i32, i32)>,
-}
-
-impl Exploration {
-    /// Inputs from spawn to `index`, in execution order.
-    fn path_to(&self, mut index: usize) -> Vec<Action> {
-        let mut actions = Vec::new();
-        while index != self.root {
-            actions.push(
-                Action::from_u8(self.input[index]).expect("recorded inputs are always valid"),
-            );
-            index = self.parent[index] as usize;
-        }
-        actions.reverse();
-        actions
-    }
-}
-
 /// Collision test identical to [`Board::can_place`] but with the rotation's
 /// cell table hoisted out of the loop. The BFS calls it thousands of times per
 /// board, and `PieceKind::cells` re-derives the rotated cells on every call.
@@ -280,116 +473,6 @@ fn fits(board: &Board, cells: &[(i32, i32); 4], x: i32, y: i32) -> bool {
         }
     }
     true
-}
-
-fn explore(board: &Board, spawn: ActivePiece) -> Option<Exploration> {
-    let kind = spawn.kind;
-    let cells = [
-        kind.cells(Rotation::Zero),
-        kind.cells(Rotation::R),
-        kind.cells(Rotation::Two),
-        kind.cells(Rotation::L),
-    ];
-    let fits_at = |rotation: Rotation, x: i32, y: i32| fits(board, &cells[rotation as usize], x, y);
-    if !fits_at(spawn.rotation, spawn.x, spawn.y) {
-        return None;
-    }
-    let root = state_index(spawn.rotation, Arrival::Moved, spawn.x, spawn.y)?;
-
-    let mut parent = vec![UNVISITED; STATE_COUNT];
-    let mut input = vec![0u8; STATE_COUNT];
-    let mut order = Vec::with_capacity(STATE_COUNT);
-    // Successors do not depend on how a position was reached, so each
-    // `(rotation, x, y)` is expanded once even when it is reachable with
-    // several arrival kinds. Resting positions are recorded here rather than
-    // re-scanned over the whole board afterwards.
-    let mut expanded = vec![false; POSITION_COUNT];
-    let mut resting = Vec::new();
-    parent[root] = root as u16;
-    order.push(root as u16);
-
-    let mut head = 0;
-    while head < order.len() {
-        let from = order[head] as usize;
-        head += 1;
-        let State { rotation, x, y, .. } = state_at(from);
-        let position = position_index(rotation, x, y);
-        if expanded[position] {
-            continue;
-        }
-        expanded[position] = true;
-        if !fits_at(rotation, x, y - 1) {
-            resting.push((rotation, x, y));
-        }
-        for (action, dx, dy) in MOVE_INPUTS {
-            if fits_at(rotation, x + dx, y + dy) {
-                push_state(
-                    &mut parent,
-                    &mut input,
-                    &mut order,
-                    from,
-                    state_index(rotation, Arrival::Moved, x + dx, y + dy),
-                    action,
-                );
-            }
-        }
-
-        for (action, to) in [
-            (Action::RotateCw, rotation.cw()),
-            (Action::RotateCcw, rotation.ccw()),
-            (Action::Rotate180, rotation.flip()),
-        ] {
-            // SRS tries the kick candidates in table order and stops at the
-            // first one that fits.
-            for &(dx, dy) in kick::kicks(kind, rotation, to) {
-                let (nx, ny) = (x + dx as i32, y + dy as i32);
-                if fits_at(to, nx, ny) {
-                    let arrival = if kick::is_fin_or_tst_kick(rotation, to, (dx, dy)) {
-                        Arrival::RotatedFinOrTst
-                    } else {
-                        Arrival::Rotated
-                    };
-                    push_state(
-                        &mut parent,
-                        &mut input,
-                        &mut order,
-                        from,
-                        state_index(to, arrival, nx, ny),
-                        action,
-                    );
-                    break;
-                }
-            }
-        }
-    }
-
-    resting.sort_unstable();
-    Some(Exploration {
-        root,
-        parent,
-        input,
-        order,
-        resting,
-    })
-}
-
-fn push_state(
-    parent: &mut [u16],
-    input: &mut [u8],
-    order: &mut Vec<u16>,
-    from: usize,
-    to: Option<usize>,
-    action: Action,
-) {
-    let Some(to) = to else {
-        return;
-    };
-    if parent[to] != UNVISITED {
-        return;
-    }
-    parent[to] = from as u16;
-    input[to] = action as u8;
-    order.push(to as u16);
 }
 
 #[cfg(test)]
@@ -495,7 +578,7 @@ mod tests {
         let board = Board::new();
         for kind in ALL_PIECES {
             for placement in generate(&board, kind) {
-                assert_eq!(placement.actions.last(), Some(&Action::HardDrop));
+                assert_eq!(placement.actions.last(), Some(Action::HardDrop));
                 assert!(!placement.pre_lock_actions().is_empty());
                 let last = *placement.pre_lock_actions().last().unwrap();
                 let is_rotation = matches!(
@@ -510,6 +593,28 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The inline buffer is large enough for every path the BFS can produce on
+    /// the test corpus, with room to spare.
+    #[test]
+    fn action_sequences_fit_the_inline_buffer() {
+        let mut boards = vec![Board::new()];
+        let mut high = Board::new();
+        for y in 0..19 {
+            high.set_row(y, Board::FULL_ROW & !(1u16 << 9));
+        }
+        boards.push(high);
+        let mut longest = 0;
+        for board in &boards {
+            for kind in ALL_PIECES {
+                for placement in generate(board, kind) {
+                    longest = longest.max(placement.actions.len());
+                }
+            }
+        }
+        assert!(longest <= 32, "longest recorded path is {longest} inputs");
+        assert!(longest < MAX_ACTIONS);
     }
 
     #[test]
@@ -559,7 +664,11 @@ mod tests {
             for placement in generate(&board, kind) {
                 let mut game =
                     Game::from_position(0, board.clone(), spawn_piece(kind)).expect("legal spawn");
-                let (last, rest) = placement.actions.split_last().expect("non-empty");
+                let (last, rest) = placement
+                    .actions
+                    .as_slice()
+                    .split_last()
+                    .expect("non-empty");
                 for action in rest {
                     game.apply(*action);
                 }
@@ -568,6 +677,21 @@ mod tests {
                 let drop = result.hard_drop.expect("hard drop is accepted");
                 assert_eq!(drop.distance, 0, "{kind:?} {:?}", placement.key());
                 assert_eq!(drop.lock.piece, placement.piece, "{kind:?}");
+            }
+        }
+    }
+
+    /// Reusing one generator for many boards must give exactly the same
+    /// placements as a fresh one.
+    #[test]
+    fn scratch_reuse_is_transparent() {
+        let mut movegen = Movegen::new();
+        let boards = [Board::new(), tsd_board()];
+        for board in &boards {
+            for kind in ALL_PIECES {
+                let reused: Vec<Placement> = movegen.generate(board, kind).to_vec();
+                let fresh = generate(board, kind);
+                assert_eq!(reused, fresh, "{kind:?}");
             }
         }
     }

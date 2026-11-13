@@ -1,0 +1,614 @@
+//! S2 evaluation: board features, placement rewards and the T-slot cutout.
+//!
+//! The search scores a placement in two parts:
+//!
+//! 1. an immediate **reward** from the S2 scoring engine
+//!    (`intetrigence_core::compute_attack`): attack lines, clear shape,
+//!    perfect clear, B2B break, surge charge and combo;
+//! 2. a **leaf value** from the board after the lock: Dellacherie-style shape
+//!    features plus S2 state terms (surge charge, combo) and a T-slot cutout.
+//!
+//! The cutout follows the public cold-clear-2 idea: instead of only scoring
+//! the shape of the stack, take the T pieces that are still available in the
+//! queue, hypothetically drop them into the best T-spin slot, and credit the
+//! lines they would clear. It is an *evaluation* term, not a search branch, so
+//! it costs one small local scan per leaf.
+//!
+//! Weights are a first hand-set (M3 tunes them with SPSA). They are ours: no
+//! value here is copied from another bot.
+
+use intetrigence_core::{
+    Board, ClearInput, PieceKind, Rotation, SpinType, compute_attack, surge_charge_from_streak,
+};
+
+use crate::movegen::Placement;
+
+/// Columns of the playfield.
+pub const COLUMNS: usize = 10;
+
+/// Height above which the stack starts to be punished quadratically.
+pub const DANGER_BASE: i32 = 12;
+
+/// Board shape features, all in "count" units so a weight is a plain scale.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Features {
+    /// Height of the tallest column.
+    pub max_height: f64,
+    /// `max(0, max_height - DANGER_BASE)^2`.
+    pub height_sq: f64,
+    /// Empty cells with an occupied cell above them in the same column.
+    pub holes: f64,
+    /// Sum over holes of the occupied cells above them, capped at 4.
+    pub hole_cover: f64,
+    /// Rows that contain at least one hole.
+    pub hole_rows: f64,
+    /// Sum of absolute height differences between adjacent columns.
+    pub bumpiness: f64,
+    /// Sum of squared height differences between adjacent columns.
+    pub bumpiness_sq: f64,
+    /// Filled/empty changes per row, walls counting as filled.
+    pub row_transitions: f64,
+    /// Depth of the deepest well (capped at 4).
+    pub well_depth: f64,
+    /// Columns at least 3 lower than both neighbours, excluding the main well.
+    pub extra_wells: f64,
+}
+
+/// Column heights, bottom-up.
+pub fn heights(board: &Board) -> [i32; COLUMNS] {
+    let mut heights = [0i32; COLUMNS];
+    for (x, height) in heights.iter_mut().enumerate() {
+        *height = board.column_height(x) as i32;
+    }
+    heights
+}
+
+/// Computes the shape features of `board`.
+pub fn features(board: &Board) -> Features {
+    let heights = heights(board);
+    let max_height = heights.iter().copied().max().unwrap_or(0);
+    let over = (max_height - DANGER_BASE).max(0);
+    let mut features = Features {
+        max_height: max_height as f64,
+        height_sq: (over * over) as f64,
+        ..Features::default()
+    };
+
+    // Holes, hole cover and hole rows in one top-down pass.
+    let mut seen = 0u16;
+    let mut cover = [0u8; COLUMNS];
+    for y in (0..Board::HEIGHT).rev() {
+        let row = board.row(y);
+        let mut holes = !row & seen & Board::FULL_ROW;
+        if holes != 0 {
+            features.hole_rows += 1.0;
+            while holes != 0 {
+                let x = holes.trailing_zeros() as usize;
+                holes &= holes - 1;
+                features.holes += 1.0;
+                features.hole_cover += f64::from(cover[x].min(4));
+            }
+        }
+        let mut filled = row;
+        while filled != 0 {
+            let x = filled.trailing_zeros() as usize;
+            filled &= filled - 1;
+            cover[x] = (cover[x] + 1).min(4);
+        }
+        seen |= row;
+    }
+
+    // Main well: the lowest column, leftmost on a tie.
+    let mut well = 0usize;
+    for x in 1..COLUMNS {
+        if heights[x] < heights[well] {
+            well = x;
+        }
+    }
+    let left = if well == 0 {
+        Board::HEIGHT as i32
+    } else {
+        heights[well - 1]
+    };
+    let right = if well + 1 == COLUMNS {
+        Board::HEIGHT as i32
+    } else {
+        heights[well + 1]
+    };
+    let depth = left.min(right) - heights[well];
+    features.well_depth = depth.clamp(0, 4) as f64;
+
+    for x in 0..COLUMNS {
+        let height = heights[x];
+        let left = if x == 0 { 0 } else { heights[x - 1] };
+        let right = if x + 1 == COLUMNS { 0 } else { heights[x + 1] };
+        // Bumpiness ignores the pairs that form the main well, so building a
+        // well is not punished as bumpiness.
+        let touches_well = x == well || x + 1 == well;
+        if !touches_well {
+            let delta = (height - right).abs();
+            features.bumpiness += f64::from(delta);
+            features.bumpiness_sq += f64::from(delta * delta);
+        }
+        if x != well && height + 3 <= left && height + 3 <= right {
+            features.extra_wells += 1.0;
+        }
+    }
+
+    // Row transitions: walls count as filled, empty rows are skipped.
+    for y in 0..Board::HEIGHT {
+        let row = board.row(y);
+        if row == 0 {
+            continue;
+        }
+        let mask = (row << 1) | 0x801;
+        features.row_transitions += f64::from((mask ^ (mask >> 1)).count_ones());
+    }
+
+    features
+}
+
+/// Weight vector for [`Features`] and the placement rewards.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Weights {
+    // Board shape (negative is bad).
+    pub max_height: f64,
+    pub height_sq: f64,
+    pub holes: f64,
+    pub hole_cover: f64,
+    pub hole_rows: f64,
+    pub bumpiness: f64,
+    pub bumpiness_sq: f64,
+    pub row_transitions: f64,
+    pub well_depth: f64,
+    pub extra_wells: f64,
+    /// Value of a T-slot that would clear 0, 1 or 2 lines.
+    pub t_slot: [f64; 3],
+
+    // Placement rewards.
+    /// Value per line of attack sent (before cancelling).
+    pub attack: f64,
+    /// Extra value by `[spin][lines]`.
+    pub clear: [[f64; 5]; 3],
+    pub perfect_clear: f64,
+    pub b2b_break: f64,
+    /// Penalty for spending a T without a T-spin while a slot was ready.
+    pub wasted_t: f64,
+    /// Value per line of surge currently charged.
+    pub surge_charge: f64,
+    /// Value per combo step after the placement.
+    pub combo: f64,
+    /// Extra value per attack line while the opener phase is active: the
+    /// cancel budget is doubled for the first 14 placements
+    /// (`docs/s2-spec.md` §7.4), so early attack is worth more.
+    pub opener_attack: f64,
+    /// Penalty per row of pending garbage.
+    pub incoming: f64,
+    /// Penalty per soft-dropped row (keeps the bot from over-dropping).
+    pub softdrop: f64,
+
+    /// Per-ply discount.
+    pub discount: f64,
+}
+
+impl Default for Weights {
+    /// First hand-set weights. M3 replaces these with SPSA-tuned values.
+    fn default() -> Self {
+        Self {
+            max_height: -3.0,
+            height_sq: -12.0,
+            holes: -30.0,
+            hole_cover: -6.0,
+            hole_rows: -16.0,
+            bumpiness: -3.0,
+            bumpiness_sq: -1.0,
+            row_transitions: -3.0,
+            well_depth: 8.0,
+            extra_wells: -14.0,
+            t_slot: [0.0, 20.0, 45.0],
+
+            attack: 14.0,
+            clear: [
+                [0.0, -14.0, -6.0, 2.0, 20.0],
+                [0.0, -5.0, 2.0, 8.0, 30.0],
+                [0.0, 8.0, 20.0, 40.0, 50.0],
+            ],
+            perfect_clear: 120.0,
+            b2b_break: -20.0,
+            wasted_t: -18.0,
+            surge_charge: 1.5,
+            combo: 2.0,
+            opener_attack: 6.0,
+            incoming: -3.0,
+            softdrop: -0.05,
+
+            discount: 0.97,
+        }
+    }
+}
+
+/// Scoring state carried through the search.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EvalContext {
+    /// Consecutive difficult clears before the next placement.
+    pub b2b_streak: u32,
+    /// Combo before the next placement (0 = the previous placement missed).
+    pub combo: u32,
+    /// Pieces placed before the next placement.
+    pub pieces_placed: u32,
+    /// Pending garbage rows (versus term; 0 in single-player).
+    pub incoming: u32,
+    /// Lines a T could clear in the current board (0/1/2), for `wasted_t`.
+    pub t_slot: u8,
+}
+
+impl EvalContext {
+    /// Opener phase is active for the first 14 placements (`docs/s2-spec.md`
+    /// §7.4).
+    pub fn opener(&self) -> bool {
+        self.pieces_placed < 14
+    }
+}
+
+/// What one placement did, in S2 scoring terms.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Reward {
+    /// Attack lines produced (surge chunks + main + perfect clear).
+    pub attack: u32,
+    /// Lines cleared.
+    pub lines: u8,
+    pub spin: SpinType,
+    pub perfect_clear: bool,
+    /// The placement broke a live B2B streak with an ordinary clear.
+    pub broke_b2b: bool,
+    /// Surge lines released by this placement.
+    pub surge_released: u32,
+    /// Surge lines still charged afterwards.
+    pub surge_charged: u32,
+    pub combo_after: u32,
+    pub b2b_after: u32,
+    /// Weighted immediate reward.
+    pub value: f64,
+}
+
+impl Default for Reward {
+    fn default() -> Self {
+        Self {
+            attack: 0,
+            lines: 0,
+            spin: SpinType::None,
+            perfect_clear: false,
+            broke_b2b: false,
+            surge_released: 0,
+            surge_charged: 0,
+            combo_after: 0,
+            b2b_after: 0,
+            value: 0.0,
+        }
+    }
+}
+
+/// Applies `placement` to `board`, scores it with the S2 engine and returns
+/// the resulting board, reward and context.
+pub fn apply_placement(
+    board: &Board,
+    placement: &Placement,
+    context: &EvalContext,
+    weights: &Weights,
+) -> (Board, Reward, EvalContext) {
+    let mut next = board.clone();
+    next.place(
+        placement.piece.kind,
+        placement.piece.rotation,
+        placement.piece.x,
+        placement.piece.y,
+    )
+    .expect("a generated placement is always legal");
+    let clear = next.clear_lines();
+
+    let difficult = placement.spin != SpinType::None || clear.lines >= 4;
+    let broke_b2b =
+        clear.lines > 0 && !difficult && !clear.perfect_clear && context.b2b_streak >= 1;
+
+    let attack = compute_attack(&ClearInput {
+        lines: clear.lines,
+        spin: placement.spin,
+        combo: context.combo,
+        b2b_streak: context.b2b_streak,
+        perfect_clear: clear.perfect_clear,
+        garbage_cleared: u32::from(clear.garbage_lines),
+        multiplier: 1.0,
+    });
+
+    let surge_charged = surge_charge_from_streak(attack.b2b_streak_after);
+    let wasted_t = placement.piece.kind == PieceKind::T
+        && context.t_slot > 0
+        && placement.spin == SpinType::None;
+
+    let mut value = weights.attack * f64::from(attack.total);
+    value += weights.clear[placement.spin.index()][clear.lines as usize];
+    if clear.perfect_clear {
+        value += weights.perfect_clear;
+    }
+    if broke_b2b {
+        value += weights.b2b_break;
+    }
+    if wasted_t {
+        value += weights.wasted_t;
+    }
+    value += weights.surge_charge * f64::from(surge_charged);
+    value += weights.combo * f64::from(attack.combo_after);
+    if context.opener() {
+        value += weights.opener_attack * f64::from(attack.total);
+    }
+
+    let reward = Reward {
+        attack: attack.total,
+        lines: clear.lines,
+        spin: placement.spin,
+        perfect_clear: clear.perfect_clear,
+        broke_b2b,
+        surge_released: attack.surge_amount,
+        surge_charged,
+        combo_after: attack.combo_after,
+        b2b_after: attack.b2b_streak_after,
+        value,
+    };
+    let next_context = EvalContext {
+        b2b_streak: attack.b2b_streak_after,
+        combo: attack.combo_after,
+        pieces_placed: context.pieces_placed + 1,
+        incoming: context.incoming,
+        t_slot: 0,
+    };
+    (next, reward, next_context)
+}
+
+/// Value of the board after a lock, including the T-slot cutout.
+///
+/// `t_available` is how many T pieces are still in the queue (including hold);
+/// the cutout credits at most two of them.
+pub fn leaf_value(
+    board: &Board,
+    context: &EvalContext,
+    weights: &Weights,
+    t_available: usize,
+) -> f64 {
+    let features = features(board);
+    let mut value = weights.max_height * features.max_height
+        + weights.height_sq * features.height_sq
+        + weights.holes * features.holes
+        + weights.hole_cover * features.hole_cover
+        + weights.hole_rows * features.hole_rows
+        + weights.bumpiness * features.bumpiness
+        + weights.bumpiness_sq * features.bumpiness_sq
+        + weights.row_transitions * features.row_transitions
+        + weights.well_depth * features.well_depth
+        + weights.extra_wells * features.extra_wells;
+
+    value += weights.surge_charge * f64::from(surge_charge_from_streak(context.b2b_streak));
+    value += weights.combo * f64::from(context.combo);
+    value -= weights.incoming * f64::from(context.incoming);
+    value += t_slot_cutout(board, t_available, weights);
+    value
+}
+
+/// Lines a T could clear in the best slot of `board` (0, 1 or 2).
+///
+/// This is the cheap shape scan behind [`t_slot_cutout`]: only columns that
+/// form a nub-down T slot are considered, so it is a handful of integer
+/// comparisons per board.
+pub fn t_slot_lines(board: &Board) -> u8 {
+    best_t_slot(board).map_or(0, |(_, _, lines)| lines)
+}
+
+/// The T-slot cutout: hypothetically spend up to `available` T pieces on the
+/// best slots and credit the lines they would clear.
+pub fn t_slot_cutout(board: &Board, available: usize, weights: &Weights) -> f64 {
+    if available == 0 {
+        return 0.0;
+    }
+    let mut board = board.clone();
+    let mut value = 0.0;
+    for _ in 0..available.min(2) {
+        let Some((x, y, lines)) = best_t_slot(&board) else {
+            break;
+        };
+        board
+            .place(PieceKind::T, Rotation::Two, x, y)
+            .expect("the slot scan only returns legal placements");
+        let clear = board.clear_lines();
+        value += weights.t_slot[clear.lines as usize];
+        debug_assert_eq!(clear.lines, lines);
+        if clear.lines == 0 {
+            break;
+        }
+    }
+    value
+}
+
+/// Best nub-down T slot: `(x, y, lines cleared)` for a rotation-2 T.
+fn best_t_slot(board: &Board) -> Option<(i32, i32, u8)> {
+    let heights = heights(board);
+    let mut best: Option<(i32, i32, u8)> = None;
+    for x in 1..COLUMNS - 1 {
+        let stem = heights[x];
+        // Cheap filter: the nub column must be at least one row below both
+        // shoulders. The exact geometry is verified with `can_place` below,
+        // because height alone cannot see an overhang hole.
+        if stem + 1 > heights[x - 1] || stem + 1 > heights[x + 1] {
+            continue;
+        }
+        let y = stem;
+        let bx = x as i32 - 1;
+        if !board.can_place(PieceKind::T, Rotation::Two, bx, y) {
+            continue;
+        }
+        if board.can_place(PieceKind::T, Rotation::Two, bx, y - 1) {
+            continue;
+        }
+        let mut probe = board.clone();
+        probe
+            .place(PieceKind::T, Rotation::Two, bx, y)
+            .expect("checked above");
+        let lines = probe.clear_lines().lines;
+        if lines == 0 {
+            continue;
+        }
+        if best.is_none_or(|(_, _, best_lines)| lines > best_lines) {
+            best = Some((bx, y, lines));
+        }
+    }
+    best
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use intetrigence_core::Cell;
+
+    fn tsd_board() -> Board {
+        let mut board = Board::new();
+        board.set_row(0, 0x1FF);
+        board.set_row(1, 0x3EF);
+        board.set_row(2, 0x3C7);
+        board.set_row(3, 0x1CF);
+        board
+    }
+
+    #[test]
+    fn empty_board_has_no_holes_and_no_height() {
+        let features = features(&Board::new());
+        assert_eq!(features.max_height, 0.0);
+        assert_eq!(features.holes, 0.0);
+        assert_eq!(features.hole_rows, 0.0);
+        assert_eq!(features.bumpiness, 0.0);
+        assert_eq!(features.row_transitions, 0.0);
+    }
+
+    #[test]
+    fn holes_are_counted_with_their_cover() {
+        let mut board = Board::new();
+        board.set_cell(3, 0, Cell::Block);
+        board.set_cell(3, 1, Cell::Empty);
+        board.set_cell(3, 2, Cell::Block);
+        let features = features(&board);
+        assert_eq!(features.holes, 1.0);
+        assert_eq!(features.hole_rows, 1.0);
+        assert_eq!(features.hole_cover, 1.0);
+        assert_eq!(features.max_height, 3.0);
+    }
+
+    #[test]
+    fn well_depth_is_capped_and_main_well_is_leftmost() {
+        let mut board = Board::new();
+        for x in 0..COLUMNS {
+            if x == 0 {
+                continue;
+            }
+            for y in 0..4 {
+                board.set_cell(x, y, Cell::Block);
+            }
+        }
+        let features = features(&board);
+        assert_eq!(features.well_depth, 4.0);
+        assert_eq!(features.extra_wells, 0.0);
+    }
+
+    #[test]
+    fn tsd_board_has_a_two_line_t_slot() {
+        let board = tsd_board();
+        assert_eq!(t_slot_lines(&board), 2);
+        let weights = Weights::default();
+        assert!(t_slot_cutout(&board, 1, &weights) > 0.0);
+        assert_eq!(t_slot_cutout(&board, 0, &weights), 0.0);
+    }
+
+    #[test]
+    fn flat_board_has_no_t_slot() {
+        let mut board = Board::new();
+        for y in 0..4 {
+            board.set_row(y, Board::FULL_ROW & !(1u16 << 9));
+        }
+        assert_eq!(t_slot_lines(&board), 0);
+    }
+
+    #[test]
+    fn reward_uses_the_s2_attack_table() {
+        let board = tsd_board();
+        let weights = Weights::default();
+        let mut movegen = crate::movegen::Movegen::new();
+        let placements = movegen.generate(&board, PieceKind::T);
+        let tsd = placements
+            .iter()
+            .find(|placement| placement.key() == (Rotation::Two, 3, 1))
+            .expect("the TSD slot is reachable");
+        let context = EvalContext::default();
+        let (next, reward, next_context) = apply_placement(&board, tsd, &context, &weights);
+        assert_eq!(reward.lines, 2);
+        assert_eq!(reward.spin, SpinType::Full);
+        assert_eq!(reward.attack, 4);
+        assert_eq!(reward.b2b_after, 1);
+        assert_eq!(next_context.combo, 1);
+        assert_eq!(next_context.pieces_placed, 1);
+        // Two rows were removed, so the stack is two rows shorter.
+        assert_eq!(next.height() + 2, board.height());
+    }
+
+    #[test]
+    fn opener_phase_makes_attack_worth_more() {
+        let board = tsd_board();
+        let weights = Weights::default();
+        let mut movegen = crate::movegen::Movegen::new();
+        let placements = movegen.generate(&board, PieceKind::T);
+        let tsd = placements
+            .iter()
+            .find(|placement| placement.key() == (Rotation::Two, 3, 1))
+            .expect("the TSD slot is reachable");
+
+        let opener = EvalContext {
+            pieces_placed: 0,
+            ..EvalContext::default()
+        };
+        let late = EvalContext {
+            pieces_placed: 20,
+            ..EvalContext::default()
+        };
+        assert!(opener.opener());
+        assert!(!late.opener());
+        let (_, opener_reward, _) = apply_placement(&board, tsd, &opener, &weights);
+        let (_, late_reward, _) = apply_placement(&board, tsd, &late, &weights);
+        assert_eq!(opener_reward.attack, late_reward.attack);
+        let expected = weights.opener_attack * f64::from(opener_reward.attack);
+        assert!((opener_reward.value - late_reward.value - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn b2b_break_and_surge_charge_are_rewarded() {
+        let mut board = Board::new();
+        // A single line ready to clear with an I piece. Row 1 keeps the clear
+        // from being a perfect clear, which would not break B2B.
+        board.set_row(0, Board::FULL_ROW & !0x0F);
+        board.set_row(1, 0x200);
+        let weights = Weights::default();
+        let mut movegen = crate::movegen::Movegen::new();
+        let placements = movegen.generate(&board, PieceKind::I);
+        let clear = placements
+            .iter()
+            .find(|placement| placement.piece.rotation == Rotation::Zero && placement.piece.x == 0)
+            .expect("the I can finish the row");
+        let context = EvalContext {
+            b2b_streak: 6,
+            combo: 0,
+            pieces_placed: 20,
+            incoming: 0,
+            t_slot: 0,
+        };
+        let (_, reward, _) = apply_placement(&board, clear, &context, &weights);
+        assert_eq!(reward.lines, 1);
+        assert!(reward.broke_b2b);
+        // Surge charge from a 6-streak is 5 lines, released in three chunks.
+        assert_eq!(reward.surge_released, 5);
+        assert_eq!(reward.b2b_after, 0);
+    }
+}

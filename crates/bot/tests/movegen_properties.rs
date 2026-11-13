@@ -174,6 +174,7 @@ fn assert_replays(board: &Board, kind: PieceKind, placement: &Placement) {
         Game::from_position(0, board.clone(), spawn_piece(kind)).expect("the spawn must be legal");
     let (last, rest) = placement
         .actions
+        .as_slice()
         .split_last()
         .expect("actions are non-empty");
     assert_eq!(*last, Action::HardDrop);

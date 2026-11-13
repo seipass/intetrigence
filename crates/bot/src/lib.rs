@@ -8,13 +8,29 @@
 //!   core engine's (`Board::spin_type` / `Board::is_immobile`); the bot keeps
 //!   no second copy of the corner table.
 //!
-//! Still to come: multithreaded anytime search, Dellacherie-style board
-//! features plus S2 versus terms, and SPSA-tuned weights.
+//! - [`eval`]: board features, S2 placement rewards (attack, B2B, combo,
+//!   surge, opener) and the T-slot cutout;
+//! - [`search`]: anytime beam search with hold, bag prediction, a
+//!   transposition graph and a worker pool;
+//! - [`play`]: a self-contained single-player driver that plays a legal game
+//!   through the engine and records think times.
+//!
+//! Still to come: S2 versus terms (garbage queue danger) and SPSA-tuned
+//! weights (M3).
 
 #![forbid(unsafe_code)]
 
+pub mod eval;
 pub mod movegen;
+pub mod play;
+pub mod search;
 
+pub use eval::{EvalContext, Features, Reward, Weights, apply_placement, features, leaf_value};
 pub use movegen::{
-    Arrival, Placement, State, generate, generate_from, reachable_states, spawn_piece,
+    ActionSeq, Arrival, Movegen, Placement, State, generate, generate_from, reachable_states,
+    spawn_piece,
+};
+pub use play::{GameReport, play_game};
+pub use search::{
+    Candidate, MAX_THREADS, Move, PieceSequence, RootState, SearchConfig, SearchResult, Searcher,
 };
