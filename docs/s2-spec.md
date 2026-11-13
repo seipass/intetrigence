@@ -1152,7 +1152,7 @@ garbage_rng(slot) = MINSTD(garbage_seed(slot))
 
 - **根拠**: TETR.IO の導出式は非公開で、S6 も「hole RNG state は入力」「callers must pass a public value」として導出を対象外にしている。よって**我々のプロトコルとして定義する**(原則 3)。乱数器は §7.7 の MINSTD をそのまま使い、**新しい定数を導入しない**。導出に同じ RNG を使うので、実装は 1 つのプリミティブだけで済み、両言語での一致検証も容易。
 - **`slot` は席ではなく bot の identity**: `slot 0 = intetrigence`、`slot 1 = attax`。**両シートで席を入れ替えても、bot ごとの穴列は同一 seed なら同じ**になる(シート間の対称性)。
-- **`piece_rng` は両者で同一**(PLAN §3.1「両者同一 seed」)。ピース袋は 1 本だけ生成し、両者に同じ列を配る。
+- **`piece_seed` は 1 本だけ導出し、両者が同じ値を使う**(PLAN §3.1「両者同一 seed」)。ただし**袋のインスタンスはプレイヤーごとに持つ**(`Bag::new(piece_seed)` を 2 つ)。したがって hold を使うまで両者の列は一致し、hold を使った本人の袋だけが 1 個進む。詳細は [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) §2.2。
 - **ラウンド開始時に毎回この導出から初期化**する。ラウンド間で RNG を引き継がない。
 - **テストベクタ**(実装の検算用。機械可読版は `docs/s2-rng-derivation.json`):
 
@@ -1287,7 +1287,43 @@ exact movegen の実装を本書と突き合わせた結果。**`main`(core `08e
 - TSD 盤面(`rows = 0x1FF, 0x3EF, 0x3C7, 0x1CF`)をビット展開して確認 → T を `(Rotation::Two, 3, 1)` に置くと **2 行が消える**、corners = 3、front(rot 2) = 2 → `Full`。col 9 の穴は 4 隅のどれでもないので、bot-dev のフィクスチャ修正は**分類を変えていない**
 - `cargo test --workspace` = **168 passed / 0 failed**(core + bot の統合状態)
 
-### 12.5 attax 現行版との差分(レフェリー設計上の注意)
+### 12.5 `crates/arena` + `crates/tbp` の監査(harness-dev `2dad514` / `4460ab4`)
+
+レフェリーと TBP host を [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) と突き合わせた結果。**コード修正は 0 件**(仕様側を 2 箇所直した)。
+
+| 対象 | 確認内容 |
+|---|---|
+| `frame = turn × 12` | `begin_turn()` が `turn * frames_per_turn`(既定 12)✓ §2.1 |
+| margin time | `GarbageMultiplier::advance_to` が **1 frame ずつ加算** ✓ §7.8 |
+| U7 導出 | `derive_seeds(seed)` → 1 つの `piece_seed` + 2 つの garbage seed ✓ §11-U7 |
+| ピース供給 | `Game::new(piece_seed)` を 2 つ = **プレイヤーごとの袋** ✓ §2.2(v1.1) |
+| 席順 | `sheet.order()` で seat 1 → seat 2 ✓ §2.3 |
+| 第 1 候補採用 | movegen 集合の最初の候補を採用し `candidate_index` を記録 ✓ §4.3 |
+| 到達可能性 | `moves.get(&cells)` で検証し、Action 列を replay して `accepted` と位置一致を確認 ✓ §4.2 |
+| hold | `held_piece().or(preview[0])` と照合 ✓ §4.2-4 |
+| 採点入力 | `combo_before` / `b2b_before` を渡す ✓ §6.8 |
+| 相殺 | **イベントごと**に `cancel_with_opener`、順序は `attack.events` のまま ✓ §5.2 |
+| 送信 | イベントごとに別パケット、`arrival_frame = frame` ✓ §5.3 |
+| opener | `on_piece_placed()` が相殺の**後**(設置前の値で判定)✓ §7.4 |
+| 挿入 | `lines == 0` のときだけ `take_insertable(0, frame)` ✓ §5.4 |
+| GSB | `lock.clear.garbage_lines` ✓ §6.6 |
+| 採点オーディット | `claimed_spin` で `declared_attack` を別計算して記録 ✓ PLAN §3.3 |
+| ターン上限 | 受信少 → 送信多 → 引き分け ✓ §6.3 |
+| トップアウト | `is_over()`(= 次 spawn 衝突)で判定し即終了 ✓ §6.1 |
+| verify-replay | `placement.piece` のみ使用(`turn.piece` は不使用)✓ §8.1 |
+
+**仕様側で直した 2 件**(実装は正しかった):
+
+1. **§2.2 の「共有 7-bag」→「プレイヤーごとの袋(同一 `piece_seed`)」**(protocol v1.1)。共有袋だと hold が列に影響せず、TETR.IO より hold が強くなる。
+2. **§6.1 の「同一 turn で両者トップアウト → 引き分け」は到達不能**(protocol v1.2)。先に死んだ側で打ち切るため。実装の「即終了・相手の勝ち」に統一。
+
+**残るリスク(1 件)**:
+
+| リスク | 内容 | 対応 |
+|---|---|---|
+| movegen の二重実装 | `crates/arena/src/movegen.rs` が `crates/bot` の BFS を独立実装している(bot 未統合のため)。片方だけ直すと**合法手集合がずれ、正当な着手が拒否される** — §4.3 の FRONT 表バグと同じ構造 | bot 統合後に `(board, kind) -> BTreeSet<(rotation,x,y)>` の**完全一致テストを恒久化**する。差し替え後も残す |
+
+### 12.6 attax 現行版との差分(レフェリー設計上の注意)
 
 `docs/attax-analysis.md`(attax-integration 担当)が記録した attax `7b38f51` の採点実装は **S2 ではない**。レフェリーは attax の自己申告する攻撃値を信用せず、**必ず本書の式で再計算**すること(PLAN §3.3 の「採点一致オーディット」の前提)。
 
@@ -1319,3 +1355,5 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.2 | 2026-11-13 | 再発防止。**§0.2.1「座標表を転記するときの規約」を新設**(反転する / 規約を書く / 反転を検出するテストを書く)。**§10 に変異テストと穴の縦順のチェック項目を追加**。ルール値の変更は無し。 |
 | v1.3.3 | 2026-11-13 | `crates/core` `dd20cda` / `08e883e` のコミットを受けて §12 を更新。FRONT 表・`insert_garbage` の穴順・`GARBAGE_SEED_MIX` 削除を「一致」に移動。**`cargo test -p intetrigence-core` = 151 passed を独立検証**。§7.5 に穴の縦順の検算例を追加。 |
 | v1.3.4 | 2026-11-13 | `crates/bot` `7cff8c0` の監査を §12.4 に追加(spin 分類の core 一本化・独立オラクル・end-to-end TSD・変異テスト)。**`cargo test --workspace` = 168 passed を独立検証**。 |
+| v1.3.5 | 2026-11-13 | §11-U7 の「袋は 1 本」という表現を修正。**seed は 1 本、袋はプレイヤーごと**であることを明記(hold で本人の袋だけ進む)。`docs/s2-referee-protocol.md` v1.1 と整合。ルール値の変更なし。 |
+| v1.3.6 | 2026-11-13 | `crates/arena` + `crates/tbp` の監査を §12.5 に追加(適合 19 項目、仕様側の修正 2 件、movegen 二重実装のリスク 1 件)。§12.6 に繰り下げ。 |

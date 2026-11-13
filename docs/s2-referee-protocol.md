@@ -50,7 +50,7 @@
 | **A** | intetrigence | attax |
 | **B** | attax | intetrigence |
 
-- **ピース列は両シートで同一**(`piece_seed` は 1 本、両者に同じ列を配る)。
+- **ピース列は両シートで同一**(`piece_seed` は 1 本。各プレイヤーが自分の袋をその seed から作り、hold で分岐する。§2.2)。
 - **ゴミ穴列は bot ごとに固定**(slot が identity なので、シートを変えても同じ bot は同じ穴列)。
 - したがって 2 シートの違いは **1 turn 内の解決順序だけ**になる(§3.2)。これが席バイアスを相殺する。
 
@@ -69,11 +69,21 @@ frame(t) = t * 12                # 5 PPS、60 fps 固定
 - `frame` は**ターン番号から導出**する。実時間は使わない(決定論のため)。
 - 実時間の制御(5 PPS のペーシング)はレフェリーの責務だが、**ゲーム状態には影響しない**。
 
-### 2.2 ピース供給
+### 2.2 ピース供給(プレイヤーごとの袋、同一 seed)
 
-- 共有 7-bag から `bag[t]` を取り、**両者に同じピース**を配る。
-- hold / preview は各プレイヤーが独立に持つ(s2-spec §2.5 / §2.6)。
-- hold は「その turn で使ったか」を各プレイヤーが持つ。**hold はターンを消費しない**(1 turn に 1 ピース設置)。
+- **各プレイヤーが自分の 7-bag を持つ**。両者の袋は**同じ `piece_seed`** から作る(`Game::new(piece_seed)` を 2 つ)。
+- したがって **hold を使うまで、両者の現在ピースと preview は完全に一致する**。
+- **hold を使うと、そのプレイヤーの袋だけが 1 個進む**(相手の袋は不変)。以後その 2 人の列は 1 個ずれる。
+- hold / preview は各プレイヤーが独立に持つ(s2-spec §2.5 / §2.6)。**hold はターンを消費しない**(1 turn に 1 ピース設置)。
+
+**この設計を採る理由**(v1.1 で「単一の共有袋」から変更した):
+
+1. **TETR.IO と同じ構造**。各プレイヤーが自分のキューを持ち、hold は自分のキューから消費する。
+2. **hold が列に影響する**ので、hold の損得が TETR.IO と同じ意味を持つ。共有袋にすると hold が列に影響せず、hold が実質無コストになって TETR.IO より強くなる(評価関数の前提も変わる)。
+3. 列のずれは**本人の選択だけ**で決まる。運の非対称は無い。
+4. `crates/core` の `Game` がそのまま使える(任意ピースを spawn する API が不要)。
+
+> **実装上の注意**: レフェリーは「この turn のピース」を**プレイヤーごとに自分の袋から**取る。共有の `bag[t]` を配ってはいけない。`crates/core` の `Game::hold()` は「hold が空のときだけ `bag.next_piece()` を呼び、埋まっていれば swap のみ」なので、この意味論と一致する。
 
 ### 2.3 1 turn の解決順序
 
@@ -81,8 +91,8 @@ frame(t) = t * 12                # 5 PPS、60 fps 固定
 
 ```
 for t in 0..1000:
-    piece = bag[t]
     for seat in [1, 2]:
+        piece = プレイヤー(seat) の袋から 1 個(§2.2)
         p = ボット(seat) の着手を取得(§4)
         検証(§4.2)
         設置を適用 → 消去 → 採点 → 相殺 → 送信(§5)
@@ -125,10 +135,10 @@ fn run_round(seed, sheet) -> RoundResult:
 
     for t in 0 .. 1000:
         frame = t * 12
-        piece = bag_next()                        # 共有 bag
         for slot in order:                        # seat 1 → seat 2
+            piece = players[slot].bag.next_piece()        # 各自の袋(§2.2)
             move = ask_bot(slot, snapshot(slot, piece))   # 応答を待つ(時間制限なし)
-            verify(slot, move)                    # §4.2
+            verify(slot, move, piece)             # §4.2
             apply(slot, move, frame)              # §5
             if topped_out(slot): return result(slot)
     return timeout_result()                       # §6.3
@@ -230,8 +240,10 @@ self.board.insert_garbage(&holes)                      # 穴の縦順は s2-spec
 
 - 死亡条件は **block-out のみ**(s2-spec §2.3)。lock-out は無い。Clutch Clear は有効。
 - 自分の設置を解決した後に、次のピースの spawn が衝突するかで判定する。
-- **seat 1 がトップアウトしたら、その turn の seat 2 の設置は行わずにラウンド終了**(seat 2 の勝ち)。
-- **同一 turn で両者がトップアウトしたら引き分け**(seat 1 が先に死に、seat 2 も同じ turn で死ぬケース)。
+- **どちらかがトップアウトした瞬間にラウンド終了**。その turn の残りの設置は行わない。トップアウトした側の負け、相手の勝ち。
+- したがって **「同一 turn で両者がトップアウト」は起こらない**(先に死んだ側で打ち切るため)。引き分けはターン上限(§6.3)でのみ発生する。
+
+> **公平性の注意**: 解決順が seat 1 → seat 2 なので、**seat 1 が先に死ねば seat 2 はその turn を打たずに勝つ**。これは逐次解決に固有の非対称で、シートの入れ替え(§1.2)で相殺する。1 ゲーム単位では偏るが、100 ゲームでは各ボットが 50 回ずつ両方の席を経験する。
 
 ### 6.2 引き分けの扱い
 
@@ -291,11 +303,11 @@ RoundResult {
          "1":{"name":"attax","commit":"...","args":[...]}},
  "started_at":"..."}
 
-{"type":"turn","t":0,"piece":"T",
- "placements":[{"slot":0,"rotation":2,"x":3,"y":1,"hold":false,
+{"type":"turn","t":0,
+ "placements":[{"slot":0,"piece":"T","rotation":2,"x":3,"y":1,"hold":false,
                 "spin":"full","lines":2,"events":[7],"sent":7,"cancelled":0,
                 "think_ms":31.2,"candidate_index":0},
-               {"slot":1,"rotation":0,"x":4,"y":0,"hold":false,
+               {"slot":1,"piece":"T","rotation":0,"x":4,"y":0,"hold":false,
                 "spin":"none","lines":0,"events":[],"sent":0,"cancelled":0,
                 "think_ms":28.7,"candidate_index":0}]}
 
@@ -305,6 +317,8 @@ RoundResult {
 ```
 
 - **`placements` は seat 順**(解決順)に並べる。verify-replay はこの順で適用する。
+- **`placement.piece` を必ず記録する**。袋はプレイヤーごとに独立しているので(§2.2)、hold の後は両者のピースが異なる。verify-replay は**この値**を使う。
+- `turn.piece` は**置かない**(v1.1 で削除)。turn 単位の「その turn のピース」は per-player bag では定義できない。参考値が要るなら `placement.piece` を読む。
 - `think_ms` と `candidate_index` は監査用。**再実行には使わない**。
 - `events` は `compute_attack` の返り値。**再実行時に再計算して一致を検証する**(採点オーディット)。
 
@@ -375,3 +389,5 @@ verify(replay) -> Result<(), Mismatch>:
 | 版 | 日付 | 変更 |
 |---|---|---|
 | v1 | 2026-11-13 | 初版。マッチ構成・席/slot・ターンと frame・解決順序・提出検証・相殺/送信/挿入・終了条件・replay 形式・監査項目・エラー処理を規定。ルール値は s2-spec.md を参照。 |
+| v1.1 | 2026-11-13 | **ピース供給を「単一の共有袋」から「プレイヤーごとの袋(同一 `piece_seed`)」に変更**(harness-dev の実装に合わせて確定)。§2.2 を書き換え、§1.2・§3.2 の擬似コード・§8.1 の replay(`placement.piece` を必須化、`turn.piece` を削除)を追随。理由: TETR.IO と同じ構造・hold が列に影響する・`crates/core` の `Game` がそのまま使える。 |
+| v1.2 | 2026-11-13 | §6.1 を実装に合わせて修正。**「同一 turn で両者トップアウト → 引き分け」は到達不能**だった(先に死んだ側で打ち切るため)。「トップアウトした瞬間に終了、相手の勝ち」に統一し、逐次解決に固有の席非対称とその相殺方法を明記。 |
