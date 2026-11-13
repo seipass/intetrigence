@@ -248,7 +248,9 @@ impl Searcher {
     /// Runs the anytime loop and returns the best move found.
     pub fn search(&mut self, root: &RootState) -> SearchResult {
         let start = Instant::now();
-        let deadline = start + self.config.budget;
+        // Leave a small margin for the final merge, which happens after the
+        // last deadline check, so the wall-clock time stays inside the budget.
+        let deadline = start + self.config.budget.mul_f32(0.95);
         let depth = self.config.depth.max(1);
         let sequence = PieceSequence::new(root.current, &root.preview, depth);
 
