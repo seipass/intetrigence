@@ -1,0 +1,1148 @@
+# TETR.IO Season 2 ルール仕様(凍結版)
+
+**対象**: intetrigence の S2 ルールエンジン(`crates/core`)・レフェリー(`crates/arena`)・attax 接続の共通仕様
+**プロファイル**: TETRA LEAGUE デフォルト相当(S2 本命プロファイル)
+**凍結日**: 2026-11-13
+**状態**: 凍結(v1)。以降の変更は「改訂履歴」に追記し、`crates/core` のバージョンと同時に上げる。
+
+この文書は PLAN.md §3.1 の表を一次ソースで裏取りし、数値定数として固定する。**未確定事項は §11 に集約**し、勝手に決めない。§11 に載っている項目は attax 作者との確認、または実機(TETR.IO クライアント)での検証を経て確定させる。
+
+---
+
+## 0. 読み方
+
+### 0.1 確度の表記
+
+各定数には確度を付ける。
+
+| 記号 | 意味 |
+|---|---|
+| **[確定]** | 一次ソース(公式パッチノート/公式 wiki)と、独立した 2 つ以上の実装が一致 |
+| **[実装一致]** | 一次ソースに数値が無く、TETR.IO の実挙動に合わせて作られた独立実装 2 つ以上が一致 |
+| **[単一実装]** | 実装 1 つだけが出典。数値は採択するが、§11 で実機確認対象にする |
+| **[未確定]** | ソース間で矛盾、または数値ソースが無い。§11 参照 |
+
+### 0.2 座標系
+
+この文書では **盤面座標 (x, y)** を使う。
+
+- `x`: 0 = 左端、9 = 右端
+- `y`: 0 = 最下段(可視領域の底)、19 = 可視領域の最上段、20〜39 = 内部バッファ
+- 回転 kick のオフセットは **(Δx, Δy)**、`Δy > 0` が**上方向**(TETR.IO / guideline の慣習)
+
+> 実装上の注意: teto(`@haelp/teto`)の kick データは `Δy > 0` が**下方向**で格納されている。取り込み時に符号反転が必須。本書の表はすべて「上方向を正」に正規化済み。
+
+### 0.3 出典 ID
+
+| ID | 出典 | 取得日 | 備考 |
+|---|---|---|---|
+| **S1** | tetrio.wiki.gg — [Mechanics](https://tetrio.wiki.gg/wiki/Mechanics) (`oldid=1673`) | 2026-11-13 | Combo Multiplier / B2B Charging / All-Mini+ / Opener Phase / GSB |
+| **S2** | tetrio.wiki.gg — [Spins](https://tetrio.wiki.gg/wiki/Spins) (`oldid=1593`) | 2026-11-13 | immobile / 2-corner / 3-corner / 5th kick |
+| **S3** | tetrio.wiki.gg — [TETRA LEAGUE](https://tetrio.wiki.gg/wiki/TETRA_LEAGUE) (`oldid=1770`) | 2026-11-13 | S2 変更点の一覧 |
+| **S4** | tetr.io 公式パッチノート `https://tetr.io/about/patchnotes/notes.json` | 2026-11-13 | BETA 1.0.0〜1.7.8 の全項目。以下 `PN <ver>` |
+| **S5** | tetris.wiki — [TETR.IO](https://tetris.wiki/TETR.IO) | 2026-11-13 | Multiplier / B2B / All-Mini+ / QP 差分 |
+| **S6** | 61bi-234469/s2-bot-lab `79505ca93bd15f7bcbd58724cb2a6ba312e09434` (MIT) | 2026-11-13 | TETR.IO クライアントから観測した**end option 全 173 キー** (`rulesets/tetrio-s2-v19-beta-1-5-0-observed.json`)、golden fixture、Rust 実装 |
+| **S7** | halp1/triangle `aa0698ab8b4299b85c5f87e9b54793e1b7d9d380` = `@haelp/teto` 4.2.8 (MIT) | 2026-11-13 | TETR.IO クライアントの再実装。kick 表・spin 判定・garbage queue の数値ソース |
+| **S8** | chouhy/MisaMino-Tetrio `df36ed3875ad853e9bb8ac869096128869493c09` | 2026-11-13 | TETR.IO 攻撃テーブル + **garbage cap = 8** の独立裏取り |
+| **S9** | chouhy/cold-clear-2 `b20a92b0ed3230dd910d0674f7a09c552a34dd46` | 2026-11-13 | all-spin 処理の参考実装(PLAN §3.2 指定) |
+| **S10** | 61び「TETR.IO Terminology and System Explanation Summary [Season 2 Compatible]」note.com | 2026-11-13 | 日本語圏の二次解説(数値の裏取りには使わない) |
+| **S11** | MochBot/fusion (Rust, TETR.IO replay coaching engine, S2 attack) | 2026-11-13 | `rules.rs` の `SPAWN_ROW = 21`、S2 attack 実装。spawn 位置と攻撃の独立裏取り |
+
+**S6 の位置づけ**: S6 の `rulesets/tetrio-s2-v19-beta-1-5-0-observed.json` は、TETR.IO クライアントが実際に送る **end option ブロックをそのまま記録したもの**。本書では「TETR.IO のデフォルト値」の一次証拠として扱う。個々のキーの**意味**は S1/S4 と S7 の実装で解釈する。
+
+---
+
+## 1. PLAN.md §3.1 の裏取り表
+
+PLAN §3.1 の全 15 行を 1 行ずつ潰す。
+
+| # | PLAN §3.1 の項目 | 凍結値 | 出典 | 確度 |
+|---|---|---|---|---|
+| 1 | 攻撃 base | Single 0 / Double 1 / Triple 2 / Quad 4 / TSM 0 / TSS 2 / TSD 4 / TST 6 / mini Double 1(完全表は §6.1) | S7 `damageCalc`、S8、S10 | [実装一致] |
+| 2 | コンボ | `base × (1 + 0.25 × combo)`、切り捨て。`base = 0` は `ln(1 + 1.25 × combo)`(combo ≥ 2)。丸めは **DOWN** | S1、S5、S7 | [確定] |
+| 3 | B2B | **B2B Charging**: difficult clear 毎に **+1 フラット**。表示 B2B ≥ 4 で surge 溜め、非 difficult clear で全放出(3 分割) | S1、S4 `PN BETA 1.1.0`/`PN BETA 1.2.0`、S7、S6 golden | [確定] |
+| 4 | All-Spin | **All-Mini+**: 非 T は immobile 判定で mini。T は 3-corner / 2-corner + 5th kick。B2B は維持・加算 | S1、S2、S4 `PN BETA 1.5.0`、S7 `spinbonusRules["all-mini+"]`、S6 (`spinbonuses: "all-mini+"`) | [確定] |
+| 5 | パーフェクトクリア | **+5 ゴミ、+1 B2B**(+2 ではない。§6.5 で決着) | S4 `PN BETA 1.2.0`、S6 (`allclear_garbage: 5`, `allclear_b2b: 1`)、S6 golden `perfect-clear-adds-b2b` | [確定] |
+| 6 | ゴミ込みボーナス | Garbage Special Bonus: ゴミを 1 行以上消し、かつ (spin または 4 行消し) のとき **+1 フラット** | S1、S4 `PN BETA 1.3.0`、S7、S6 (`garbagespecialbonus: true`) | [確定] |
+| 7 | Opener Phase | 設置 1〜14 個目の間、`pending ≥ sent` なら相殺量 **×2** | S1、S4 `PN BETA 1.1.0`/`1.2.0`、S7 `GarbageQueue.cancel`、S6 (`openerphase: 14`) | [確定] |
+| 8 | ゴミ | change-on-attack(**TL は change = 1.0 = 毎攻撃で必ず列変更**。×2.5 は QUICK PLAY の話 → §7.6)。キュー + 遅延挿入。cap 8 行/ロック、遅延 20 frame、相殺優先 | S6 (option 全値)、S7、S8 | [確定] |
+| 9 | 回転 | **SRS+**(I の kick が左右反転)+ **180°**(全ピース、5 テスト) | S1、S5、S7 `kicks["SRS+"]` | [実装一致] |
+| 10 | 盤面 | 10×20 可視、内部 40 行。**lock-out は無効**、block-out のみ。Clutch Clear 有効 | S6 (`boardwidth 10`, `boardheight 20`, `boardbuffer 20`, `nolockout: true`, `clutch: true`)、S1、S7 | [確定] |
+| 11 | ランダマイザー | 7-bag、5 preview + hold | S6 (`bagtype: "7-bag"`, `nextcount: 5`, `display_hold: true`) | [確定] |
+| 12 | ペース | 5 PPS(ペアドターン)、1000 turn cap | プロジェクト決定(PLAN §3.1)。TETR.IO のルールではなく**マッチプロトコル** | [確定(プロトコル)] |
+| 13 | 思考時間 | intetrigence `--ms 100`、attax は S2 版デフォルト | プロトコル | [確定(プロトコル)] |
+| 14 | シート | 各 seed を両シートでプレイ | プロトコル | [確定(プロトコル)] |
+| 15 | シード | 両プロジェクト未使用の held-out seeds | プロトコル | [確定(プロトコル)] |
+
+**PLAN の記述に対する訂正(2 点)**
+
+1. §3.1「ゴミ」行の「攻撃間でばらけ率 ×2.5」は **QUICK PLAY 専用**の記述(S5 QP 節)。TETRA LEAGUE は `messiness_change = 1.0` で、**攻撃が切り替わるたびに 100% 列を引き直す**。PLAN の文言は「攻撃内は同列、攻撃間は必ず別列(ただし乱数で同列になり得る)」に読み替える。§7.6 参照。
+2. §3.1「パーフェクトクリア」行の「+1 / +2 の表記揺れ」は **解消済み**。+2 は S2 プレシーズン(`PN BETA 1.1.0`)の値で、S2 本開幕(`PN BETA 1.2.0`)で +5 ゴミ / +1 B2B に変更された。S1 wiki の「All Clear は B2B を 2 得る」記述(S1/S3)が残っているだけ。
+
+---
+
+## 2. 盤面・ピース供給
+
+### 2.1 盤面
+
+| 定数 | 値 | 出典 | 確度 |
+|---|---|---|---|
+| 可視幅 `W` | 10 | S6 `boardwidth: 10` | [確定] |
+| 可視高 `H` | 20 | S6 `boardheight: 20` | [確定] |
+| 内部バッファ | 20 行(内部 40 行) | S6 `boardbuffer: 20` | [確定] |
+| 内部総高 `FULL_H` | 40 | 上記の和 | [確定] |
+| lock-out | **無効** | S6 `nolockout: true`、S1「lock out was disabled by default」 | [確定] |
+| Clutch Clear | **有効** | S6 `clutch: true`、S4 `PN BETA 1.5.0` | [確定] |
+| Lock delay | 500 ms(30 frame) | S1、S6 `locktime: 30` | [確定] |
+| Lock reset 上限 | 15 | S6 `lockresets: 15` | [確定] |
+| 重力 | `g: 0.02` G(初期)、`gincrease: 0.0035`/s、`gmargin: 7200` frame | S6 | [確定] |
+| ARE | 0 | S6 `are: 0`, `lineclear_are: 0` | [確定] |
+
+**レフェリー上の扱い**: 本マッチはペアドターン・5 PPS の離散イベント系なので、重力・lock delay・ARE は**勝敗に影響しない**。レフェリーは「1 turn = 1 ピース設置」として時間を進め、`frame` は `turn × 12`(5 PPS = 12 frame/piece)で進める。frame が効くのは **garbage multiplier の margin time と、ゴミパケットの 20 frame 遅延**だけである(§7.5)。
+
+### 2.2 spawn
+
+```
+spawn_x(piece) = floor(W/2 - matrix_w/2)
+spawn_y        = H + 2.04      # TETR.IO 内部座標(y 上向き、原点は可視最下段)
+spawn_rotation = 0 (North)
+```
+
+- `matrix_w`: I = 4、O = 2、それ以外 = 3
+- したがって **I・T・S・Z・J・L は x = 3、O は x = 4**
+- 出典: S7 `Tetromino.constructor`(`Math.floor(boardWidth / 2 - matrix.w / 2)`, `boardHeight + 2.04`)、S6 (`spawn_rotation` 空 = 全ピース 0)
+
+#### 2.2.1 spawn セルの絶対座標(実装はこれを直接使う)
+
+`y = H + 2.04` の `.04` は sub-row offset で、**設置ベースのレフェリーには不要**(占有行は `floor` で決まる)。重要なのは **最下段セルが row 21** であること。可視領域は row 0〜19 なので、spawn したピースは**完全にバッファ内(不可視)**にある。
+
+| ピース | row 21(下段) | row 22(上段) |
+|---|---|---|
+| I | x = 3,4,5,6 | — |
+| O | x = 4,5 | x = 4,5 |
+| T | x = 3,4,5 | x = 4 |
+| S | x = 3,4 | x = 4,5 |
+| Z | x = 4,5 | x = 3,4 |
+| J | x = 3,4,5 | x = 3 |
+| L | x = 3,4,5 | x = 5 |
+
+**全ピース共通: 最下段セルは row 21**(= 可視最上段 19 の 2 行上)。
+
+- 出典: S7 `Tetromino`(`location[1] = boardHeight + 2.04`、セルは `y - box_row` で row 21.04 / 22.04)、S11 `rules.rs`(`SPAWN_ROW = 21`、pivot 基準・row 0 = 床)
+- 確度: [実装一致](TETR.IO 専用エンジン 2 つが一致)
+- **帰結**: 可視 20 行(row 0〜19)を**すべて埋めても spawn できる**。block-out するのはスタックが **row 21** に達したとき。
+
+> **実装監査メモ(2026-11-13)**: `crates/core/src/piece.rs` の `spawn_position` は最下段セルを **row 20** に置いている(I = (3,18)、O = (4,20)、他 = (3,19))。本書は **row 21** を要求する。**1 行低いため、block-out が 1 行早く起きる**(可視最終行が埋まった時点で死ぬ)。トップアウト争いの局面で勝敗に直結するので修正が必要。
+
+### 2.3 block-out / lock-out / Clutch
+
+- **block-out**: spawn 直後のピースが既存ブロックと重なる(または盤外)→ 死亡。
+- **lock-out**: S2 TL デフォルトでは**無効**(`nolockout: true`)。可視領域より上でロックしても死なない。次の spawn が block-out するまで続く。
+- **Clutch Clear**: 直前の設置でライン消去が発生していた場合、spawn 位置が重なるとピースを 1 行ずつ上へ押し上げ、`y < FULL_H` の範囲で合法な位置を探す。見つかれば生存、見つからなければ block-out。
+  - 出典: S7 `#considerBlockout`、S4 `PN BETA 1.5.0`「If you clear line(s) and would immediately top out afterwards, your next piece will be pushed up」
+
+**レフェリー実装要求**: 死亡判定は「spawn 位置の衝突」+「Clutch の押し上げ探索」の 2 段。lock-out 判定を入れてはいけない。
+
+### 2.4 7-bag
+
+- 7 種を 1 袋としてシャッフルし、袋が尽きたら新しい袋を引く。**同じ袋に同じ種は 2 回入らない**。
+- シャッフルは Fisher–Yates(降順)、乱数は MINSTD(§7.7 と同じ RNG)。
+- 出典: S7 `Bag7`/`RNG.shuffleArray`、S6 `bagtype: "7-bag"`
+
+```
+shuffle(a):  for i = len-1 downto 1:
+               r = floor(next_float() * (i+1)); swap(a[i], a[r])
+```
+
+**重要**: 本マッチでは**両者同一 seed**を使う(PLAN §3.1)。seed → 乱数系列の対応は §7.7 の MINSTD を共通に使い、ピース袋とゴミ列で**別々の RNG インスタンス**を持つ(TETR.IO と同じ。混ぜない)。
+
+### 2.5 hold
+
+- hold は 1 ピースにつき 1 回まで。設置(ロック)すると再び使える。
+- hold が空のときは next の先頭を持ち、next から 1 つ補充する。
+- hold は **opener phase のピースカウントを進めない**(§7.4)。
+- 出典: S6 (`display_hold: true`, `infinite_hold: false`)、S7 `hold()`
+
+### 2.6 preview
+
+- **5 preview**。`nextcount: 5`(S6)。
+- 探索・評価は 5 preview + hold を完全に見てよい(PLAN §2 の attax 制約との差分)。
+
+---
+
+## 3. 回転系
+
+### 3.1 SRS+(既定)
+
+SRS+ は「SRS の I の kick を左右対称にしたもの」。J/L/S/T/Z は SRS と同一。
+
+#### 3.1.1 J, L, S, T, Z(5 テスト)
+
+`(Δx, Δy)`、`Δy > 0` が上。テストは**この順**に試す。
+
+| 遷移 | T1 | T2 | T3 | T4 | T5 |
+|---|---|---|---|---|---|
+| 0 → R | (0,0) | (-1,0) | (-1,+1) | (0,-2) | (-1,-2) |
+| R → 0 | (0,0) | (+1,0) | (+1,-1) | (0,+2) | (+1,+2) |
+| R → 2 | (0,0) | (+1,0) | (+1,-1) | (0,+2) | (+1,+2) |
+| 2 → R | (0,0) | (-1,0) | (-1,+1) | (0,-2) | (-1,-2) |
+| 2 → L | (0,0) | (+1,0) | (+1,+1) | (0,-2) | (+1,-2) |
+| L → 2 | (0,0) | (-1,0) | (-1,-1) | (0,+2) | (-1,+2) |
+| L → 0 | (0,0) | (-1,0) | (-1,-1) | (0,+2) | (-1,+2) |
+| 0 → L | (0,0) | (+1,0) | (+1,+1) | (0,-2) | (+1,-2) |
+
+出典: S7 `kicks["SRS+"].kicks`(符号正規化済み)。S1「SRS+ は I の kick のみ変更」と整合。
+
+#### 3.1.2 I(5 テスト)
+
+| 遷移 | T1 | T2 | T3 | T4 | T5 |
+|---|---|---|---|---|---|
+| 0 → R | (0,0) | **(+1,0)** | **(-2,0)** | (-2,-1) | (+1,+2) |
+| R → 0 | (0,0) | **(-1,0)** | **(+2,0)** | (-1,-2) | (+2,+1) |
+| R → 2 | (0,0) | (-1,0) | (+2,0) | (-1,+2) | (+2,-1) |
+| 2 → R | (0,0) | **(-2,0)** | **(+1,0)** | (-2,+1) | (+1,-2) |
+| 2 → L | (0,0) | (+2,0) | (-1,0) | (+2,+1) | (-1,-2) |
+| L → 2 | (0,0) | **(+1,0)** | **(-2,0)** | (+1,+2) | (-2,-1) |
+| L → 0 | (0,0) | (+1,0) | (-2,0) | (+1,-2) | (-2,+1) |
+| 0 → L | (0,0) | (-1,0) | (+2,0) | **(+2,-1)** | **(-1,+2)** |
+
+**太字 = 素の SRS との差分**(SRS の I 表は 0→R が `(-2,0),(+1,0),(-2,-1),(+1,2)` 等)。差分は「左右反転」と「テスト順の入れ替え」の両方を含む。
+
+- 出典: S7 `kicks["SRS+"].i_kicks`(符号正規化済み)
+- 確度: オフセットの**集合**は [実装一致]、**テスト順**は [単一実装] → §11-U1 で実機確認
+
+> **実装監査メモ(2026-11-13)**: `crates/core/src/kick.rs` の `I_KICKS` は現状**素の SRS**(0→R = `(-2,0),(1,0),(-2,-1),(1,2)`)。SRS+ ではない。差し替えが必要。§12 参照。
+
+#### 3.1.3 O
+
+O は回転してもセルが変わらないため kick 不要(全テスト `(0,0)` と等価)。ただし 180° は §3.2 の一般表を使う(S7 は O に専用表を持たず汎用 180 表を引く)。
+
+### 3.2 180° kick(全ピース・全方向)
+
+180° 回転は `0↔2`, `R↔L` の 4 遷移。各遷移 **5 テスト**(`(0,0)` + 表の 4 件)。
+
+#### 3.2.1 J, L, S, T, Z, O(汎用)
+
+| 遷移 | T1 | T2 | T3 | T4 | T5 |
+|---|---|---|---|---|---|
+| 0 → 2 | (0,0) | (0,+1) | (+1,+1) | (-1,+1) | (+1,0) |
+| 2 → 0 | (0,0) | (0,-1) | (-1,-1) | (+1,-1) | (-1,0) |
+| R → L | (0,0) | (+1,0) | (+1,+2) | (+1,+1) | (0,+2) |
+| L → R | (0,0) | (-1,0) | (-1,+2) | (-1,+1) | (0,+2) |
+
+出典: S7 `kicks["SRS+"].kicks["02"/"20"/"13"/"31"]`(符号正規化済み)。S1「osk が Discord に pin した 180 kick 図」と整合。
+
+> 注意: `0→2` と `2→0` は 5 テスト目まで含めて**上下反転の関係**にある。`R→L` と `L→R` は 5 テスト目が共通 `(0,+2)`。
+
+#### 3.2.2 I
+
+I の 180° は**各遷移 1 テストのみ**(`(0,0)` + 1 件)。
+
+| 遷移 | T1 | T2 |
+|---|---|---|
+| 0 → 2 | (0,0) | (0,+1) |
+| 2 → 0 | (0,0) | (0,-1) |
+| R → L | (0,0) | (+1,0) |
+| L → R | (0,0) | (-1,0) |
+
+出典: S7 `kicks["SRS+"].i_kicks["02"/"20"/"13"/"31"]`
+確度: [単一実装] → §11-U1
+
+### 3.3 5th kick(FIN / TST)判定
+
+T スピンの「mini か full か」を決める際、**5 番目の kick を使ったか**が効く(§4.3)。判定は kick の**オフセット値**で行う:
+
+```
+fin_or_tst =
+     (遷移 ∈ {2→L, 0→L} かつ kick = (+1,-2))
+  or (遷移 ∈ {2→R, 0→R} かつ kick = (-1,-2))
+```
+
+- `(+1,-2)` は 0→L / 2→L の **5 番目**、`(-1,-2)` は 0→R / 2→R の **5 番目**に一致する。
+- 出典: S7 `#isTSpinKick`
+- 意味: この 2 つは「TST / FIN 用の特殊 kick」で、これを使った T スピンは **front corner が 1 個でも full spin** として扱う(S2)。
+
+---
+
+## 4. スピン判定(All-Mini+)
+
+`spinbonuses = "all-mini+"`(S6)。判定は 3 系統。
+
+### 4.1 前提: 「最後の操作が回転」
+
+スピン判定は**最後の移動が回転**であることが前提。移動・落下が後に入ると spin は無効。設置ベースのレフェリーでは「提出された placement が回転を伴うか」を movegen 側で保証する(`crates/core` の movegen が回転由来の配置のみ spin 候補にする)。
+
+### 4.2 非 T ピース: immobile 判定 → 常に mini
+
+```
+immobile(p) =
+   !legal(p at x-1, y)  かつ
+   !legal(p at x+1, y)  かつ
+   !legal(p at x,   y+1) かつ   # 上方向(overhang)
+   !legal(p at x,   y-1)
+```
+
+実際には「接地済み」なので下方向チェックは常に false、左右はライン消去に寄与しないため、**本質は上方向(overhang)チェック**。
+
+- 条件を満たせば **mini**(非 T に full spin は存在しない)
+- 満たさなければ spin なし
+- 出典: S2「Immobile」節、S7 `Tetromino.isAllSpinPosition`、S4 `PN BETA 1.2.0`「All-Spins (immobile spins with pieces other than T) will be detected as a Mini」
+
+**mini の攻撃値**(§6.1): mini single = 0、mini double = 1、mini triple = 2、mini quad = 10。
+
+> 直感に反する点: **非 T の mini single は 0 ライン**。ただし B2B は加算・維持されるので、B2B 中の Z-Spin Single は +1(フラット B2B 分)を送る。S10 の記述(ZSS: B2B 無し 0 / B2B 有り 1)と一致。
+
+### 4.3 T ピース: 3-corner / 2-corner + 5th kick
+
+T のみ corner ベースの判定を使う。
+
+```
+1. 最後の操作が回転でなければ spin なし
+2. T の 4 隅(回転状態ごとに定義)のうち、埋まっている数を corners とする
+   - 盤外(左右の壁・底)は「埋まっている」とみなす
+3. corners < 3 → spin なし
+4. front_corners = 「T が向いている 2 隅」のうち埋まっている数
+5. front_corners == 2 → full spin
+   front_corners != 2 → mini
+   ただし fin_or_tst(§3.3)が真なら full spin
+```
+
+- 出典: S2「2-corner and 3-corner」節、S7 `#detectSpinFromCorners`
+- 4 隅の座標は回転状態ごとに固定(S7 `cornerTable.t`)。T の 4 状態は同じ 4 隅 `(-1,-1), (+1,-1), (+1,+1), (-1,+1)`(T の中心基準)を使い、各隅に「front になり得る回転 2 つ」を割り当てる。
+
+| 隅 (Δx, Δy) | front になる回転 |
+|---|---|
+| (-1,-1) | 3, 0 |
+| (+1,-1) | 0, 1 |
+| (+1,+1) | 1, 2 |
+| (-1,+1) | 2, 3 |
+
+(回転: 0 = North, 1 = East/R, 2 = South/2, 3 = West/L)
+
+- `PN BETA 1.5.0`:「Immobile T-Spins that don't fulfill the three-corner-rule now count as Minis」= All-Mini+ で **T も immobile 判定の mini を取れる**。実装上は「3-corner を満たさない T スピンでも、immobile なら mini」ではなく、**T の mini 判定は 2-corner ルールで行い、immobile は非 T 専用**と解釈する(S7 の実装がそうなっている)。§11-U2 で実機確認。
+
+### 4.4 B2B との関係
+
+- **mini も difficult clear**(`spin != none` なら mini でも difficult)。→ B2B を維持し、+1 する。
+- 出典: S1「Back-to-Back is amount of difficult line clears (Quad or higher, **Spin mini single or higher**, Spin single or higher)」、S3「All-spins now count towards B2B and are classified as a difficult clear」
+- **0 ラインのスピン**(ライン消去なし)は B2B を維持も破壊もしない(§6.2 の `lines > 0` 条件)。
+
+---
+
+## 5. 用語: combo / b2b の内部表現
+
+実装間で 0-based / 1-based が混在するので、本書の表現を固定する。
+
+| 変数 | 定義 | 初期値 |
+|---|---|---|
+| `combo` | **この設置を行う前の連続消去数**(0 = 直前の設置が消去なし)。式に入るのはこの値。設置後は `combo + 1` になる | 0 |
+| **`b2b_streak`** | **連続 difficult clear 数 `N`**。0 = B2B なし、1 = 1 回目、… | **0** |
+| `b2b_disp` | 派生値。**表示 B2B 数** = `max(N - 1, 0)` | 0 |
+| `lines` | その設置で消したライン数(0〜4) | — |
+| `spin` | `none` / `mini` / `full` | — |
+| `pc` | パーフェクトクリアか | — |
+| `g_cleared` | その設置で消したゴミ行数 | — |
+
+**状態変数は `b2b_streak`(= N)ただ 1 つ**。`b2b_disp` は表示と surge 量のための派生値で、状態としては持たない。
+
+- 「表示 B2B x N」= `b2b_disp = N`。S1「The first difficult line clears are not counted. For example, when you clear 10 Quads, "B2B x9" will show.」→ 10 連続 Quad で `N = 10`, `b2b_disp = 9`。
+- `combo` は S1 の式の `x` にそのまま入る(S1: `base*(1+0.25x)` where x is combo)。
+- **具体例**: 1 回目の消去では `combo = 0`(乗算なし)。2 連続目では `combo = 1`(×1.25)。3 連続目では `combo = 2`(×1.5)。
+- 実装間の対応: S11(fusion)は `-1` を「消去なし」のセンチネルに持ち、`combo_after = pre + 1` を式に入れる。S7(teto)も `stats.combo` が `-1` 始まりで、`max(stats.combo, 0)` を式に入れる。**本書の `combo` は両者の「式に入る値」と一致する**。
+
+**遷移**(`lines > 0` のときのみ動く):
+
+| 条件 | `b2b_streak` の遷移 |
+|---|---|
+| difficult clear(`spin != none` または `lines >= 4`)、PC でない | `N' = N + 1` |
+| PC(`pc == true`) | `N' = N + 1`(**+1 のみ**。difficult 分と重ねない) |
+| それ以外のライン消去 | `N' = 0`(B2B が切れる) |
+| `lines == 0` | `N' = N`(維持) |
+
+> **なぜ `b2b_disp` を状態にしないか**: `b2b_disp` は 0 が「B2B なし」と「1 回目の difficult clear 直後」の両方を表してしまい、遷移が書けない。S7 は `-1` を「なし」のセンチネルに使い、S6 は 1-based の `N` を使っている。**本書は S6 と同じ `N` を採る**。
+>
+> S6 の golden fixture `chain-and-surge.json` は 1-based(`b2b_after = 1` が最初の difficult clear)なので、**そのまま `N` として読める**。S7 の `stats.b2b` は `N - 1`。
+
+---
+
+## 6. 攻撃計算
+
+### 6.1 base テーブル
+
+| 消去 | `spin` | `lines` | base |
+|---|---|---|---|
+| Single | none | 1 | **0** |
+| Double | none | 2 | **1** |
+| Triple | none | 3 | **2** |
+| Quad | none | 4 | **4** |
+| T-Spin Mini Single (TSM) | mini | 1 | **0** |
+| Mini Double | mini | 2 | **1** |
+| Mini Triple | mini | 3 | **2** |
+| Mini Quad | mini | 4 | **10** |
+| T-Spin Single (TSS) | full | 1 | **2** |
+| T-Spin Double (TSD) | full | 2 | **4** |
+| T-Spin Triple (TST) | full | 3 | **6** |
+| T-Spin Quad | full | 4 | **10** |
+
+- 出典: S7 `garbageData`(`single 0, double 1, triple 2, quad 4, tspinMiniSingle 0, tspinMiniDouble 1, tspinMiniTriple 2, tspinDouble 4, tspinTriple 6, tspinQuad 10`)、S8、S10
+- **非 T スピンは mini 固定**(§4.2)。したがって Z-Spin Double は base 1、J-Spin Triple は base 2。
+- 5 ライン以上(ペンタ)は TL では発生しない(`lines ≤ 4`)。実装は `lines > 4` を reject してよい。
+- **0 ラインのスピン**は base 0(攻撃なし)。B2B 維持のみ。
+
+### 6.2 B2B Charging の +1
+
+```
+if lines > 0 and N_after >= 2:      # N_after = その設置を反映した後の b2b_streak
+    base += 1
+```
+
+- **フラット +1**。streak の長さに依存しない(S1「adds one extra line of garbage to each attack until the streak is broken」)。
+- **判定は「消した後」の状態で行う**(`N_after`)。理由:
+  - 1 回目の difficult clear は `N_before = 0` → `N_after = 1` → **加算なし**(S1「first difficult clear is not counted」)。
+  - 2 連続目は `N_before = 1` → `N_after = 2` → **+1**。
+  - B2B が切れる消去は `N_after = 0` → **加算なし**(切った攻撃に B2B ボーナスは乗らない)。
+  - PC は `N_after = N_before + 1` なので、PC 連鎖中は +1 が乗る。
+- 出典: S1、S4 `PN BETA 1.2.0`「B2B sends 1 for every attack (like Guideline)」、S7(`garbageCalcV2` に渡す `b2b` は**更新後**の `max(stats.b2b, 0)`)、S11(`if b2b_after.max(0) > 0 { garbage += 1 }`)、S6 golden `second-difficult-clear` / `ordinary-clear-breaks-b2b`
+- **旧 B2B Chaining の表(S1 の 0-1/2-3/4-8/… の表)は使わない。** あれは S1 と 40L/BLITZ のもの。
+
+### 6.3 Multiplier コンボ
+
+```
+if combo >= 1:
+    base = base * (1 + 0.25 * combo)
+if combo >= 2:
+    base = max(base, ln(1 + 1.25 * combo))
+```
+
+- `combo` は §5 の 0-based。1 回目の消去は `combo = 0` なので**乗算なし**。
+- **`ln` 項は「置き換え」ではなく `max`**。base > 0 のとき combo が小さいと ln 項が負けるので実質効かない。**base = 0(Single / TSM / 非 T mini single)のときだけ ln 項が攻撃を作る**。これが S1 の「If the base attack is 0, the function ln(1+1.25x) is used for 2-combo and above」の実装上の意味。
+- 出典: S1、S5、S7 `garbageCalcV2`
+- 浮動小数の注意: `1 + 0.25*combo` は combo < 2^50 で正確、`base ≤ 10` との積も正確。**乗算側は浮動小数誤差が出ない**。`ln` 側は `ln_1p` を使い、丸めは floor。
+
+### 6.4 丸め
+
+| モード | 挙動 | 使うモード |
+|---|---|---|
+| **DOWN** | `floor(x)` | **TETRA LEAGUE デフォルト** |
+| RNG | `floor(x) + (rng() < frac(x) ? 1 : 0)` | QUICK PLAY |
+
+- 出典: S1、S5、S6 `roundmode: "down"`
+- **TL は DOWN**。レフェリーは RNG モードを実装しなくてよい(実装してもデフォルト off)。
+- 丸めは **`attack × garbage_multiplier + GSB` の後に 1 回**。途中で丸めない。
+
+### 6.5 パーフェクトクリア
+
+```
+if pc:
+    attack += floor(5 * garbage_multiplier)
+```
+
+- **+5 ゴミ**(multiplier の影響を受ける = 掛けてから floor)、**+1 B2B**。
+- 出典: S4 `PN BETA 1.2.0`「All Clears now send 5 Garbage. However, they also count as Back-to-Back.」、S6 `allclear_garbage: 5` / `allclear_b2b: 1` / `allclear_b2b_sends: true` / `allclear_b2b_dupes: false` / `allclear_charges: false`、S11 `S2_TL_PC_GARBAGE = 5` / `S2_TL_PC_B2B = 1`、S6 golden `perfect-clear-adds-b2b`
+- **+2 ではない**。+2 は `PN BETA 1.1.0`(S2 プレシーズン)の値。S1 の「All Clear will be gained by 2」は S1 の記述で、S2 本開幕で +1 に変わっている。S3 も「All Clear garbage attack was reduced from 10 to 5, and now worth 1 B2B」と明記。
+- **注意**: S11 の `AttackConfig::tetra_league()` には `pc_b2b: 2` / `b2b_chaining: true` という**S1 時代の古いフィールドが残っている**。S11 の S2 経路は `S2_TL_*` 定数を使っており、そちらが `1` / Charging。**古いフィールドをコピーしないこと。**
+- **`allclear_b2b_dupes: false`**: PC が同時に difficult clear(TSD 等)でも B2B は **+1 だけ**(difficult 分と PC 分を重ねない)。S7 の実装(`if (difficult && !(pc && pc.b2b)) b2b++` / `if (pc && pc.b2b) b2b += pc.b2b`)がこれに一致。
+- **`allclear_charges: false`**: PC の B2B 加算が surge の溜めに寄与しない、と読める。**ただし S7 は区別せず `b2b` を素直に加算しており、surge にも効いてしまう**。→ **§11-U3(未確定)**。
+
+### 6.6 Garbage Special Bonus (GSB)
+
+```
+gsb = 1  if  g_cleared > 0  and  (spin != none  or  lines >= 4)
+      0  otherwise
+```
+
+- **フラット +1**。multiplier の影響を受けない(S1「send a flat (not influenced by multipliers) +1 extra garbage」)。
+- 条件は「**その設置でゴミ行を 1 行以上消した**」かつ「**スピン or 4 行消し**」。
+  - Quad でゴミを消す → +1
+  - TSD でゴミを消す → +1
+  - 非 T mini double でゴミを消す → +1(spin なので)
+  - Single でゴミを消す → **+0**(spin でも 4 行でもない)
+  - Quad でゴミを消さない → **+0**
+- 出典: S1「Quads and Spins (including All-Spins) that clear garbage send a flat +1」、S4 `PN BETA 1.3.0`、S7(`garbageCleared > 0 && (spin || lines >= 4)`)、S11(`garbage_cleared > 0 && difficult_clear`)、S6 `garbagespecialbonus: true`
+- 加算位置: `floor(attack * mult + gsb)`。**丸めの内側**に入るが、gsb は整数なので結果は `floor(attack*mult) + 1` と等しい。
+
+### 6.7 surge(B2B Charging)
+
+#### 6.7.1 溜め
+
+- 溜め量は**状態として持たない**。`b2b_streak`(= `N`)から毎回導出する(実装が単純で、S7/S6 もそうしている)。
+- 表示上の surge 量:
+
+```
+b2b_disp     = max(N - 1, 0)
+surge_charge = b2b_disp      if b2b_disp >= 4
+               0             otherwise
+```
+
+- すなわち **表示 B2B x4 から溜まり始め、溜め量 = 表示 B2B 数**。上限なし。
+- 出典: S1「When you reach a B2B streak of 4, you begin charging a Surge attack. Surge has a starting power of 1 line in QUICK PLAY and 4 lines in other modes. Each level of B2B adds 1 line to Surge … if the player has an 8 B2B streak, then 8 lines are charged (5 lines in QUICK PLAY)」、S6 `b2bcharge_at: 4` / `b2bcharge_base: 3`、S11 `S2_TL_B2B_CHARGE_AT = 4` / `S2_TL_B2B_CHARGE_BASE = 3`、S6 golden `chain-and-surge.json`
+- 一般式(TETR.IO のオプション表現): `surge = b2b_disp_before - at + base + 1`。TL は `at = 4, base = 3` → `surge = b2b_disp_before`。QP は `base = 0` → `surge = b2b_disp_before - 3`。
+- `N` で書くと: 放出時の `N_before >= 5` が条件で、`surge_charge = N_before - 1`。
+
+#### 6.7.2 放出条件
+
+```
+release  iff  (lines > 0) and (not difficult) and (not pc) and (N_before >= 1)
+```
+
+- つまり **difficult clear でも PC でもないライン消去**で B2B が切れた瞬間に放出。
+- ライン消去なし(`lines == 0`)では**切れない**(放出しない)。
+- PC は B2B を**加算**するので切れない。
+- `N_before >= 1` は「そもそも B2B が繋がっていた」ことの条件(繋がっていなければ「切る」ものが無い)。
+- 出典: S1「When you break a B2B streak, all stored Surge lines are sent at once」、S7(`brokeB2B` フラグは `stats.b2b` が `-1` でないときのみ真)、S6 golden `ordinary-clear-breaks-b2b`
+
+#### 6.7.3 量と 3 分割
+
+```
+S = floor(surge_charge * garbage_multiplier)      # multiplier を掛けて floor
+if S > 0:
+    r = round(S / 3)                              # 四捨五入(0.5 は切り上げ)
+    chunks = [r, r, S - 2*r]                      # 0 の要素は捨てる
+```
+
+- **`r = round(S/3)` を 2 回使い、3 番目は残り**。したがって:
+  - `S = 3k`   → `[k, k, k]`
+  - `S = 3k+1` → `[k, k, k+1]` … **端数は 3 番目**
+  - `S = 3k+2` → `[k+1, k+1, k]` … **端数は 1・2 番目**
+- 出典: S7(`[Math.round(surged/3), Math.round(surged/3), surged - 2*Math.round(surged/3)]`)、S6 golden `chain-and-surge.json`(`amount 4 → [1,1,2]`, `amount 5 → [2,2,1]`)
+- **S1 の文言「first and second segments carrying the remainder」は 3k+2 の場合しか当たらない。3k+1 では 3 番目が端数を持つ。S1 の記述は不正確**(実装 2 つが一致している方を採る)。→ §11-U4 に記録。
+
+#### 6.7.4 送出順序
+
+surge の 3 分割は、**その設置の通常攻撃より前に**送られる。
+
+```
+送信イベント列 = [surge_chunk_1, surge_chunk_2, surge_chunk_3, 通常攻撃, PC ボーナス]
+```
+
+- 出典: S7(`gEvents.splice(0, 0, ...garbages)` で先頭に挿入、PC は末尾に push)
+- 各イベントは**独立に**相殺される(§7.3)。合計は同じだが、**相殺の順序とキューへの積算順序が変わる**ので実装上は無視できない。
+
+### 6.8 1 設置あたりの攻撃計算(完成形)
+
+```
+fn attack(clear, state) -> (attack_events, next_state):
+    # 0. 前提
+    N_before = state.b2b_streak
+    combo    = state.combo                   # その設置の「前」の値
+    difficult = (clear.spin != none) or (clear.lines >= 4)
+
+    # 1. chain 更新(§5 の遷移表)
+    if clear.lines > 0:
+        combo_after = combo + 1
+        if clear.pc:                         # PC は +1 のみ(difficult 分と重ねない)
+            N_after = N_before + 1
+            broke   = false
+        elif difficult:
+            N_after = N_before + 1
+            broke   = false
+        else:
+            N_after = 0
+            broke   = (N_before >= 1)
+    else:
+        combo_after = 0
+        N_after     = N_before
+        broke       = false
+
+    # 2. base(§6.1)+ B2B フラット +1(§6.2、判定は N_after)
+    base = BASE[clear.spin][clear.lines]     # lines == 0 のとき 0
+    if clear.lines > 0 and N_after >= 2:
+        base += 1
+
+    # 3. combo multiplier(§6.3)
+    if combo >= 1:
+        base = base * (1 + 0.25 * combo)
+    if combo >= 2:
+        base = max(base, ln_1p(1.25 * combo))
+
+    # 4. 通常攻撃イベント(§6.6 GSB 込み)
+    gsb  = 1 if (clear.g_cleared > 0 and (clear.spin != none or clear.lines >= 4)) else 0
+    main = floor(base * mult + gsb)  if (base > 0 or gsb > 0) else NONE
+
+    # 5. surge(§6.7。N_before を使う。N_after は 0 になっている)
+    events = []
+    if broke and N_before >= 5:
+        S = floor((N_before - 1) * mult)     # = floor(b2b_disp_before * mult)
+        if S > 0:
+            r = round_half_up(S / 3)
+            events += [c for c in [r, r, S - 2*r] if c > 0]
+
+    # 6. 通常攻撃 → PC の順に追加(§6.7.4)
+    if main != NONE: events += [main]
+    if clear.pc:     events += [floor(5 * mult)]
+
+    return (events, combo_after, N_after)
+```
+
+注意 1: `combo` は**その設置の前の値**を式に入れる(1 回目の消去は combo 0)。
+注意 2: B2B の +1 判定だけは**設置後**の `N_after` を使う(§6.2)。surge 量は**設置前**の `N_before` を使う(§6.7.1)。この 2 つを取り違えると「B2B を切った攻撃に +1 が乗る」「surge が 1 少ない」というバグになる。
+
+---
+
+## 7. ゴミシステム
+
+### 7.1 定数(S6 の観測値)
+
+| 定数 | 値 | 意味 |
+|---|---|---|
+| `garbagecap` | **8** | 1 ロックで挿入できる最大行数 |
+| `garbagecapmax` | 40 | cap の上限(cap が増加する設定のとき) |
+| `garbagecapincrease` | 0 | cap の時間増加(0 = 増えない) |
+| `garbagecapmargin` | 0 | cap 増加の開始時間 |
+| `garbageabsolutecap` | 0 | 0 = 無限(キュー全体の上限なし) |
+| `garbagespeed` | **20** frame | パケットが「到着」してから挿入可能になるまでの遅延 |
+| `garbageholesize` | 1 | 穴の幅 |
+| `messiness_change` | **1.0** | 攻撃(パケット)を消化し終えたときに列を引き直す確率 |
+| `messiness_inner`(within) | **0.0** | 同一パケット内で列を引き直す確率 |
+| `messiness_nosame` | false | 直前と同じ列を避けるか |
+| `messiness_timeout` | 0 | 時間経過での列変更なし |
+| `messiness_center` | false | 中央寄せなし |
+| `garbagemultiplier` | 1.0 | 攻撃倍率の初期値 |
+| `garbageincrease` | **0.008** /s | margin time 後の増加量 |
+| `garbagemargin` | **10800** frame(180 s) | margin time 開始 |
+| `garbageblocking` | `combo blocking` | ライン消去したロックでは挿入しない |
+| `roundmode` | `down` | 丸め |
+| `passthrough` | `zero` | パススルー無効 |
+
+- 出典: S6 `normalizedOptions`(TETR.IO クライアントの end option をそのまま記録)
+- 独立裏取り: S8 README「in tetrio, you will at most accept 8 lines of garbage at a time, which is garbage cap = 8」、S1「Garbage takes 20 frames, or 0.333 seconds, to travel」
+
+### 7.2 キューへの積算
+
+- 送信側の攻撃は、**送信イベントごとに 1 パケット**として相手のキューに積まれる。
+- パケットは `(amount, arrival_frame)` を持つ。`arrival_frame` は送信時点の frame。
+- キューは `arrival_frame` 昇順、同時刻なら**積まれた順**(FIFO)。
+- キュー全体の上限は**なし**(`garbageabsolutecap: 0`)。
+- 出典: S7 `GarbageQueue.receive` / `tank`(`this.queue.sort((a,b) => a.frame - b.frame)`)、S6 `garbageabsolutecap: 0`
+
+### 7.3 相殺(キャンセル)
+
+```
+cancel(attack_amount, pieces_placed):
+    send   = attack_amount
+    cancel = 0
+    if (pieces_placed + 1 <= 14) and (queue_total >= sent_total):
+        cancel = attack_amount          # Opener Phase: 相殺予算が 2 倍
+
+    while (send > 0 or cancel > 0) and queue not empty:
+        queue[0].amount -= 1
+        if queue[0].amount == 0:
+            pop queue[0]
+            if rng.next_float() < messiness_change:   # 1.0 → 常に真
+                reroll_column()
+                has_changed_column = true
+        if send > 0: send -= 1
+        else:        cancel -= 1
+
+    sent_total += send
+    return send        # 残り = 相手に送られる行数
+```
+
+- **相殺が送信より優先**(`send` を先に消費するので、結果として「まず自分の攻撃でキューを削り、削りきれなかった分が相手へ飛ぶ」)。
+- **1 行ずつ**キューを削る。パケットの途中でも削れる。
+- パケットを削りきった瞬間に列を引き直す(§7.6)。
+- `sent_total` は「**実際に相手へ飛んだ行数の累計**」を保持する(Opener Phase の条件で使う)。
+- 出典: S7 `GarbageQueue.cancel`、S6 `spike_stress.rs` の同等実装
+
+**複数イベントがある場合**(surge 3 分割 + 通常攻撃 + PC): §6.7.4 の順に、**イベントごとに `cancel` を呼ぶ**。1 つのイベントでキューを削りきれなかった残りが `sent_total` に加算され、次のイベントの相殺はその続きから始まる。
+
+### 7.4 Opener Phase
+
+```
+条件: pieces_placed + 1 <= 14   かつ   queue_total >= sent_total
+効果: 相殺予算が 2 倍(cancel = attack_amount を追加）
+```
+
+- `pieces_placed` は**その設置より前**に置いたピース数。したがって **1 個目〜14 個目**の設置が対象。15 個目から無効。
+- **hold はカウントを進めない**(hold は設置ではない)。hold を挟んでも「設置 14 個」で終わる。
+- `queue_total` は**現在キューに残っている行数**(到着前のパケットも含む)。
+- `sent_total` は**このラウンドで相手に飛ばした行数の累計**(相殺で消えた分は含まない)。
+- 効果は「**相殺量が 2 倍**」であって「送信量が 2 倍」ではない。相手への送信量は変わらない。
+- 出典: S1「For the first 14 pieces placed, if your lines sent that round is less than the amount pending, you cancel twice as much」、S4 `PN BETA 1.1.0`/`1.2.0`、S7、S6 `openerphase: 14`
+- 確度: [確定]。ただし「`>=` か `>` か」は S1 の文言(`less than`)と実装(`>=`)が食い違う。**実装(`>=`)を採る** → §11-U5。
+
+**具体例**: 相手から 4 行 pending、自分はまだ 0 行送信、5 個目の設置で Double(攻撃 1)。
+→ 条件成立(`5 <= 14` かつ `4 >= 0`)。`send = 1, cancel = 1` → キューから 2 行消える。`sent_total += 0`。
+→ 結果: 2 行相殺、送信 0。
+
+### 7.5 挿入(タンク)
+
+```
+on_lock(lines):
+    if lines > 0:
+        return                      # combo blocking: 消したら挿入しない
+    rows = 0
+    sort queue by arrival_frame
+    while rows < 8 and queue not empty:
+        if queue[0].arrival_frame + 20 > current_frame:
+            break
+        insert_one_row(hole = current_column)
+        queue[0].amount -= 1
+        rows += 1
+        if queue[0].amount == 0:
+            pop queue[0]
+            if rng.next_float() < messiness_change:
+                reroll_column()
+                has_changed_column = true
+```
+
+- **挿入はロック後・即時**。ライン消去をしなかったロックでのみ発生。
+- **1 行ずつ**盤面を上に押し上げる。1 ロックで最大 **8 行**。
+- 遅延: パケットの `arrival_frame + 20` を過ぎたものだけ挿入できる。5 PPS(12 frame/piece)なら、送信から約 2 ピース後に挿入可能。
+- 出典: S7 `GarbageQueue.tank` / `#lock`、S6 `spike_stress.rs`
+
+**盤面上端の扱い**: 行を挿入すると全行が 1 つ上へずれ、40 行目を超えた分は**破棄**される。S7(teto)は「内部 41 行配列の index 37 を削除し、38・39 を残す」という特殊な実装をしており、**上端 3 行の挙動が素直な実装と異なる**。→ §11-U6(実機確認)。トップアウト直前の局面でしか差が出ないが、レフェリーの判定が変わり得るので実装前に決める。
+
+### 7.6 change-on-attack(穴列の乱数)
+
+```
+初期: last_column = null, has_changed_column = false
+
+insert_one_row():
+    col = last_column
+    if (col == null) or (rng.next_float() < within):    # within = 0.0
+        if not has_changed_column:
+            col = reroll_column()
+            has_changed_column = true
+    place row with hole at col
+    has_changed_column = false
+    # パケットを消化しきったら
+    if packet.amount == 0:
+        pop packet
+        if rng.next_float() < change:                   # change = 1.0 → 常に真
+            reroll_column()
+            has_changed_column = true
+
+reroll_column():
+    col = floor(rng.next_float() * 10)                  # nosame=false, center=false
+    last_column = col
+    return col
+```
+
+- **TL の実効挙動**: パケット(= 1 回の攻撃)の**全行が同じ列**。パケットを消化し終えた時点で**必ず**列を引き直す。したがって「攻撃内は同列、攻撃間は必ず別列(ただし乱数が同じ値を返すことはある)」。
+- `within = 0.0` なので、同一パケット内で列が変わることはない。
+- **PLAN §3.1 の「攻撃間でばらけ率 ×2.5」は QUICK PLAY の記述**(S5 QP 節)。TL では change = 1.0 で、×2.5 は存在しない。
+- 出典: S7 `GarbageQueue.#reroll_column` / `tank`、S5「change on attack」、S6 `messiness_change: 1`, `messiness_inner: 0`
+
+**RNG 消費順**(再現性に直結):
+1. 行挿入時: `last_column == null` なら draw なしで reroll(内部で 1 draw)。`last_column != null` なら `within` 判定で **1 draw**(結果は必ず false)。
+2. パケット消化時: `change` 判定で **1 draw**、真なら `reroll_column` で **1 draw**。
+3. 相殺でパケットを消化したときも 2. と同じ(挿入時と同じ順)。
+
+> 実装は**この draw 順序を厳密に再現**しないと、同じ seed でも穴列がずれる。`crates/core` のプロパティテストで「同一 seed + 同一イベント列 → 同一盤面」を検証すること。
+
+### 7.7 乱数(MINSTD / Park–Miller)
+
+```
+MODULUS    = 2_147_483_647
+MULTIPLIER = 16_807
+MAX_FLOAT  = 2_147_483_646
+
+seed_init(s):  v = s mod MODULUS;  if v <= 0: v += MAX_FLOAT
+next():        v = (MULTIPLIER * v) mod MODULUS;  return v
+next_float():  (next() - 1) / MAX_FLOAT
+```
+
+- 出典: S7 `RNG`、S6 `spike_stress.rs` の `Rng`(同一実装)
+- ピース袋とゴミ列で**別インスタンス**。seed の割り当て方は §11-U7(レフェリーで決める)。
+
+### 7.8 margin time(攻撃倍率)
+
+```
+multiplier(frame) = 1.0 + max(0, frame - 10800) * (0.008 / 60)
+```
+
+- **ただし閉じた式で計算してはいけない。** TETR.IO は **1 frame ごとに `+0.008/60` を累積**する。閉じた式と IEEE-754 で結果が食い違い、**実際に 1 行差が出る**:
+  - frame 12300 で、累積値は `1.199999999999978`、閉じた式は `1.2`。
+  - 攻撃 5 に multiplier を掛けて floor すると、累積では **5**、閉じた式では **6**。
+- 出典: S6 `src-js/dynamic-values.mjs` のコメント(実測付き)、S6 `spike_stress.rs` の `Multiplier`
+- **実装要求**: `f64` の逐次加算で `multiplier[frame]` を構築する(または同じ丸め結果になる累積キャッシュ)。閉じた式は禁止。
+
+---
+
+## 8. 攻撃計算の具体例
+
+すべて `multiplier = 1.0`(frame ≤ 10800)を前提。`N` は §5 の `b2b_streak`(連続 difficult clear 数)、`combo` は 0-based。**「B2B x5」= `N = 6`** であることに注意。
+各式は §6.8 の擬似コードにそのまま対応する。全例は §6.8 の参照実装で機械検証済み(§8 末尾)。
+
+### 例 1: 素の Single(combo 0、B2B なし)
+
+```
+N_before = 0, combo = 0, lines = 1, spin = none
+base = 0 (Single)
+N_after = 1 → N_after >= 2 でない → B2B 加算なし
+combo = 0 → 乗算なし
+attack = floor(0) = 0
+```
+**送信 0 行。** これが TETR.IO の 0 コンボ Single(「0 コンボ Single は飛ばない」)。
+
+### 例 2: 2 連続目の Double(combo 1、B2B なし)
+
+```
+N_before = 0, combo = 1, lines = 2, spin = none
+base = 1 (Double)
+N_after = 1 → 加算なし
+combo = 1 → 1 × (1 + 0.25) = 1.25
+attack = floor(1.25) = 1
+```
+**送信 1 行。**(DOWN モードなので 1.25 → 1。RNG モードなら 25% で 2。)
+
+### 例 3: B2B x5・combo 2 での TSD
+
+```
+N_before = 6 (表示 B2B x5), combo = 2, lines = 2, spin = full
+base = 4 (TSD)
+N_after = 7 → N_after >= 2 → base = 4 + 1 = 5
+combo = 2 → 5 × (1 + 0.5) = 7.5
+combo >= 2 → max(7.5, ln_1p(2.5)) = max(7.5, 1.2528) = 7.5
+attack = floor(7.5) = 7
+```
+**送信 7 行。** N は 7 に増え、surge の溜めは 6 になる(まだ放出しない)。
+
+### 例 4: 例 3 と同じだが、その TSD がゴミを 1 行消した
+
+```
+例 3 の 7 に GSB +1(g_cleared > 0 かつ spin != none)→ 8
+```
+**送信 8 行。**
+
+### 例 5: B2B x8 を Single で切る(combo 0)
+
+```
+N_before = 9 (表示 B2B x8), combo = 0, lines = 1, spin = none
+Single: base = 0, N_after = 0 → 加算なし, combo 0 → 通常攻撃 0
+surge: broke = true, N_before = 9 >= 5 → S = floor((9-1) × 1.0) = 8
+       r = round_half_up(8/3) = 3 → [3, 3, 8-6=2]
+送信イベント列 = [3, 3, 2]   (通常攻撃は 0 なのでイベントなし)
+```
+**送信 8 行(3 + 3 + 2)。** N は 0 に戻る。
+
+### 例 6: B2B x4 を Single で切る
+
+```
+N_before = 5 (表示 B2B x4) → S = floor(4 × 1.0) = 4, r = round_half_up(4/3) = 1 → [1, 1, 2]
+Single の通常攻撃 = 0
+```
+**送信 4 行(1 + 1 + 2)。** 端数が 3 番目に来ることに注意(§6.7.3)。
+
+### 例 7: B2B x3 を Single で切る
+
+```
+N_before = 4 (表示 B2B x3) → 4 < 5 → surge なし
+Single = 0
+```
+**送信 0 行。** 表示 B2B が 4 未満だと切っても何も出ない。
+
+### 例 8: B2B x5 を Double(combo 0)で切る
+
+```
+N_before = 6 (表示 B2B x5) → S = floor(5 × 1.0) = 5, r = round_half_up(5/3) = 2 → [2, 2, 1]
+Double: base 1, N_after = 0 → 加算なし, combo 0 → 1
+送信イベント列 = [2, 2, 1, 1]
+```
+**送信 6 行。** 合計は 5 + 1。順序は surge が先(§6.7.4)。
+
+### 例 9: パーフェクトクリア(Double、combo 0、B2B なし)
+
+```
+N_before = 0, combo = 0, lines = 2, spin = none, pc = true
+Double: base 1, N_after = 1 → 加算なし, combo 0 → 1
+PC ボーナス: floor(5 × 1.0) = 5
+N_after = 1
+送信イベント列 = [1, 5]
+```
+**送信 6 行。** 次の difficult clear から B2B ボーナス +1 が乗る。
+
+### 例 10: パーフェクトクリアを TSD で(表示 B2B x2)
+
+```
+N_before = 3 (表示 B2B x2), combo = 0, lines = 2, spin = full, pc = true
+base = 4 (TSD)
+N_after = 4 → N_after >= 2 → base = 4 + 1 = 5
+combo 0 → 5
+PC ボーナス: +5
+N_after は +1 のみ(allclear_b2b_dupes = false。difficult 分と PC 分を重ねない)→ 4
+送信イベント列 = [5, 5]
+```
+**送信 10 行。**
+
+### 例 11: combo 5 での Single(base 0 の ln 項)
+
+```
+N_before = 0, combo = 5, lines = 1, spin = none
+base = 0 (Single), N_after = 1 → 加算なし
+乗算: 0 × (1 + 1.25) = 0
+ln 項: max(0, ln_1p(1.25 × 5)) = ln(7.25) = 1.9810
+attack = floor(1.9810) = 1
+```
+**送信 1 行。** base 0 でも combo が乗ると ln で 1 行出る。
+
+### 例 12: margin time の 1 行差(frame 12300)
+
+```
+multiplier(12300):
+  累積実装 → 1.199999999999978
+  閉じた式 → 1.2
+
+N_before = 2 (表示 B2B x1), lines = 4, spin = none
+base = 4 (Quad), N_after = 3 → 加算 +1 → 5
+combo 0 → 5
+attack = floor(5 × 1.199999999999978) = floor(5.99999999999989) = 5
+attack = floor(5 × 1.2)               = floor(6.0)              = 6
+```
+**累積実装で 5 行、閉じた式で 6 行。** 逐次加算が正(§7.8)。
+
+### 例 13: Opener Phase の相殺(§7.4 の再掲)
+
+```
+5 個目の設置、相手の pending = 4、自分の sent_total = 0、攻撃 = 1(Double, combo 0)
+条件: 5 <= 14 かつ 4 >= 0 → 成立
+send = 1, cancel = 1 → キューから 2 行消える(1 行目が send、2 行目が cancel を消費)
+sent_total += 0
+```
+**2 行相殺、送信 0。** 攻撃 1 で 2 行消えるのが Opener Phase。
+
+### 例 14: 非 T mini double と B2B(All-Mini+ の攻撃値)
+
+```
+(a) 単発(表示 B2B なし): N_before = 0, lines = 2, spin = mini
+    base = 1 (mini double), N_after = 1 → 加算なし
+    attack = floor(1) = 1
+
+(b) 2 連続目(表示 B2B x1): N_before = 1, lines = 2, spin = mini
+    base = 1, N_after = 2 → 加算 +1 → 2
+    attack = floor(2) = 2
+```
+**単発 1 行、B2B 中 2 行。** 非 T スピンは full にならないので base は mini のまま。B2B の +1 だけが乗る。
+
+### 例 15: TSS(表示 B2B x1)
+
+```
+N_before = 2, lines = 1, spin = full, combo = 0
+base = 2 (TSS), N_after = 3 → 加算 +1 → 3
+attack = floor(3) = 3
+```
+**送信 3 行。** mini single なら base 0 で、B2B 中でも +1 の 1 行にしかならない(差が大きい)。
+
+### 8.16 検証サマリ
+
+上の 15 例(と補助ケース)を §6.8 の擬似コードどおりに実装した参照実装で実行し、**全 18 ケースが一致**することを確認済み(2026-11-13)。
+
+**独立実装との照合**: 同じ 18 ケースを S11(MochBot/fusion)の `s2_attack_parts` のロジックに通したところ、**イベント列と合計が 18/18 で完全一致**した。差分はカウンタのセンチネル規約だけ(S11 は `-1` を「なし」に使い、本書は 0 始まり)。
+
+機械可読な fixture を **`docs/s2-attack-examples.json`** に置いた(`schema: intetrigence/s2-attack-examples/1`)。`crates/core` のテストはこれを読んで照合すること。
+
+表は「入力 → 送信イベント列(合計)」。
+
+| # | 入力(N / combo / lines / spin / pc / g / mult) | イベント列 | 合計 | N_after |
+|---|---|---|---|---|
+| 1 | 0 / 0 / 1 / none / – / 0 / 1.0 | `[]` | 0 | 1 |
+| 2 | 0 / 1 / 2 / none / – / 0 / 1.0 | `[1]` | 1 | 1 |
+| 3 | 6 / 2 / 2 / full / – / 0 / 1.0 | `[7]` | 7 | 7 |
+| 4 | 6 / 2 / 2 / full / – / 1 / 1.0 | `[8]` | 8 | 7 |
+| 5 | 9 / 0 / 1 / none / – / 0 / 1.0 | `[3,3,2]` | 8 | 0 |
+| 6 | 5 / 0 / 1 / none / – / 0 / 1.0 | `[1,1,2]` | 4 | 0 |
+| 7 | 4 / 0 / 1 / none / – / 0 / 1.0 | `[]` | 0 | 0 |
+| 8 | 6 / 0 / 2 / none / – / 0 / 1.0 | `[2,2,1,1]` | 6 | 0 |
+| 9 | 0 / 0 / 2 / none / PC / 0 / 1.0 | `[1,5]` | 6 | 1 |
+| 10 | 3 / 0 / 2 / full / PC / 0 / 1.0 | `[5,5]` | 10 | 4 |
+| 11 | 0 / 5 / 1 / none / – / 0 / 1.0 | `[1]` | 1 | 1 |
+| 12 | 2 / 0 / 4 / none / – / 0 / 1.199999999999978 | `[5]` | 5 | 3 |
+| 12' | 2 / 0 / 4 / none / – / 0 / 1.2(閉じた式) | `[6]` | 6 | 3 |
+| 13 | Opener 相殺(pending 4、sent 0、攻撃 1) | 2 行相殺 | 送信 0 | – |
+| 14a | 0 / 0 / 2 / mini / – / 0 / 1.0 | `[1]` | 1 | 1 |
+| 14b | 1 / 0 / 2 / mini / – / 0 / 1.0 | `[2]` | 2 | 2 |
+| 15 | 2 / 0 / 1 / full / – / 0 / 1.0 | `[3]` | 3 | 3 |
+| 補1 | 0 / 0 / 4 / none / – / 0 / 1.0(1 個目の Quad) | `[4]` | 4 | 1 |
+| 補2 | 1 / 0 / 4 / none / – / 0 / 1.0(2 個目の Quad) | `[5]` | 5 | 2 |
+
+---
+
+## 9. レフェリーが実装すべき状態
+
+`crates/core` の `GameState` は最低限これを持つ(§6.8 / §7 の式が参照する)。
+
+| フィールド | 型 | 用途 |
+|---|---|---|
+| `board` | 40 行 × 10 列 bitboard | 盤面 |
+| `combo` | u32 | §6.3 |
+| `b2b_streak` | u32 | §6.2 / §6.7(**表示 B2B ではなく連続 difficult clear 数 N**) |
+| `pieces_placed` | u32 | §7.4 |
+| `sent_total` | u32 | §7.4 |
+| `garbage_queue` | Vec<Packet{amount, arrival_frame}> | §7.2 |
+| `garbage_rng` | MINSTD 状態 | §7.6 |
+| `last_column` | Option<u8> | §7.6 |
+| `has_changed_column` | bool | §7.6 |
+| `bag` | 7-bag 状態 + RNG | §2.4 |
+| `hold` | Option<Piece> + `hold_available` | §2.5 |
+| `next` | [Piece; 5] | §2.6 |
+| `frame` | u64 | §7.5 / §7.8 |
+| `multiplier_cache` | 累積 f64 | §7.8 |
+
+**決定論の要求**: `(seed, 入力列)` から盤面・攻撃・キューが**完全に再現**できること。verify-replay(PLAN §3.3)の前提。
+
+---
+
+## 10. 実装チェックリスト(core-engine 向け)
+
+- [ ] §6.1 の base テーブルが全 12 ケースで一致(特に **mini triple = 2 / mini quad = 10**)
+- [ ] §6.2 B2B +1 が「1 回目の difficult clear では乗らない」(判定は `N_after >= 2`)
+- [ ] §6.3 combo の ln 項が **max** であること(base > 0 で ln が勝つケースを作らない)
+- [ ] §6.4 丸めが DOWN、**丸めは 1 回だけ**
+- [ ] §6.5 PC = +5 / +1 B2B、TSD+PC で **+1 のみ**
+- [ ] §6.6 GSB の条件が「ゴミを消した」かつ「spin or 4 行」
+- [ ] §6.7.3 surge 3 分割が `[r, r, S-2r]`、`S=4 → [1,1,2]`、`S=5 → [2,2,1]`
+- [ ] §6.7.4 surge が通常攻撃より**前**に送られる
+- [ ] §7.3 相殺が**1 行ずつ**、`sent_total` が「実際に飛んだ行数」だけ増える
+- [ ] §7.4 Opener が `pieces_placed + 1 <= 14`、hold で進まない
+- [ ] §7.5 挿入が「ライン消去なしのロック」のみ、最大 8 行、20 frame 遅延
+- [ ] §7.6 RNG draw 順序が仕様どおり(同一 seed で同一盤面)
+- [ ] §7.8 multiplier が**逐次加算**(閉じた式を使っていない)
+- [ ] §3.1.2 I の kick が **SRS+**(素の SRS ではない)
+- [ ] §3.2 180 kick が全ピース・全 4 遷移
+- [ ] §4.3 T の 5th kick 判定が `(+1,-2)` / `(-1,-2)`
+- [ ] §2.3 lock-out 判定が**存在しない**こと
+
+---
+
+## 11. 未確定リスト
+
+**確定させるまで実装で勝手に決めない。** 各項目に「確認先」と「暫定措置」を書く。暫定措置は実装を止めないためのもので、**凍結値ではない**。
+
+### U1. SRS+ の I kick のテスト順
+
+- **何が未確定か**: オフセットの集合は S7 から取れるが、**試す順序**が素の SRS と入れ替わっている(0→R が `(+1,0)` 先、`(-2,0)` 後)。順序が違うと「両方合法な局面でどちらに着地するか」が変わり、spin 判定・5th kick 判定にも波及する。
+- **根拠**: S7 のみ。S1 は「左右対称」としか書かず、図は画像で数値化できない。
+- **確認先**: TETR.IO の Custom Room(テストマップ)で I の 0→R を両方合法な局面に打ち、着地位置を観測。または attax 作者に S2 版の kick 表を共有してもらう。
+- **暫定措置**: S7 の順序をそのまま実装し、`#[ignore]` 付きのテストで差し替え可能にしておく。
+
+### U2. T の mini 判定における immobile の扱い
+
+- **何が未確定か**: `PN BETA 1.5.0` は「Immobile T-Spins that don't fulfill the three-corner-rule now count as Minis」と書く。素直に読むと「T も immobile 判定で mini を取れる」だが、S7 の実装は **T の mini を 2-corner ルールのみで決め、immobile は非 T 専用**。S2 も「In All-Mini, the T-piece does not score Spin Minis when immobile」と書いており、S7 と整合する。
+- **根拠**: S2 と S7 は一致。S4 の文言だけが曖昧。
+- **確認先**: TETR.IO 実機で「3-corner を満たさないが immobile な T」を打ち、mini になるか確認。
+- **暫定措置**: **S7 / S2 の解釈を採る**(T は 3-corner + 2-corner のみ、immobile は非 T)。§4.3 はこの解釈で書いてある。
+
+### U3. PC の B2B 加算が surge の溜めに寄与するか(`allclear_charges`)
+
+- **何が未確定か**: S6 の観測 option に `allclear_charges: false` がある。「PC で得た B2B は surge の溜めに数えない」と読めるが、S7 は区別せず `b2b` を加算するので surge にも効く。PC は稀なので実害は小さいが、**B2B x4 直前で PC を打つと surge が 1 増えるか**が変わる。
+- **根拠**: S6 の option 名のみ。S1/S5 に記述なし。S7 は未実装。
+- **確認先**: TETR.IO 実機で「B2B x3 → PC → 非 difficult clear」を打ち、surge が出るか観測。または attax 作者に S2 版の扱いを確認。
+- **暫定措置**: **S7 に合わせて「PC の +1 も surge に寄与する」**で実装。差し替え可能にしておく。
+
+### U4. surge 3 分割の端数の位置(S1 の記述と実装の食い違い)
+
+- **何が未確定か**: S1 は「first and second segments carrying the remainder」と書くが、S7 と S6 golden は `[r, r, S-2r]` で、**S = 3k+1 のとき端数が 3 番目**に来る(S=4 → [1,1,2])。
+- **根拠**: S7 と S6 golden が一致。S1 の散文だけが違う。
+- **確認先**: TETR.IO 実機で B2B x4 を Single で切り、相手の盤面に 1 行目が来るタイミングを見る(1 行目が 1 行か 2 行か)。
+- **暫定措置**: **実装 2 つ(S7 / S6)を採る**。本書 §6.7.3 はその値。
+
+### U5. Opener Phase の境界条件(`>=` か `>` か)
+
+- **何が未確定か**: S1 は「if your lines sent that round is **less than** the amount pending」= `pending > sent`。実装は `queue_total >= sent_total`。`pending == sent` のときだけ差が出る(実装は発動、S1 の文言は非発動)。
+- **根拠**: S7 / S6 が `>=`。S1 の散文が `>`。
+- **確認先**: 実機で「pending と sent が同数」の局面を作るのは難しい。attax 作者との仕様合意で決めるのが現実的。
+- **暫定措置**: **実装(`>=`)を採る**。
+
+### U6. ゴミ挿入時の上端 3 行の扱い
+
+- **何が未確定か**: S7(teto)は内部 41 行配列で「index 37 を削除し 38・39 を残す」という特殊な操作をする。素直な実装(40 行で上端を破棄)と、**スタックが 37 行以上に達したときの挙動が違う**。
+- **根拠**: S7 の `Board.insertGarbage` のみ。S6 の `insert_garbage_row` が同じ quirk をコメント付きで再現している(「teto would insert with column null…」「the old row 37 is lost」)。
+- **確認先**: 実機で「スタック 37 行 + ゴミ挿入」を作り、どの行が消えるか観測。または attax 作者と「トップアウト判定は block-out のみなので差が出ない」ことを確認して、**差が出ないと結論してよい**。
+- **暫定措置**: 素直な実装(40 行、上端破棄)で進める。**トップアウト直前でしか差が出ないため、勝率への影響は無視できると判断**。ただしレフェリーの replay 検証で不一致が出たら S7 の quirk を実装する。
+
+### U7. seed から各 RNG への割り当て
+
+- **何が未確定か**: TETR.IO は 1 つの seed から「ピース袋」「ゴミ列」「(相手ごとの)ゴミ列」を作るが、**その導出式は非公開**。本書は MINSTD のアルゴリズムだけを固定し、seed の割り当ては決めていない。
+- **根拠**: S6 は「hole RNG state is an input」「callers must pass a public value」としており、導出は対象外。
+- **確認先**: **レフェリーのプロトコルとして我々が決める**(attax 作者と合意)。TETR.IO の再現は不要。
+- **暫定措置**: `piece_rng = MINSTD(seed)`, `garbage_rng[player] = MINSTD(seed ^ (player_id * 0x9E3779B9))` のように**明示的に分ける**。両者に同じ仕様を渡す。
+
+### U8. 非 T スピンの「mini triple」の存在
+
+- **何が未確定か**: 非 T の 3 ライン消しスピン(例: L-Spin Triple)は `mini` + `lines 3` → base **2**。S7 の表には `tspinMiniTriple: 2` があるが、S1/S2 に「mini triple」の記述はなく、実機で観測されたという証拠もない。
+- **根拠**: S7 の表のみ。
+- **確認先**: 実機で L-Spin Triple を打ち、送信量を測る(base 2 なら B2B なしで 2 行)。
+- **暫定措置**: S7 の値を採る(base 2)。頻度は低い。
+
+### U9. 5 PPS ペアドターンと frame 進行の対応
+
+- **何が未確定か**: レフェリーは「1 turn = 1 ピース」で進めるが、`frame` を `turn × 12` とすると、**実際の 5 PPS より garbage multiplier の margin time が早く来る/遅く来る**可能性がある。実際の TETR.IO は 60 fps 固定で、5 PPS なら 12 frame/piece で正しい。
+- **根拠**: プロトコル設計。
+- **確認先**: プロトコルとして確定(PLAN §3.1)。attax 作者と「turn 番号で同期する」ことを合意する。
+- **暫定措置**: `frame = turn × 12`。1000 turn で 12000 frame = 200 秒 → **margin time(10800 frame)に到達する**。終盤の攻撃が 1.2 倍になるので、評価関数にも効く。
+
+---
+
+## 12. 実装監査(2026-11-13 時点)
+
+`crates/core` の `07aaa24` を本書と突き合わせた結果。
+
+### 12.1 一致を確認したもの
+
+| 対象 | 確認内容 |
+|---|---|
+| `kick.rs` `JLSTZ_KICKS` | §3.1.1 の 8 遷移 × 5 テストすべて一致 |
+| `kick.rs` `I_KICKS` | §3.1.2 の 8 遷移 × 5 テストすべて一致(**SRS+ 対応済み**) |
+| `kick.rs` `JLSTZ_180_KICKS` | §3.2.1 の 4 遷移 × 5 テストすべて一致 |
+| `kick.rs` `I_180_KICKS` | §3.2.2 の 4 遷移 × 2 テストすべて一致 |
+| `kick.rs` `kicks()` の O 分岐 | 90° は `O_KICKS`、180° は汎用表(§3.1.3 の要求どおり) |
+| `kick.rs` `is_fin_or_tst_kick` | §3.3 の `(+1,-2)` / `(-1,-2)` 判定と一致 |
+| `piece.rs` spawn の x | I/T/S/Z/J/L = 3、O = 4(§2.2 と一致) |
+| `piece.rs` 回転中心 | 3×3 = (1,1)、I 4×4 = (1.5,1.5)、O 2×2 = (0.5,0.5)(SRS true rotation) |
+
+### 12.2 修正が必要なもの
+
+| 対象 | 現状 | 本書の要求 | 優先度 |
+|---|---|---|---|
+| `piece.rs` `spawn_position` | 最下段セルが **row 20**(I = (3,18)、O = (4,20)、他 = (3,19)) | 最下段セルが **row 21**(I = (3,19)、O = (4,21)、他 = (3,20))。§2.2.1 の表 | **高**(block-out が 1 行早い) |
+| `scoring.rs` | インターフェースのみ | §6 全体。`docs/s2-attack-examples.json` の 18 件で照合 | 高 |
+| `garbage.rs` | インターフェースのみ | §7 全体 | 高 |
+| `opener.rs` | インターフェースのみ | §7.4 | 中 |
+
+### 12.3 本書側で用意したもの
+
+| ファイル | 内容 | 使い方 |
+|---|---|---|
+| `docs/s2-attack-examples.json` | 攻撃計算の fixture 18 件(`schema: intetrigence/s2-attack-examples/1`) | `crates/core` のテストで読み、`attack()` の出力と `expected` を照合する |
+
+`fixture` は「入力(`lines` / `spin` / `combo` / `b2bStreak` / `perfectClear` / `garbageCleared` / `multiplier`)+ 期待値(`events` / `total` / `comboAfter` / `b2bStreakAfter` / `base` / `gsb` / `surgeAmount`)」の形。`base` は B2B +1 と combo 乗算を適用した**後**の値(丸め前)。
+
+**フィールドの意味(取り違えやすいので明記)**:
+
+| フィールド | 意味 |
+|---|---|
+| 入力 `combo` | **この設置で式に入る値** = 直前までの連続消去数(0 = 直前が消去なし)。§5 の `combo` |
+| 入力 `b2bStreak` | **この設置前**の連続 difficult clear 数 `N`(0 = B2B なし)。§5 の `b2b_streak` |
+| 出力 `comboAfter` | **次の設置で式に入る値** = 消去ありなら `combo + 1`、消去なしなら 0 |
+| 出力 `b2bStreakAfter` | この設置後の `N` |
+
+> **S11(fusion)との対応**: S11 の `combo_after` は「その設置で式に入る値」なので、**本書の入力 `combo` と同値**。S11 の `b2b_after` は `-1` 始まりのセンチネルなので **`本書の b2bStreakAfter - 1`**。名前が紛らわしいので、S11 を参照するときは値の意味で読み替えること。
+
+### 12.4 attax 現行版との差分(レフェリー設計上の注意)
+
+`docs/attax-analysis.md`(attax-integration 担当)が記録した attax `7b38f51` の採点実装は **S2 ではない**。レフェリーは attax の自己申告する攻撃値を信用せず、**必ず本書の式で再計算**すること(PLAN §3.3 の「採点一致オーディット」の前提)。
+
+| 項目 | attax 現行(guideline) | 本書(S2 TL) |
+|---|---|---|
+| Mini Triple | 0 | **2** |
+| Mini Quad | 未定義 | **10** |
+| T-Spin Quad | 未定義 | **10** |
+| コンボ | 加算テーブル | **乗算** `base × (1 + 0.25 × combo)` + ln 項 |
+| B2B | +1 のみ | **+1 + surge** |
+| PC | +10 | **+5** |
+| ゴミ込みボーナス | なし | **+1** |
+| Opener Phase | なし | **相殺 ×2** |
+| 180° 回転 | なし | **あり** |
+| All-Spin | T のみ | **All-Mini+(全ピース)** |
+
+attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致**する。差分は上表の項目に限られる。
+---
+
+## 13. 改訂履歴
+
+| 版 | 日付 | 変更 |
+|---|---|---|
+| v1 | 2026-11-13 | 初版。PLAN §3.1 全 15 行の裏取り、攻撃式・surge・All-Mini+・GSB・Opener・ゴミ・SRS+/180 の数値固定、計算例 15 件 + 機械検証 fixture、未確定 9 件。PLAN の「×2.5」「PC +2」の 2 点を訂正。 |
+| v1.1 | 2026-11-13 | `crates/core` `07aaa24` の実装監査を反映。§2.2.1 を追加(spawn セルの絶対座標を表で固定。**最下段セルは row 21**)。§12 を監査結果に書き換え。S11(MochBot/fusion)を出典に追加。 |
+| v1.2 | 2026-11-13 | S11(fusion)の S2 攻撃実装で §6.2 / §6.5 / §6.6 / §6.7 を三重裏取り。fixture 18 件を S11 のロジックと照合し、**イベント列・合計が 18/18 一致**。§5 の `combo` の定義を「式に入る値」と明示。§12.3 にフィールド意味表を追加。S11 の `AttackConfig` に残る S1 時代の古い値(`pc_b2b: 2`)への警告を追記。 |

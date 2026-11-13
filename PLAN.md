@@ -58,10 +58,10 @@
 | コンボ | base × (1 + 0.25 × combo)、切り捨て。base 0 は ln(1 + 1.25 × combo)(combo ≥ 2) |
 | B2B | **B2B Charging**: difficult clear 毎に +1(フラット)。streak ≥ 4 で surge 溜め(= streak 数)、非 B2B 消しで全放出(3 分割) |
 | All-Spin | **All-Mini+**: T 以外は immobile 判定で mini 扱い(SS 0 / SD 1)、B2B は維持・加算。T は 3-corner / 2-corner + 5th kick ルール |
-| パーフェクトクリア | +5(B2B 加算は要仕様固定: ソースで +1 / +2 の表記揺れあり) |
+| パーフェクトクリア | +5、B2B **+1**(確定。+2 は S2 プレシーズン表記) |
 | ゴミ込みボーナス | ゴミを含む Quad / TSD 等は +1(Garbage Special Bonus) |
 | Opener Phase | 最初の 14 ピース、相殺 ×2 |
-| ゴミ | change-on-attack(攻撃内は同列が基本、攻撃間でばらけ率 ×2.5)。**キュー + 遅延挿入**、送信攻撃はキュー相殺が優先、cap・遅延の定数は M1 で固定 |
+| ゴミ | change-on-attack(TL は messiness_change = 1.0、攻撃間で必ず列を引き直し。×2.5 は QUICK PLAY の記述)。**キュー + 遅延挿入(遅延 20 frame、cap 8 行/ロック)**、送信攻撃はキュー相殺が優先 |
 | 回転 | **SRS+**(I の kick 修正)+ **180° 回転**(独自 kick) |
 | 盤面 | 10×20 可視(内部 40 行)、block-out / lock-out |
 | ランダマイザー | 7-bag, 両者同一 seed。5 preview + hold |
@@ -72,7 +72,9 @@
 
 **合格条件(確定)**: 新規 held-out seeds 50 個 × 両シート = **100 ゲームで 90 勝以上**(点推定 ≥ 90%)。Wilson 95% CI も併記
 
-### 3.2 仕様の一次ソース(M1 でフリーズする)
+**数値定数の正は docs/s2-spec.md(v1.2 凍結・18 fixture を独立 2 実装で検証済み)**。未確定 9 件(U1〜U9)は同 §11:要実機確認 U1/U2/U4/U6/U8、attax 作者確認 U3/U5/U7。
+
+### 3.2 仕様の一次ソース(v1.2 でフリーズ済み → docs/s2-spec.md)
 
 - **attax 作者との合意仕様(最優先)**: 両者が同一のテーブル・定数・seed 仕様を使う。M0 で共有ドキュメント化
 - tetrio.wiki.gg(Mechanics / Spins / TETRA LEAGUE)
@@ -177,3 +179,8 @@ intetrigence/
 
 ### 残件
 - 期限(未定でもマイルストーン駆動で進行可)
+
+## 8. 進捗ログ
+
+- **2026-11-13 Wave 1 完了・受理**: docs/s2-spec.md v1.2 凍結(PC B2B +1、ゴミ cap 8/遅延 20f、TL messiness 1.0、surge 3 分割 [r,r,S-2r] を決着。18 fixture を独立 2 実装で検証)。attax を 7b38f51 に固定(bun 1.4.0、build/test 緑)、TBP smoke 14/14 成功(エビデンス scripts/evidence/attax-tbp-smoke/)、docs/attax-integration.md + docs/attax-analysis.md 作成(敵の重み・特徴量を記録)。crates/core 基盤 + テスト 105 緑(commits 5f54c1a, 07aaa24)。仕様監査で core の spawn 行バグ(row 20 → 正 21)を発見 → Wave 2 で修正。
+- **Wave 2(進行中)**: core-engine = spawn 修正 + S2 採点(scoring/opener/garbage)+ fixture 18/18 照合。s2-spec-lead = attax 作者への確認事項ドキュメント(U3/U5/U7)。bot-dev(新設)= exact movegen。harness-dev(新設)= S2 レフェリー + TBP host + M0 ゲート(現行 attax と 10 ゲーム、replay 検証)。

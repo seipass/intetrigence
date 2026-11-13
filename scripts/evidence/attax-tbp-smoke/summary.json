@@ -1,0 +1,625 @@
+{
+  "generatedAt": "2026-11-13T14:35:13.300Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.19.0",
+    "bun": "1.4.0",
+    "os": "Windows_NT 10.0.26200"
+  },
+  "attax": {
+    "dir": "C:\\Users\\Hasilan\\Projects\\attax",
+    "adapter": "C:\\Users\\Hasilan\\Projects\\attax\\tbp\\attax-tbp.ts",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "commitDate": "2026-11-13T21:11:16+09:00",
+    "branch": "main",
+    "dirty": ""
+  },
+  "steps": [
+    {
+      "name": "info",
+      "ok": true,
+      "detail": {
+        "name": "Attax",
+        "version": "overhaul/full",
+        "author": "attax",
+        "features": []
+      }
+    },
+    {
+      "name": "ready",
+      "ok": true
+    },
+    {
+      "name": "start",
+      "ok": true,
+      "detail": {
+        "queue": [
+          "I",
+          "T",
+          "L",
+          "S",
+          "Z",
+          "O"
+        ],
+        "hold": null,
+        "combo": 0,
+        "b2b": false
+      }
+    },
+    {
+      "name": "move 0",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 42,
+        "first": {
+          "location": {
+            "type": "I",
+            "orientation": "north",
+            "x": 7,
+            "y": 0
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 41.26,
+        "adapterReportedMs": 38.4,
+        "nodes": 8653,
+        "depth": 5,
+        "queueLen": 6,
+        "hold": null,
+        "extra": "attax 38.4ms"
+      }
+    },
+    {
+      "name": "move 1",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 30,
+        "first": {
+          "location": {
+            "type": "T",
+            "orientation": "north",
+            "x": 4,
+            "y": 0
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 32.13,
+        "adapterReportedMs": 30.3,
+        "nodes": 8168,
+        "depth": 5,
+        "queueLen": 6,
+        "hold": null,
+        "extra": "attax 30.3ms"
+      }
+    },
+    {
+      "name": "move 2",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 15,
+        "first": {
+          "location": {
+            "type": "S",
+            "orientation": "north",
+            "x": 2,
+            "y": 0
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 28.43,
+        "adapterReportedMs": 26.8,
+        "nodes": 8537,
+        "depth": 5,
+        "queueLen": 6,
+        "hold": null,
+        "extra": "attax 26.8ms"
+      }
+    },
+    {
+      "name": "move 3",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 18,
+        "first": {
+          "location": {
+            "type": "L",
+            "orientation": "south",
+            "x": 2,
+            "y": 2
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 34.22,
+        "adapterReportedMs": 32.7,
+        "nodes": 10740,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "L",
+        "extra": "attax 32.7ms"
+      }
+    },
+    {
+      "name": "move 4",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 30,
+        "first": {
+          "location": {
+            "type": "O",
+            "orientation": "north",
+            "x": 8,
+            "y": 1
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 27,
+        "adapterReportedMs": 25.5,
+        "nodes": 8901,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "Z",
+        "extra": "attax 25.5ms"
+      }
+    },
+    {
+      "name": "move 5",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 12,
+        "first": {
+          "location": {
+            "type": "J",
+            "orientation": "west",
+            "x": 7,
+            "y": 2
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 31.15,
+        "adapterReportedMs": 29.7,
+        "nodes": 10809,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "Z",
+        "extra": "attax 29.7ms"
+      }
+    },
+    {
+      "name": "start-resend-after-garbage",
+      "ok": true,
+      "detail": {
+        "garbageRows": 4,
+        "hole": 5,
+        "staleBoardAcceptedIndex": -1,
+        "staleBoardProblems": [
+          "overlap (6,3)",
+          "overlap (6,2)"
+        ]
+      }
+    },
+    {
+      "name": "post-garbage move 0",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 39,
+        "first": {
+          "location": {
+            "type": "Z",
+            "orientation": "north",
+            "x": 6,
+            "y": 4
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 30.2,
+        "adapterReportedMs": 28.4,
+        "nodes": 9124,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "Z",
+        "extra": "attax 28.4ms"
+      }
+    },
+    {
+      "name": "post-garbage move 1",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 6,
+        "first": {
+          "location": {
+            "type": "I",
+            "orientation": "east",
+            "x": 5,
+            "y": 2
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 31.51,
+        "adapterReportedMs": 30,
+        "nodes": 10739,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "T",
+        "extra": "attax 30.0ms"
+      }
+    },
+    {
+      "name": "post-garbage move 2",
+      "ok": true,
+      "detail": {
+        "acceptedIndex": 0,
+        "moveCount": 6,
+        "first": {
+          "location": {
+            "type": "T",
+            "orientation": "north",
+            "x": 4,
+            "y": 0
+          },
+          "spin": "none"
+        },
+        "firstProblems": [],
+        "hostRoundTripMs": 31.94,
+        "adapterReportedMs": 30.4,
+        "nodes": 10510,
+        "depth": 6,
+        "queueLen": 6,
+        "hold": "T",
+        "extra": "attax 30.4ms"
+      }
+    },
+    {
+      "name": "quit",
+      "ok": true,
+      "detail": {
+        "childExit": {
+          "code": 0,
+          "signal": null
+        }
+      }
+    }
+  ],
+  "think": {
+    "moves": 9,
+    "medianMs": 31.51,
+    "p95Ms": 41.26,
+    "minMs": 27,
+    "maxMs": 41.26,
+    "allMs": [
+      41.26,
+      32.13,
+      28.43,
+      34.22,
+      27,
+      31.15,
+      30.2,
+      31.51,
+      31.94
+    ]
+  },
+  "nodes": {
+    "total": 86181,
+    "median": 9124,
+    "perMove": [
+      8653,
+      8168,
+      8537,
+      10740,
+      8901,
+      10809,
+      9124,
+      10739,
+      10510
+    ]
+  },
+  "acceptance": {
+    "suggestions": 9,
+    "firstChoiceAccepted": 9,
+    "indexHistogram": {
+      "0": 9
+    },
+    "indices": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "transcriptPath": "scripts/evidence/attax-tbp-smoke/transcript.jsonl",
+  "decisionsLogPath": "scripts/evidence/attax-tbp-smoke/attax-decisions.jsonl",
+  "summaryPath": "scripts/evidence/attax-tbp-smoke/summary.json",
+  "staleBoard": {
+    "acceptedIndex": -1,
+    "firstProblems": [
+      "overlap (6,3)",
+      "overlap (6,2)"
+    ],
+    "first": {
+      "location": {
+        "type": "Z",
+        "orientation": "east",
+        "x": 5,
+        "y": 2
+      },
+      "spin": "none"
+    }
+  },
+  "finishedAt": "2026-11-13T14:35:13.806Z",
+  "childExit": {
+    "code": 0,
+    "signal": null
+  },
+  "piecesPlaced": 9,
+  "depths": {
+    "perMove": [
+      5,
+      5,
+      5,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6
+    ],
+    "histogram": {
+      "5": 3,
+      "6": 6
+    }
+  },
+  "decisions": [
+    {
+      "ms": 38.43,
+      "nodes": 8653,
+      "depth": 5,
+      "primary": {
+        "kind": "I",
+        "rotation": 0,
+        "x": 6,
+        "y": 18,
+        "tspin": "none",
+        "hold": false
+      },
+      "first": {
+        "location": {
+          "type": "I",
+          "orientation": "north",
+          "x": 7,
+          "y": 0
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 30.3,
+      "nodes": 8168,
+      "depth": 5,
+      "primary": {
+        "kind": "T",
+        "rotation": 0,
+        "x": 3,
+        "y": 18,
+        "tspin": "none",
+        "hold": false
+      },
+      "first": {
+        "location": {
+          "type": "T",
+          "orientation": "north",
+          "x": 4,
+          "y": 0
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 26.78,
+      "nodes": 8537,
+      "depth": 5,
+      "primary": {
+        "kind": "S",
+        "rotation": 0,
+        "x": 1,
+        "y": 18,
+        "tspin": "none",
+        "hold": true
+      },
+      "first": {
+        "location": {
+          "type": "S",
+          "orientation": "north",
+          "x": 2,
+          "y": 0
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 32.67,
+      "nodes": 10740,
+      "depth": 6,
+      "primary": {
+        "kind": "L",
+        "rotation": 2,
+        "x": 1,
+        "y": 16,
+        "tspin": "none",
+        "hold": true
+      },
+      "first": {
+        "location": {
+          "type": "L",
+          "orientation": "south",
+          "x": 2,
+          "y": 2
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 25.46,
+      "nodes": 8901,
+      "depth": 6,
+      "primary": {
+        "kind": "O",
+        "rotation": 0,
+        "x": 7,
+        "y": 17,
+        "tspin": "none",
+        "hold": false
+      },
+      "first": {
+        "location": {
+          "type": "O",
+          "orientation": "north",
+          "x": 8,
+          "y": 1
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 29.65,
+      "nodes": 10809,
+      "depth": 6,
+      "primary": {
+        "kind": "J",
+        "rotation": 3,
+        "x": 6,
+        "y": 16,
+        "tspin": "none",
+        "hold": false
+      },
+      "first": {
+        "location": {
+          "type": "J",
+          "orientation": "west",
+          "x": 7,
+          "y": 2
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 25.71,
+      "nodes": 9182,
+      "depth": 6,
+      "primary": {
+        "kind": "Z",
+        "rotation": 1,
+        "x": 4,
+        "y": 16,
+        "tspin": "none",
+        "hold": true
+      },
+      "first": {
+        "location": {
+          "type": "Z",
+          "orientation": "east",
+          "x": 5,
+          "y": 2
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 28.43,
+      "nodes": 9124,
+      "depth": 6,
+      "primary": {
+        "kind": "Z",
+        "rotation": 0,
+        "x": 5,
+        "y": 14,
+        "tspin": "none",
+        "hold": true
+      },
+      "first": {
+        "location": {
+          "type": "Z",
+          "orientation": "north",
+          "x": 6,
+          "y": 4
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 29.97,
+      "nodes": 10739,
+      "depth": 6,
+      "primary": {
+        "kind": "I",
+        "rotation": 1,
+        "x": 3,
+        "y": 16,
+        "tspin": "none",
+        "hold": false
+      },
+      "first": {
+        "location": {
+          "type": "I",
+          "orientation": "east",
+          "x": 5,
+          "y": 2
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    },
+    {
+      "ms": 30.38,
+      "nodes": 10510,
+      "depth": 6,
+      "primary": {
+        "kind": "T",
+        "rotation": 0,
+        "x": 3,
+        "y": 18,
+        "tspin": "none",
+        "hold": true
+      },
+      "first": {
+        "location": {
+          "type": "T",
+          "orientation": "north",
+          "x": 4,
+          "y": 0
+        },
+        "spin": "none"
+      },
+      "cellsAboveRow20": false
+    }
+  ],
+  "ok": true
+}

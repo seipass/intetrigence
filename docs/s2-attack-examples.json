@@ -1,0 +1,427 @@
+{
+  "schema": "intetrigence/s2-attack-examples/1",
+  "spec": "docs/s2-spec.md §6.8 / §8",
+  "source": "TETR.IO S2 TETRA LEAGUE defaults; see docs/s2-spec.md §0.3",
+  "notes": "N = b2b_streak (consecutive difficult clears), combo is 0-based, mult = garbage multiplier",
+  "cases": [
+    {
+      "id": "single-combo0",
+      "input": {
+        "lines": 1,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 0,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [],
+        "total": 0,
+        "comboAfter": 1,
+        "b2bStreakAfter": 0,
+        "base": 0.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "double-combo1",
+      "input": {
+        "lines": 2,
+        "spin": "none",
+        "combo": 1,
+        "b2bStreak": 0,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          1
+        ],
+        "total": 1,
+        "comboAfter": 2,
+        "b2bStreakAfter": 0,
+        "base": 1.25,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "tsd-b2bx5-combo2",
+      "input": {
+        "lines": 2,
+        "spin": "full",
+        "combo": 2,
+        "b2bStreak": 6,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          7
+        ],
+        "total": 7,
+        "comboAfter": 3,
+        "b2bStreakAfter": 7,
+        "base": 7.5,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "tsd-b2bx5-combo2-garbage",
+      "input": {
+        "lines": 2,
+        "spin": "full",
+        "combo": 2,
+        "b2bStreak": 6,
+        "perfectClear": false,
+        "garbageCleared": 1,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          8
+        ],
+        "total": 8,
+        "comboAfter": 3,
+        "b2bStreakAfter": 7,
+        "base": 7.5,
+        "gsb": 1,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "surge-break-b2bx8-single",
+      "input": {
+        "lines": 1,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 9,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          3,
+          3,
+          2
+        ],
+        "total": 8,
+        "comboAfter": 1,
+        "b2bStreakAfter": 0,
+        "base": 0.0,
+        "gsb": 0,
+        "surgeAmount": 8
+      }
+    },
+    {
+      "id": "surge-break-b2bx4-single",
+      "input": {
+        "lines": 1,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 5,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          1,
+          1,
+          2
+        ],
+        "total": 4,
+        "comboAfter": 1,
+        "b2bStreakAfter": 0,
+        "base": 0.0,
+        "gsb": 0,
+        "surgeAmount": 4
+      }
+    },
+    {
+      "id": "surge-break-b2bx3-single",
+      "input": {
+        "lines": 1,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 4,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [],
+        "total": 0,
+        "comboAfter": 1,
+        "b2bStreakAfter": 0,
+        "base": 0.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "surge-break-b2bx5-double",
+      "input": {
+        "lines": 2,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 6,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          2,
+          2,
+          1,
+          1
+        ],
+        "total": 6,
+        "comboAfter": 1,
+        "b2bStreakAfter": 0,
+        "base": 1.0,
+        "gsb": 0,
+        "surgeAmount": 5
+      }
+    },
+    {
+      "id": "pc-double",
+      "input": {
+        "lines": 2,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 0,
+        "perfectClear": true,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          1,
+          5
+        ],
+        "total": 6,
+        "comboAfter": 1,
+        "b2bStreakAfter": 1,
+        "base": 1.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "pc-tsd-b2bx2",
+      "input": {
+        "lines": 2,
+        "spin": "full",
+        "combo": 0,
+        "b2bStreak": 3,
+        "perfectClear": true,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          5,
+          5
+        ],
+        "total": 10,
+        "comboAfter": 1,
+        "b2bStreakAfter": 4,
+        "base": 5.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "single-combo5-log",
+      "input": {
+        "lines": 1,
+        "spin": "none",
+        "combo": 5,
+        "b2bStreak": 0,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          1
+        ],
+        "total": 1,
+        "comboAfter": 6,
+        "b2bStreakAfter": 0,
+        "base": 1.9810014688665833,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "quad-b2bx1-margin-accum",
+      "input": {
+        "lines": 4,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 2,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.199999999999978
+      },
+      "expected": {
+        "events": [
+          5
+        ],
+        "total": 5,
+        "comboAfter": 1,
+        "b2bStreakAfter": 3,
+        "base": 5.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "quad-b2bx1-margin-closed",
+      "input": {
+        "lines": 4,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 2,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.2
+      },
+      "expected": {
+        "events": [
+          6
+        ],
+        "total": 6,
+        "comboAfter": 1,
+        "b2bStreakAfter": 3,
+        "base": 5.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "mini-double-first",
+      "input": {
+        "lines": 2,
+        "spin": "mini",
+        "combo": 0,
+        "b2bStreak": 0,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          1
+        ],
+        "total": 1,
+        "comboAfter": 1,
+        "b2bStreakAfter": 1,
+        "base": 1.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "mini-double-b2b",
+      "input": {
+        "lines": 2,
+        "spin": "mini",
+        "combo": 0,
+        "b2bStreak": 1,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          2
+        ],
+        "total": 2,
+        "comboAfter": 1,
+        "b2bStreakAfter": 2,
+        "base": 2.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "tss-b2bx1",
+      "input": {
+        "lines": 1,
+        "spin": "full",
+        "combo": 0,
+        "b2bStreak": 2,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          3
+        ],
+        "total": 3,
+        "comboAfter": 1,
+        "b2bStreakAfter": 3,
+        "base": 3.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "quad-first",
+      "input": {
+        "lines": 4,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 0,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          4
+        ],
+        "total": 4,
+        "comboAfter": 1,
+        "b2bStreakAfter": 1,
+        "base": 4.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    },
+    {
+      "id": "quad-second",
+      "input": {
+        "lines": 4,
+        "spin": "none",
+        "combo": 0,
+        "b2bStreak": 1,
+        "perfectClear": false,
+        "garbageCleared": 0,
+        "multiplier": 1.0
+      },
+      "expected": {
+        "events": [
+          5
+        ],
+        "total": 5,
+        "comboAfter": 1,
+        "b2bStreakAfter": 2,
+        "base": 5.0,
+        "gsb": 0,
+        "surgeAmount": 0
+      }
+    }
+  ]
+}
