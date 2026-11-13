@@ -453,7 +453,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
                 }
             }
             ReplayRecord::Result(result) => {
-                verify_result(&engine, result, &mut report);
+                verify_result(&mut engine, result, &mut report);
                 index += 1;
             }
             other => {
@@ -469,7 +469,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     Ok(report)
 }
 
-fn verify_result(engine: &Engine, result: &ResultRecord, report: &mut VerifyReport) {
+fn verify_result(engine: &mut Engine, result: &ResultRecord, report: &mut VerifyReport) {
     let over: Vec<usize> = (0..2)
         .filter(|&slot| engine.players[slot].game.is_over())
         .collect();
@@ -478,6 +478,13 @@ fn verify_result(engine: &Engine, result: &ResultRecord, report: &mut VerifyRepo
         (result.winner, result.reason.clone())
     } else if let Some(&loser) = over.first() {
         (Some(1 - loser as u8), "TopOut".to_string())
+    } else if result.reason == "TopOut" {
+        // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
+        // placement even though the game is not block-out.
+        match result.winner.map(|winner| 1 - winner as usize) {
+            Some(loser) if !engine.has_legal_move(loser) => (result.winner, "TopOut".to_string()),
+            _ => (None, "TurnCap".to_string()),
+        }
     } else {
         let a = &engine.players[0];
         let b = &engine.players[1];
