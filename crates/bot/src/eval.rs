@@ -63,22 +63,29 @@ pub fn heights(board: &Board) -> [i32; COLUMNS] {
     heights
 }
 
-/// Computes the shape features of `board`.
-pub fn features(board: &Board) -> Features {
-    let heights = heights(board);
-    let max_height = heights.iter().copied().max().unwrap_or(0);
-    let over = (max_height - DANGER_BASE).max(0);
-    let mut features = Features {
-        max_height: max_height as f64,
-        height_sq: (over * over) as f64,
-        ..Features::default()
-    };
+/// Column heights plus the shape features, computed in one top-down pass.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoardAnalysis {
+    pub heights: [i32; COLUMNS],
+    pub features: Features,
+}
 
-    // Holes, hole cover and hole rows in one top-down pass.
+/// Computes [`BoardAnalysis`] for `board`.
+///
+/// One pass over the rows gives the heights, the holes and their cover; the
+/// bumpiness, well and transition terms then come from the heights. The search
+/// calls this for every child, so it avoids the per-column `column_height`
+/// scan that [`heights`] does.
+pub fn analyse(board: &Board) -> BoardAnalysis {
+    let mut heights = [0i32; COLUMNS];
+    let mut features = Features::default();
     let mut seen = 0u16;
     let mut cover = [0u8; COLUMNS];
+
     for y in (0..Board::HEIGHT).rev() {
         let row = board.row(y);
+
+        // Holes in this row: empty cells with a filled cell somewhere above.
         let mut holes = !row & seen & Board::FULL_ROW;
         if holes != 0 {
             features.hole_rows += 1.0;
@@ -89,14 +96,23 @@ pub fn features(board: &Board) -> Features {
                 features.hole_cover += f64::from(cover[x].min(4));
             }
         }
+
         let mut filled = row;
         while filled != 0 {
             let x = filled.trailing_zeros() as usize;
             filled &= filled - 1;
+            if heights[x] == 0 {
+                heights[x] = y as i32 + 1;
+            }
             cover[x] = (cover[x] + 1).min(4);
         }
         seen |= row;
     }
+
+    let max_height = heights.iter().copied().max().unwrap_or(0);
+    let over = (max_height - DANGER_BASE).max(0);
+    features.max_height = max_height as f64;
+    features.height_sq = (over * over) as f64;
 
     // Main well: the lowest column, leftmost on a tie.
     let mut well = 0usize;
@@ -145,7 +161,12 @@ pub fn features(board: &Board) -> Features {
         features.row_transitions += f64::from((mask ^ (mask >> 1)).count_ones());
     }
 
-    features
+    BoardAnalysis { heights, features }
+}
+
+/// Computes the shape features of `board`.
+pub fn features(board: &Board) -> Features {
+    analyse(board).features
 }
 
 /// Weight vector for [`Features`] and the placement rewards.
@@ -374,7 +395,7 @@ pub fn leaf_value(
     weights: &Weights,
     t_available: usize,
 ) -> f64 {
-    let features = features(board);
+    let BoardAnalysis { heights, features } = analyse(board);
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.holes * features.holes
@@ -389,7 +410,7 @@ pub fn leaf_value(
     value += weights.surge_charge * f64::from(surge_charge_from_streak(context.b2b_streak));
     value += weights.combo * f64::from(context.combo);
     value -= weights.incoming * f64::from(context.incoming);
-    value += t_slot_cutout(board, t_available, weights);
+    value += t_slot_cutout_with_heights(board, &heights, t_available, weights);
     value
 }
 
@@ -399,19 +420,29 @@ pub fn leaf_value(
 /// form a nub-down T slot are considered, so it is a handful of integer
 /// comparisons per board.
 pub fn t_slot_lines(board: &Board) -> u8 {
-    best_t_slot(board).map_or(0, |(_, _, lines)| lines)
+    best_t_slot(board, &heights(board)).map_or(0, |(_, _, lines)| lines)
 }
 
 /// The T-slot cutout: hypothetically spend up to `available` T pieces on the
 /// best slots and credit the lines they would clear.
 pub fn t_slot_cutout(board: &Board, available: usize, weights: &Weights) -> f64 {
+    t_slot_cutout_with_heights(board, &heights(board), available, weights)
+}
+
+/// [`t_slot_cutout`] with the heights already computed.
+fn t_slot_cutout_with_heights(
+    board: &Board,
+    heights: &[i32; COLUMNS],
+    available: usize,
+    weights: &Weights,
+) -> f64 {
     if available == 0 {
         return 0.0;
     }
     let mut board = board.clone();
     let mut value = 0.0;
     for _ in 0..available.min(2) {
-        let Some((x, y, lines)) = best_t_slot(&board) else {
+        let Some((x, y, lines)) = best_t_slot(&board, heights) else {
             break;
         };
         board
@@ -428,8 +459,7 @@ pub fn t_slot_cutout(board: &Board, available: usize, weights: &Weights) -> f64 
 }
 
 /// Best nub-down T slot: `(x, y, lines cleared)` for a rotation-2 T.
-fn best_t_slot(board: &Board) -> Option<(i32, i32, u8)> {
-    let heights = heights(board);
+fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)> {
     let mut best: Option<(i32, i32, u8)> = None;
     for x in 1..COLUMNS - 1 {
         let stem = heights[x];
@@ -484,6 +514,39 @@ mod tests {
         assert_eq!(features.hole_rows, 0.0);
         assert_eq!(features.bumpiness, 0.0);
         assert_eq!(features.row_transitions, 0.0);
+    }
+
+    /// Golden values for the single-pass analysis. They were recorded before
+    /// the heights were folded into the same pass, so they pin that the
+    /// optimisation did not change a single feature.
+    #[test]
+    fn analysis_matches_the_recorded_feature_values() {
+        let mut board = Board::new();
+        for y in 0..19 {
+            let mut row = Board::FULL_ROW & !(1u16 << 9);
+            if y % 3 == 0 {
+                row &= !(1u16 << ((y * 7 + 3) % 9));
+            }
+            board.set_row(y, row);
+        }
+        board.set_row(19, 0b0000_0001_1100_0000);
+        let analysis = analyse(&board);
+        assert_eq!(
+            analysis.features,
+            Features {
+                max_height: 20.0,
+                height_sq: 64.0,
+                holes: 6.0,
+                hole_cover: 23.0,
+                hole_rows: 6.0,
+                bumpiness: 3.0,
+                bumpiness_sq: 3.0,
+                row_transitions: 76.0,
+                well_depth: 4.0,
+                extra_wells: 0.0,
+            }
+        );
+        assert_eq!(analysis.heights, heights(&board));
     }
 
     #[test]
