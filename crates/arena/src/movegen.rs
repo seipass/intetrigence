@@ -197,6 +197,14 @@ pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
         }
         let piece = state.piece(kind);
         let cells = sorted_cells(piece.cells());
+        // One placement per cell set. I/O/S/Z describe the same cells with more
+        // than one rotation; the first BFS-order state is the canonical one.
+        // The spin is path/rotation independent for those pieces (non-T spins
+        // are the immobile predicate, which depends only on the cell set), so
+        // dropping the duplicates cannot lose a spin label.
+        if by_cells.contains_key(&cells) {
+            continue;
+        }
         let (spin, path) = best_spin(board, kind, state, &rotation_edges, &parent);
         let placement = Placement {
             kind,

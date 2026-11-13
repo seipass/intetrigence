@@ -18,6 +18,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent::AgentAudit;
 
+/// 5 PPS budget per placement (200 ms). Placements above it are counted so a
+/// report can state whether the nominal pace was met (protocol v1.3 §2.1).
+pub const PPS_BUDGET_MS: f64 = 200.0;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ThinkStats {
     pub count: usize,
@@ -25,6 +29,8 @@ pub struct ThinkStats {
     pub p95_ms: f64,
     pub max_ms: f64,
     pub mean_ms: f64,
+    /// Placements whose wall-clock think time exceeded [`PPS_BUDGET_MS`].
+    pub over_budget: u32,
 }
 
 impl ThinkStats {
@@ -47,6 +53,10 @@ impl ThinkStats {
             p95_ms: round3(sorted[rank - 1]),
             max_ms: round3(sorted[count - 1]),
             mean_ms: round3(sorted.iter().sum::<f64>() / count as f64),
+            over_budget: samples
+                .iter()
+                .filter(|&&sample| sample > PPS_BUDGET_MS)
+                .count() as u32,
         }
     }
 }
@@ -94,6 +104,11 @@ pub struct ScoringAudit {
     pub attack_checked: u32,
     pub attack_matches: u32,
     pub attack_mismatches: u32,
+    /// Attack mismatches where the claimed spin label agreed with the referee.
+    /// These are scoring-table differences, not spin-classification differences.
+    pub attack_mismatches_same_spin: u32,
+    /// Attack mismatches where the spin label itself differed.
+    pub attack_mismatches_spin_diff: u32,
     pub declared_total: u32,
     pub recomputed_total: u32,
     pub examples: Vec<ScoringMismatch>,
@@ -136,6 +151,11 @@ impl ScoringAudit {
                 self.attack_matches += 1;
             } else {
                 self.attack_mismatches += 1;
+                if claimed_spin == Some(recomputed_spin) {
+                    self.attack_mismatches_same_spin += 1;
+                } else {
+                    self.attack_mismatches_spin_diff += 1;
+                }
             }
             if (declared != recomputed_attack || claimed_spin != Some(recomputed_spin))
                 && self.examples.len() < 20

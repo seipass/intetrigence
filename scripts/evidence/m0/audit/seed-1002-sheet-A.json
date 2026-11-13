@@ -1,7 +1,7 @@
 {
   "seed": 1002,
   "sheet": "A",
-  "started_at": "unix:1794591442",
+  "started_at": "unix:1794591785",
   "winner": 1,
   "reason": "TopOut",
   "detail": null,
@@ -23,17 +23,19 @@
   "think": [
     {
       "count": 58,
-      "median_ms": 0.757,
-      "p95_ms": 1.12,
-      "max_ms": 3.065,
-      "mean_ms": 0.75
+      "median_ms": 0.663,
+      "p95_ms": 1.036,
+      "max_ms": 1.319,
+      "mean_ms": 0.642,
+      "over_budget": 0
     },
     {
       "count": 57,
-      "median_ms": 26.89,
-      "p95_ms": 35.062,
-      "max_ms": 39.298,
-      "mean_ms": 27.134
+      "median_ms": 27.725,
+      "p95_ms": 34.088,
+      "max_ms": 41.493,
+      "mean_ms": 27.842,
+      "over_budget": 0
     }
   ],
   "first_choice": [
@@ -59,6 +61,8 @@
       "attack_checked": 58,
       "attack_matches": 58,
       "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
       "declared_total": 8,
       "recomputed_total": 8,
       "examples": []
@@ -71,6 +75,8 @@
       "attack_checked": 57,
       "attack_matches": 57,
       "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
       "declared_total": 25,
       "recomputed_total": 25,
       "examples": []
@@ -104,7 +110,7 @@
     "decision_log": "scripts/evidence/m0\\logs\\seed-1002-sheet-A-attax.jsonl",
     "decisions_logged": 57,
     "nodes_total": 554853,
-    "extra_ms_total": 1506.8,
+    "extra_ms_total": 1543.8,
     "suggestions_with_stats": 57,
     "cells_above_row20": false,
     "hold_matches": 57,

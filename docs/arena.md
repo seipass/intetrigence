@@ -1,7 +1,7 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.2
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.3
 **ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.6
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
@@ -90,7 +90,8 @@ protocol §2.2 は「共有 7-bag から `bag[t]` を取り、両者に同じピ
 protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂され、
 §8.1 の `turn.piece` は削除・`placement.piece` が必須になった。v1.2 では §6.1 の
 「同一 turn の同時トップアウト → 引き分け」が到達不能と確認され、「トップアウトした瞬間に
-終了、相手の勝ち」に統一された(実装は元からその挙動)。s2-spec §11-U7 の
+終了、相手の勝ち」に統一された(実装は元からその挙動)。v1.3 では §2.1 のペーシングが
+「実時間で待たない・200 ms 超過を数える」に確定した(下記 D8)。s2-spec §11-U7 の
 「ピース袋は 1 本」も「`piece_seed` は 1 本、袋のインスタンスはプレイヤーごと」に
 修正された(v1.3.5、ルール値の変更なし。v1.3.6 は §12 の監査追記のみ)。
 
@@ -150,11 +151,13 @@ lines / PC / ゴミ消しを使う)。attax は guideline 採点なので、All-
 protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので、同一 turn の同時トップアウトは
 **到達しない**。引き分けは turn cap の同点のみ。
 
-### D8. ペーシング(P5)
+### D8. ペーシング(P5、protocol v1.3 で確定)
 
 実時間では待たない。`frame = turn * 12` が状態を決め、think time は `suggest` ごとに測る。
-時間制限は課さない(protocol §0.5)。実時間の 5 PPS 演出が必要になったら
-`run_round` に sleep を足すだけで、状態には影響しない。
+時間制限は課さない(protocol §0.5)。代わりに **1 手 200 ms(5 PPS の持ち時間)を超えた手**を
+`ThinkStats.over_budget` に数え、レポートに出す。0 件なら「公称 5 PPS と実測が一致」と
+主張でき、超過があれば正直に書ける。実時間の 5 PPS 演出が必要になったら `run_round` に
+sleep を足すだけで、状態には影響しない。
 
 ### D9. 統計
 
@@ -181,16 +184,16 @@ protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので�
 
 | seed | sheet | 勝者 | 理由 | turns | replay | think median (ms) intetrigence / attax | first-choice | spin 一致 |
 |---|---|---|---|---|---|---|---|---|
-| 1001 | A | attax | TopOut | 51 | OK | 1.1 / 27.2 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1001 | B | attax | TopOut | 51 | OK | 0.9 / 27.6 | 1.00 / 1.00 | 1.00 / 0.96 |
-| 1002 | A | attax | TopOut | 58 | OK | 0.8 / 26.9 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1002 | B | attax | TopOut | 58 | OK | 0.7 / 26.1 | 1.00 / 1.00 | 1.00 / 1.00 |
-| 1003 | A | attax | TopOut | 48 | OK | 0.7 / 28.6 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1003 | B | attax | TopOut | 48 | OK | 0.7 / 27.5 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1004 | A | attax | TopOut | 104 | OK | 0.7 / 27.0 | 1.00 / 1.00 | 1.00 / 0.97 |
-| 1004 | B | attax | TopOut | 94 | OK | 0.9 / 27.2 | 1.00 / 1.00 | 1.00 / 0.99 |
-| 1005 | A | attax | TopOut | 131 | OK | 0.4 / 26.1 | 1.00 / 1.00 | 1.00 / 0.98 |
-| 1005 | B | attax | TopOut | 92 | OK | 0.6 / 26.0 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1001 | A | attax | TopOut | 51 | OK | 0.8 / 27.8 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1001 | B | attax | TopOut | 51 | OK | 0.8 / 27.2 | 1.00 / 1.00 | 1.00 / 0.96 |
+| 1002 | A | attax | TopOut | 58 | OK | 0.7 / 27.7 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1002 | B | attax | TopOut | 58 | OK | 0.7 / 28.0 | 1.00 / 1.00 | 1.00 / 1.00 |
+| 1003 | A | attax | TopOut | 48 | OK | 0.6 / 28.1 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1003 | B | attax | TopOut | 48 | OK | 0.6 / 28.3 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1004 | A | attax | TopOut | 104 | OK | 0.6 / 26.7 | 1.00 / 1.00 | 1.00 / 0.97 |
+| 1004 | B | attax | TopOut | 94 | OK | 0.8 / 26.9 | 1.00 / 1.00 | 1.00 / 0.99 |
+| 1005 | A | attax | TopOut | 131 | OK | 0.4 / 28.7 | 1.00 / 1.00 | 1.00 / 0.98 |
+| 1005 | B | attax | TopOut | 92 | OK | 0.5 / 29.1 | 1.00 / 1.00 | 1.00 / 1.00 |
 
 - **replay 検証: 10/10 成功**(`arena verify scripts/evidence/m0`)。
 - 監査: 到達可能性拒否 0、queue 不変条件違反 0、hold 推論の不一致 0、
@@ -198,10 +201,18 @@ protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので�
 - 採点オーディット: attax の spin 不一致は 0〜3 件/ゲーム。すべて
   「attax は `none`、S2 レフェリーは `mini`」(非 T の immobile spin)で、
   1 件は攻撃量が 0 → 1 行に変わった。guideline 採点との差が記録できている。
+  `ScoringAudit` は **spin 不一致**と**spin が一致したうえでの攻撃量不一致**を別カウンタで持つ
+  (`attack_mismatches_same_spin`)。最終レポートではボット別にこの 2 つを分けて出す。
+- **200 ms 超過**: 全 10 ゲームで 0 件(ベースライン < 2 ms、attax ~27 ms)。
+- **ボット別集計**(10 ゲーム合計):
+  - intetrigence(baseline): 735 配置、spin 不一致 **0**、攻撃不一致 **0**、200 ms 超過 **0**
+  - attax: 730 配置、spin 不一致 **12**、攻撃不一致 **2**(うち **spin が一致したうえでの攻撃不一致 0**)、200 ms 超過 **0**
+  - attax の 12 件はすべて「attax `none` → S2 `mini`」の All-Mini+ 非 T spin。攻撃の 2 件も
+    その spin 差に由来する。同じ spin での攻撃量は一致している。
 - **勝敗は参考値**: 0 勝 10 敗。ベースラインが攻撃を作れず(51 手で攻撃 6 行)、
   attax(23 行)にゴミで押し切られた。配管・監査・replay の証明が目的。
 - 証拠: `scripts/evidence/m0/{summary.json,summary.md,audit/*.json,replays/*.jsonl,logs/*}`。
-- header の版: この証拠は `docs/s2-spec.md@v1.3.6` / `docs/s2-referee-protocol.md@v1.2`。
+- header の版: この証拠は `docs/s2-spec.md@v1.3.6` / `docs/s2-referee-protocol.md@v1.3`。
   `arena match` は既定で `+<short HEAD>` を付ける(`git show <commit>:<path>` で当時の文書を復元)。
   この証拠は統合前の worktree で生成したため、dangling hash を避けて版のみを記録している。
   統合コミット後に `scripts/m0-match.sh` を再実行すると `+<commit>` 付きになる。
@@ -226,7 +237,8 @@ scripts/m0-match.sh
 5. **movegen の一本化**(bot-dev 提案): `crates/bot::Movegen` に `Placement.actions` /
    `generate_from` / `reachable_states` / `unique_by_cells` があり、`crates/arena::movegen`
    を差し替え可能。**I/O/S/Z は同一セルを複数 rotation で表す**ので、クロスチェックは
-   両者をセル集合に畳んでから比較する(`(rotation, x, y)` の集合で比べると個数が食い違う)。
+   両者を **`(cells, spin)` の集合**に畳んでから比較する(`(rotation, x, y)` の集合で比べると
+   個数が食い違う)。spin を含めるのは、セルが同じでも回転由来かどうかで採点が変わるため。
    差し替え後もクロスチェックは残す(FRONT 表バグと同じ二重実装リスクの検出)。
 6. `verify-replay` は着手列の再実行であって探索の再現ではない(PLAN §3.3 のとおり)。
 7. forfeit は負けとして集計する(protocol §7 の P2 暫定)。

@@ -69,7 +69,7 @@ impl MatchConfig {
             attax: None,
             started_at: now_stamp(),
             rules: version_string("docs/s2-spec.md", "v1.3.6"),
-            protocol: version_string("docs/s2-referee-protocol.md", "v1.2"),
+            protocol: version_string("docs/s2-referee-protocol.md", "v1.3"),
         }
     }
 }
@@ -138,6 +138,9 @@ pub struct GameSummary {
     pub first_choice_rate: [f64; 2],
     pub spin_match_rate: [f64; 2],
     pub attack_match_rate: [f64; 2],
+    pub spin_mismatches: [u32; 2],
+    pub attack_mismatches_same_spin: [u32; 2],
+    pub think_over_budget: [u32; 2],
     pub sent_total: [u32; 2],
     pub received_total: [u32; 2],
     pub attack_total: [u32; 2],
@@ -157,6 +160,21 @@ pub struct AttaxSummary {
     pub command_line: String,
 }
 
+/// Match-level audit totals for one bot. The final report must separate spin
+/// label mismatches from same-spin attack mismatches (protocol v1.3 §8.4).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BotAggregate {
+    pub slot: u8,
+    pub name: String,
+    pub placements: u32,
+    pub spin_checked: u32,
+    pub spin_mismatches: u32,
+    pub attack_checked: u32,
+    pub attack_mismatches: u32,
+    pub attack_mismatches_same_spin: u32,
+    pub think_over_budget: u32,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MatchSummary {
     pub schema: String,
@@ -172,6 +190,7 @@ pub struct MatchSummary {
     pub verified: u32,
     pub verify_failures: u32,
     pub attax: Option<AttaxSummary>,
+    pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
 }
 
@@ -207,6 +226,15 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         first_choice_rate: [audit.first_choice[0].rate, audit.first_choice[1].rate],
         spin_match_rate: [spin_rate(audit, 0), spin_rate(audit, 1)],
         attack_match_rate: [attack_rate(audit, 0), attack_rate(audit, 1)],
+        spin_mismatches: [
+            audit.scoring[0].spin_mismatches,
+            audit.scoring[1].spin_mismatches,
+        ],
+        attack_mismatches_same_spin: [
+            audit.scoring[0].attack_mismatches_same_spin,
+            audit.scoring[1].attack_mismatches_same_spin,
+        ],
+        think_over_budget: [audit.think[0].over_budget, audit.think[1].over_budget],
         sent_total: [audit.totals[0].sent_total, audit.totals[1].sent_total],
         received_total: [
             audit.totals[0].received_total,
@@ -244,6 +272,41 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
             bun_version: attax.bun_version.clone(),
             command_line: attax.command_line.clone(),
         });
+    let bots = [0usize, 1].map(|slot| BotAggregate {
+        slot: slot as u8,
+        name: audits
+            .first()
+            .map(|audit| audit.bots[slot].name.clone())
+            .unwrap_or_default(),
+        placements: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].placements)
+            .sum(),
+        spin_checked: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].spin_checked)
+            .sum(),
+        spin_mismatches: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].spin_mismatches)
+            .sum(),
+        attack_checked: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_checked)
+            .sum(),
+        attack_mismatches: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_mismatches)
+            .sum(),
+        attack_mismatches_same_spin: audits
+            .iter()
+            .map(|audit| audit.scoring[slot].attack_mismatches_same_spin)
+            .sum(),
+        think_over_budget: audits
+            .iter()
+            .map(|audit| audit.think[slot].over_budget)
+            .sum(),
+    });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
         started_at: audits
@@ -261,6 +324,7 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
         verified,
         verify_failures: games.len() as u32 - verified,
         attax,
+        bots,
         notes: vec![
             "M0 gate: plumbing / audit / replay proof. The intetrigence side is the in-process \
              M0 baseline stand-in, not the real bot (crates/bot is still a skeleton)."
@@ -506,6 +570,30 @@ mod tests {
             verified: 0,
             verify_failures: 0,
             attax: None,
+            bots: [
+                BotAggregate {
+                    slot: 0,
+                    name: "a".into(),
+                    placements: 0,
+                    spin_checked: 0,
+                    spin_mismatches: 0,
+                    attack_checked: 0,
+                    attack_mismatches: 0,
+                    attack_mismatches_same_spin: 0,
+                    think_over_budget: 0,
+                },
+                BotAggregate {
+                    slot: 1,
+                    name: "b".into(),
+                    placements: 0,
+                    spin_checked: 0,
+                    spin_mismatches: 0,
+                    attack_checked: 0,
+                    attack_mismatches: 0,
+                    attack_mismatches_same_spin: 0,
+                    think_over_budget: 0,
+                },
+            ],
             notes: vec!["note".into()],
         };
         let markdown = summary.to_markdown();
