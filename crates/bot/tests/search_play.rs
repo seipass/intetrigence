@@ -113,12 +113,12 @@ fn the_answer_does_not_depend_on_the_thread_count() {
         threads: 1,
         ..config.clone()
     });
-    let a = one.search(&state);
+    let a = one.search(&state).expect("a move exists");
     let mut eight = Searcher::new(SearchConfig {
         threads: 8,
         ..config
     });
-    let b = eight.search(&state);
+    let b = eight.search(&state).expect("a move exists");
     assert_eq!(a.best, b.best);
     assert_eq!(a.value, b.value);
     assert_eq!(a.line, b.line);
@@ -148,7 +148,7 @@ fn the_search_prefers_a_t_spin_over_a_flat_placement() {
         budget: Duration::from_secs(5),
         ..SearchConfig::default()
     });
-    let result = searcher.search(&state);
+    let result = searcher.search(&state).expect("a move exists");
     assert_eq!(result.best.piece, PieceKind::T);
     assert_eq!(
         result.best.placement.spin,
