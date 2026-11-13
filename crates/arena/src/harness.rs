@@ -68,7 +68,7 @@ impl MatchConfig {
             out_dir: out_dir.into(),
             attax: None,
             started_at: now_stamp(),
-            rules: version_string("docs/s2-spec.md", "v1.3.6"),
+            rules: version_string("docs/s2-spec.md", "v1.3.7"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.3"),
         }
     }

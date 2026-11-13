@@ -27,6 +27,7 @@ pub struct ThinkStats {
     pub count: usize,
     pub median_ms: f64,
     pub p95_ms: f64,
+    pub p99_ms: f64,
     pub max_ms: f64,
     pub mean_ms: f64,
     /// Placements whose wall-clock think time exceeded [`PPS_BUDGET_MS`].
@@ -47,10 +48,12 @@ impl ThinkStats {
             (sorted[count / 2 - 1] + sorted[count / 2]) / 2.0
         };
         let rank = ((0.95 * count as f64).ceil() as usize).clamp(1, count);
+        let rank99 = ((0.99 * count as f64).ceil() as usize).clamp(1, count);
         Self {
             count,
             median_ms: round3(median),
             p95_ms: round3(sorted[rank - 1]),
+            p99_ms: round3(sorted[rank99 - 1]),
             max_ms: round3(sorted[count - 1]),
             mean_ms: round3(sorted.iter().sum::<f64>() / count as f64),
             over_budget: samples
@@ -287,6 +290,7 @@ mod tests {
         assert_eq!(stats.count, 20);
         assert_eq!(stats.median_ms, 10.5);
         assert_eq!(stats.p95_ms, 19.0);
+        assert_eq!(stats.p99_ms, 20.0);
         assert_eq!(stats.max_ms, 20.0);
     }
 

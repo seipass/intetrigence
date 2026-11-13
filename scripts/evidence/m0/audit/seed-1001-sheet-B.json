@@ -1,7 +1,7 @@
 {
   "seed": 1001,
   "sheet": "B",
-  "started_at": "unix:1794591785",
+  "started_at": "unix:1794591993",
   "winner": 1,
   "reason": "TopOut",
   "detail": null,
@@ -23,18 +23,20 @@
   "think": [
     {
       "count": 51,
-      "median_ms": 0.805,
-      "p95_ms": 1.095,
-      "max_ms": 1.17,
-      "mean_ms": 0.757,
+      "median_ms": 0.954,
+      "p95_ms": 1.299,
+      "p99_ms": 1.321,
+      "max_ms": 1.321,
+      "mean_ms": 0.86,
       "over_budget": 0
     },
     {
       "count": 51,
-      "median_ms": 27.24,
-      "p95_ms": 36.027,
-      "max_ms": 40.198,
-      "mean_ms": 27.415,
+      "median_ms": 28.074,
+      "p95_ms": 35.16,
+      "p99_ms": 40.721,
+      "max_ms": 40.721,
+      "mean_ms": 28.445,
       "over_budget": 0
     }
   ],
@@ -117,7 +119,7 @@
     "decision_log": "scripts/evidence/m0\\logs\\seed-1001-sheet-B-attax.jsonl",
     "decisions_logged": 51,
     "nodes_total": 499114,
-    "extra_ms_total": 1358.5,
+    "extra_ms_total": 1408.9,
     "suggestions_with_stats": 51,
     "cells_above_row20": false,
     "hold_matches": 51,

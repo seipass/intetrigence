@@ -140,15 +140,45 @@ pub fn spawn_state(kind: PieceKind) -> ActivePiece {
 /// Enumerates every grounded placement reachable from `start`.
 pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
     let kind = start.kind;
+    let mut placements: Vec<Placement> = Vec::new();
+    let mut by_cells: HashMap<[(i32, i32); 4], usize> = HashMap::new();
+    for placement in generate_all(board, start, hold) {
+        match by_cells.get(&placement.cells) {
+            Some(&index) => {
+                // The same cells can be reached with a different last action
+                // (I/O/S/Z are 180-degree symmetric). A non-T spin is
+                // `spin_entry && immobile`, so keeping the first state could
+                // drop a Mini that a rotation entry would earn. Keep the
+                // strongest label; ties keep the first BFS-order placement.
+                if placement.spin.index() > placements[index].spin.index() {
+                    placements[index] = placement;
+                }
+            }
+            None => {
+                by_cells.insert(placement.cells, placements.len());
+                placements.push(placement);
+            }
+        }
+    }
+    MoveSet {
+        kind,
+        hold,
+        placements,
+        by_cells,
+    }
+}
+
+/// Every reachable grounded placement, **without** cell-set deduplication.
+///
+/// This is the raw BFS result: one entry per `(rotation, x, y)` state. It is
+/// used by the cell-set invariant tests and by the post-integration cross-check
+/// against `intetrigence_bot::Movegen` (which exposes `unique_by_cells`).
+pub fn generate_all(board: &Board, start: ActivePiece, hold: bool) -> Vec<Placement> {
+    let kind = start.kind;
     if !board.can_place(kind, start.rotation, start.x, start.y) {
         // A blocked spawn is a block-out (docs/s2-spec.md §2.3): no placement
         // exists, and a hypothetical hold must not be offered.
-        return MoveSet {
-            kind,
-            hold,
-            placements: Vec::new(),
-            by_cells: HashMap::new(),
-        };
+        return Vec::new();
     }
     let first = State::new(start);
 
@@ -190,23 +220,14 @@ pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
     }
 
     let mut placements = Vec::new();
-    let mut by_cells = HashMap::new();
     for &state in &order {
         if board.can_place(kind, state.rotation(), state.x, state.y - 1) {
             continue; // not grounded
         }
         let piece = state.piece(kind);
         let cells = sorted_cells(piece.cells());
-        // One placement per cell set. I/O/S/Z describe the same cells with more
-        // than one rotation; the first BFS-order state is the canonical one.
-        // The spin is path/rotation independent for those pieces (non-T spins
-        // are the immobile predicate, which depends only on the cell set), so
-        // dropping the duplicates cannot lose a spin label.
-        if by_cells.contains_key(&cells) {
-            continue;
-        }
         let (spin, path) = best_spin(board, kind, state, &rotation_edges, &parent);
-        let placement = Placement {
+        placements.push(Placement {
             kind,
             rotation: state.rotation(),
             x: state.x,
@@ -215,17 +236,9 @@ pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
             spin,
             path,
             hold,
-        };
-        by_cells.insert(cells, placements.len());
-        placements.push(placement);
+        });
     }
-
-    MoveSet {
-        kind,
-        hold,
-        placements,
-        by_cells,
-    }
+    placements
 }
 
 fn sorted_cells(mut cells: [(i32, i32); 4]) -> [(i32, i32); 4] {

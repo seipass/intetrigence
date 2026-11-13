@@ -9,6 +9,8 @@
 //! `intetrigence_bot::Movegen`; both sides must be compared as **cell sets**
 //! (I/O/S/Z describe the same cells with more than one rotation).
 
+use std::collections::HashMap;
+
 use intetrigence_arena::movegen::{self, spawn_state};
 use intetrigence_core::{Board, Game, PieceKind, Rotation, SpinType};
 
@@ -161,6 +163,39 @@ fn sealed_cavity_is_legal_but_unreachable() {
         moves.get(&cavity).is_none(),
         "movegen must not offer the sealed cavity"
     );
+}
+
+#[test]
+fn cell_set_keeps_the_strongest_spin() {
+    // I/O/S/Z describe the same cells with more than one rotation, and the
+    // rotations can differ in whether the last action was a rotation. A non-T
+    // spin is `spin_entry && immobile`, so the collapsed placement must keep
+    // the strongest label (bot-dev, 27edb70).
+    for (name, board) in fixtures() {
+        for kind in intetrigence_core::ALL_PIECES {
+            let all = movegen::generate_all(&board, spawn_state(kind), false);
+            let mut best: HashMap<[(i32, i32); 4], SpinType> = HashMap::new();
+            for placement in &all {
+                let entry = best.entry(placement.cells).or_insert(placement.spin);
+                if placement.spin.index() > entry.index() {
+                    *entry = placement.spin;
+                }
+            }
+            let moves = movegen::generate(&board, spawn_state(kind), false);
+            assert_eq!(
+                moves.placements().len(),
+                best.len(),
+                "{name}/{kind:?}: exactly one placement per cell set"
+            );
+            for placement in moves.placements() {
+                assert_eq!(
+                    placement.spin, best[&placement.cells],
+                    "{name}/{kind:?}: {:?} lost its strongest spin",
+                    placement.cells
+                );
+            }
+        }
+    }
 }
 
 #[test]
