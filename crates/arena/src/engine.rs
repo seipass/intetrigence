@@ -442,6 +442,23 @@ impl Profile {
     }
 }
 
+/// Bag state at the tail of the six-entry TBP queue (active + 5 preview).
+///
+/// TBP `start.randomizer.bag_state` is the bag at the **end of the queue**, not
+/// the bag the active piece came from: the five preview pieces may cross a bag
+/// boundary. `Game::bag_state()` gives the current bag after the active piece;
+/// `preview(5 + tail_len)` then yields the tail bag's remaining pieces.
+pub fn tail_bag_state(game: &mut intetrigence_core::Game) -> Vec<PieceKind> {
+    let remaining = game.bag_state().remaining;
+    let r = remaining.len();
+    let tail_len = if r > 5 { r - 5 } else { 2 + r };
+    let preview = game.preview(5 + tail_len);
+    preview
+        .get(5..5 + tail_len)
+        .map(<[PieceKind]>::to_vec)
+        .unwrap_or_default()
+}
+
 /// The referee's round state for both players.
 #[derive(Clone, Debug)]
 pub struct Engine {
@@ -524,7 +541,7 @@ impl Engine {
             hold: player.game.held_piece(),
             can_hold: player.game.can_hold(),
             preview: player.game.preview(5),
-            bag_state: player.game.bag_state().remaining,
+            bag_state: tail_bag_state(&mut player.game),
             combo: player.scoring.state.combo,
             b2b_streak: player.scoring.state.b2b_streak,
             pending_garbage: player.garbage.queue_total(),

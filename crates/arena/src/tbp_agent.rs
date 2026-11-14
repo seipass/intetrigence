@@ -283,6 +283,10 @@ impl Agent for TbpAgent {
                 commit.combo,
                 commit.b2b_streak,
             );
+            // Cancel the bot's in-flight search before resetting the board
+            // (CC2's `stop` resets its worker; attax ignores it; clys's adapter
+            // suppresses it because clys's stop clears the engine).
+            host.stop();
             host.start(&payload, "garbage", commit.board_hash, commit.turn);
             self.mirror = Mirror::from_start(&payload);
         } else {

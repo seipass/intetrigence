@@ -280,6 +280,12 @@ impl Host {
         let _ = self.send(&HostMessage::Start(payload.clone()));
     }
 
+    /// Sends `stop` (cancel the bot's current search). Bots that do not use it
+    /// ignore the message (attax) or suppress it in their adapter (clys).
+    pub fn stop(&mut self) {
+        let _ = self.send(&HostMessage::Stop);
+    }
+
     /// Sends `suggest` and waits for `suggestion`, recording the round trip.
     pub fn suggest(&mut self) -> Result<SuggestionPayload, HostError> {
         let started = Instant::now();
