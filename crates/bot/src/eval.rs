@@ -398,11 +398,20 @@ pub fn apply_placement(
         b2b_after: attack.b2b_streak_after,
         value,
     };
+    // Attack cancels queued garbage before anything is sent
+    // (`docs/s2-spec.md` §7.3), and the opener phase doubles the budget
+    // (§7.4). Propagating this through the search is what lets it see that a
+    // quad now is worth more than a quad later when a spike is queued.
+    let cancel_budget = if context.opener() {
+        2 * attack.total
+    } else {
+        attack.total
+    };
     let next_context = EvalContext {
         b2b_streak: attack.b2b_streak_after,
         combo: attack.combo_after,
         pieces_placed: context.pieces_placed + 1,
-        incoming: context.incoming,
+        incoming: context.incoming.saturating_sub(cancel_budget),
         t_slot: 0,
     };
     (next, reward, next_context)
