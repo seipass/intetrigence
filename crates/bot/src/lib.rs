@@ -30,7 +30,7 @@ pub use movegen::{
     ActionSeq, Arrival, Movegen, Placement, State, generate, generate_from, reachable_states,
     spawn_piece, unique_by_cells,
 };
-pub use play::{GameReport, play_game};
+pub use play::{GameReport, play_game, play_game_with_garbage};
 pub use search::{
     Candidate, MAX_THREADS, Move, PieceSequence, RootState, SearchConfig, SearchResult, Searcher,
 };
