@@ -435,7 +435,7 @@ self.board.insert_garbage(&holes)                      # 穴の縦順は s2-spec
 - 死亡条件は **block-out のみ**(s2-spec §2.3)。lock-out は無い。Clutch Clear は有効。
 - 自分の設置を解決した後に、次のピースの spawn が衝突するかで判定する。
 - **どちらかがトップアウトした瞬間にラウンド終了**。その turn の残りの設置は行わない。トップアウトした側の負け、相手の勝ち。
-- したがって **「同一 turn で両者がトップアウト」は起こらない**(先に死んだ側で打ち切るため)。引き分けはターン上限(§6.3)でのみ発生する。
+- したがって **「同一 turn で両者がトップアウト」は起こらない**(先に死んだ側で打ち切るため)。**S2 に引き分けは存在しない**。勝者が決まらないのはターン上限(§6.3、未決着)と forfeit(§7、不成立)の 2 つだけで、どちらも `winner = None`。
 
 > **公平性の注意**: 解決順が seat 1 → seat 2 なので、**seat 1 が先に死ねば seat 2 はその turn を打たずに勝つ**。これは逐次解決に固有の非対称で、シートの入れ替え(§1.2)で相殺する。1 ゲーム単位では偏るが、50 ゲームでは各ボットが 25 回ずつ両方の席を経験する。
 
@@ -597,7 +597,7 @@ else                   → forfeit-other    (表現できるのに 0 候補 = �
 
 #### 7.1.4 レポート要件(必須)
 
-1. **決着を種類別に分けて出す**: `TopOut` 勝ち / `TurnCap` 勝ち / `TopOut` 負け / `TurnCap` 負け / `forfeit-vision` / `forfeit-other` / 引き分け。合計だけを出してはいけない。
+1. **決着を種類別に分けて出す**: `wins_topout` / `losses_topout` / `unresolved`(TurnCap)/ `no_contest`(Forfeit)/ `stuck`。`no_contest` は `forfeit_vision` / `forfeit_other` / `forfeit_unknown` に割る。**合計だけを出してはいけない。`draws` という名前を使わない。**
 2. **勝率は `TopOut` + `TurnCap` の勝数で計算する**。`forfeit-vision` を勝ちに含めた数字を「勝率」として出してはいけない。
 3. **`forfeit-vision` は件数と理由を別掲**する(ゲート外)。「相手の視野制限により N ゲームが不戦」と書く。
 4. **`forfeit-other` が 1 件でもあればラウンド不成立**。原因を修正して新しい seeds でやり直す(§7.1.2 のアダプタ故障)。
@@ -846,10 +846,19 @@ verify(replay) -> Result<(), Mismatch>:
 - [ ] **各相手のビルドコミット**(attax `7b38f51` / CC2 / clys)と起動コマンド
 - [ ] **profile が `official` であること**(§1.3)
 - [ ] **段階ゲートの結果**: 段階 1 の結果と、段階 2・3 を実行したか(§1.4)
-- [ ] **3 マッチそれぞれの `TopOut` の勝数と Wilson 95% CI**(forfeit・未決着を勝ちに含めない、§7.1.3)
-- [ ] **段階 1 は 50/50 の `TopOut` 勝ちでなければ主張しない**。未決着・forfeit・負けが 1 件でもあれば「50 勝 0 敗」ではなく「N 勝 M 敗(TurnCap X / forfeit Y)」と書く
-- [ ] **未決着(`TurnCap`)と不成立(`Forfeit`)を別々に件数で出す**。`draws` という 1 つの数にまとめない(§6.2、`docs/s2-rule-audit.md` F2)
-- [ ] **3 マッチそれぞれの決着の内訳**: `TopOut` 勝ち / `TurnCap` 勝ち / `TopOut` 負け / `TurnCap` 負け / `forfeit-vision` / `forfeit-other` / 引き分け(§7.1.2)
+- [ ] **3 マッチそれぞれの `wins_topout` と Wilson 95% CI**(未決着・不成立を勝ちに含めない、§7.1.3)
+- [ ] **段階 1 は 50/50 の `TopOut` 勝ちでなければ主張しない**。未決着・no contest・負けが 1 件でもあれば「50 勝 0 敗」ではなく「`wins_topout` N / `losses_topout` M / `unresolved` X / `no_contest` Y」と書く
+- [ ] **集計は次の 6 項目で出す**(`draws` という名前を使わない。実装も持たない):
+  | 項目 | 意味 | 実装のフィールド |
+  |---|---|---|
+  | `wins_topout` | `TopOut` 勝ち | `wins_topout` |
+  | `losses_topout` | `TopOut` 負け | `losses_topout` |
+  | `unresolved` | ターン上限(`winner = None`) | `unresolved` |
+  | `no_contest` | forfeit(`winner = None`) | `no_contest` |
+  | `stuck` | 合法手なし(到達不能) | `stuck` |
+  | `forfeit_vision` / `forfeit_other` / `forfeit_unknown` | `no_contest` の原因別内訳 | 同名 |
+- [ ] **`wins_topout + losses_topout + unresolved + no_contest + stuck == 50`** を検算する(合計が合わないレポートは無効。§1.4 のゲートも同じ検算をする)
+- [ ] **`wins_turncap` という項目を書かない**(`TurnCap` は勝ちではない。§7.1.3)
 - [ ] **`forfeit-vision` の件数と理由**(相手の視野制限による不戦、ゲート外)
 - [ ] **測定の完全性**(§8.3.1): 全ゲームの replay・verify・audit・相手の decision log が揃っていること
 - [ ] **`TopOut` で決着したゲームの勝敗**(3 マッチそれぞれ、別掲)
@@ -1018,3 +1027,4 @@ verify(replay) -> Result<(), Mismatch>:
 | v1.25 | 2026-11-15 | §7.1.6 を確定。旧 194 件を**修正した分類器で V=20 再分類**すると **32 vision(正当)+ 162 other(アダプタ故障)**。V=40 の再分類は「パッチ後 attax なら」の参考値。**`visible_rows` はハードコードせずソースから自動検出**(`movegen.ts` の `ROWS`、`12196ec`)。 |
 | v1.26 | 2026-11-15 | **ルール監査(`docs/s2-rule-audit.md`)の反映**。§6.3 の「攻撃量で勝者を決める」順位付けを**削除**(TETR.IO にも我々のルールにも存在しない発明規則)。`TurnCap` は未決着(`winner = None`)で**勝ちに数えない**。`Forfeit` の `winner` を `None`(no contest)に変更(§7.1.3.1)。§6.2 の「段階 1 は `wins == 50`」を §1.4 と整合。§8.5 で未決着と不成立を分離。 |
 | v1.27 | 2026-11-15 | **ゲートを goal に合わせて厳格化**。段階 1 = `wins_topout == 50` かつ `losses_topout == 0` かつ `turncap == 0` かつ `forfeit == 0`(完全試合)。段階 2・3 = `wins_topout >= 48` かつ `turncap == 0`。v1.26 の 45/48 は manager の緩い提案であり goal ではなかった。§1 の表・§6.2・§7.1.3・§8.5 を追随。**§10.2 に「変更時の走査規則」を新設**(`grep -rn` を必須手順化。失敗 5・6 を記録)。 |
+| v1.28 | 2026-11-15 | **実装(harness-dev、`crates/arena`)の新スキーマに追随**。§8.5 の受入チェックリストを `wins_topout` / `losses_topout` / `unresolved` / `no_contest` / `stuck` の 6 項目に更新し、**`draws` を全面廃止**。合計検算(50)を必須化。§6.1 の「引き分けはターン上限でのみ発生」を「S2 に引き分けは存在しない」に訂正。§7.1.4 の内訳要求を更新。 |
