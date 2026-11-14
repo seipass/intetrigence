@@ -281,12 +281,14 @@ scripts/m0-match.sh
 [`docs/m2-tuning-report.md`](m2-tuning-report.md)、証拠は `scripts/evidence/m2-tuning/`。
 
 - **18 勝 2 敗 0 分**(勝率 90.0%、Wilson 95% CI 69.9%–97.2%)、replay 検証 **20/20**
-- ただし **18 勝はすべて attax の forfeit**(20 行視野で可視領域に置けず `moves` が空)。
-  intetrigence の forfeit は **0**。40 行のトップアウトまで到達した 2 ゲームは **0 勝 2 敗**
-  (9006-A downstack、9010-A buried。いずれも sheet A)
-- think median / p95: intetrigence **97.1 / 98.7 ms**、attax **29.1 / 35.9 ms**、200 ms 超 0
-- attack/piece: intetrigence **0.986**、attax **0.866**。受信ゴミ/ゲーム: **75.7 / 110.0**
-- 採点オーディット: intetrigence spin 0 / attack 0、attax spin 88(All-Mini+ 非 T)/ same-spin attack 0
+- 勝ちの内訳(protocol v1.8 §7.1): **TopOut 0 / forfeit-vision 18 / forfeit-other 0**。
+  負けは **TopOut 2**(9006-A downstack、9010-A buried。いずれも sheet A)。
+  intetrigence の forfeit は **0**、`other` の forfeit も **0**(無効ゲームなし)
+- 18 勝はすべて attax の **vision forfeit**: ゴミで attax の可視 20 行が埋まり、
+  `moves` が空になった。40 行のトップアウトまで到達した 2 ゲームは **0 勝 2 敗**
+- think median / p95: intetrigence **97.1 / 98.9 ms**、attax **37.0 / 46.7 ms**、200 ms 超 0
+- attack/piece: intetrigence **1.000**、attax **0.876**。受信ゴミ/ゲーム: **72.0 / 105.0**
+- 採点オーディット: intetrigence spin 0 / attack 0、attax spin 78(All-Mini+ 非 T)/ same-spin attack 0
 - **解釈**: 生の勝率は M2 ゲート(5 割)を超えるが、その大半は attax の 20 行視野による forfeit。
   フル 40 行視野の相手に対する強さはまだ測れていない。M3 は防御・downstack と
   (可能なら)フル視野の相手での評価が課題。

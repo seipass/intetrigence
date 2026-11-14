@@ -611,6 +611,13 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
     let Some(active) = player.game.active() else {
         return ForfeitCause::Other;
     };
+    // A piece entirely in the hidden buffer cannot be represented by the bot's
+    // visible rows: the adapter places it at the top of its grid, overlapping
+    // the stack, and its movegen returns nothing.
+    let lowest_cell = active.cells().iter().map(|&(_, y)| y).min().unwrap_or(0);
+    if lowest_cell as u32 >= visible_rows {
+        return ForfeitCause::Vision;
+    }
     let board = player.game.board();
     let stack_top = (0..intetrigence_core::Board::HEIGHT)
         .rev()

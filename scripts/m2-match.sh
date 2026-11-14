@@ -38,6 +38,7 @@ rm -rf "$OUT_DIR"
 cargo run --release -p intetrigence-arena --bin arena -- match \
   --seeds "$SEEDS" --sheets A,B --turns "$TURNS" \
   --attax "$ATTAX_DIR" --bot search --ms "$MS" --threads "$THREADS" \
-  --out "$OUT_DIR"
+  --out "$OUT_DIR" \
+  --note "M2 gate: real intetrigence search (--ms $MS, $THREADS threads) vs attax 7b38f51. Forfeit wins are broken down by cause in the report."
 
 cargo run --release -p intetrigence-arena --bin arena -- verify "$OUT_DIR"
