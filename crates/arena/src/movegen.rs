@@ -127,10 +127,21 @@ fn convert(placement: &intetrigence_bot::Placement, hold: bool) -> Placement {
 /// This is the raw `(rotation, x, y)` result. It is used by the cell-set
 /// invariant tests and by the cross-check against the bot's movegen.
 pub fn generate_all(board: &Board, start: ActivePiece, hold: bool) -> Vec<Placement> {
+    generate_all_with_180(board, start, hold, true)
+}
+
+/// Like [`generate_all`], but excludes 180-degree rotations when
+/// `supports_180` is false (capability-aware forfeit classification).
+pub fn generate_all_with_180(
+    board: &Board,
+    start: ActivePiece,
+    hold: bool,
+    supports_180: bool,
+) -> Vec<Placement> {
     MOVEGEN.with(|cell| {
         let mut movegen = cell.borrow_mut();
         movegen
-            .generate_from(board, start)
+            .generate_from_with_180(board, start, supports_180)
             .iter()
             .map(|placement| convert(placement, hold))
             .collect()
@@ -140,10 +151,21 @@ pub fn generate_all(board: &Board, start: ActivePiece, hold: bool) -> Vec<Placem
 /// Enumerates every grounded placement reachable from `start`, one per cell
 /// set (the strongest spin label wins).
 pub fn generate(board: &Board, start: ActivePiece, hold: bool) -> MoveSet {
+    generate_with_180(board, start, hold, true)
+}
+
+/// Like [`generate`], but excludes 180-degree rotations when `supports_180`
+/// is false (capability-aware forfeit classification).
+pub fn generate_with_180(
+    board: &Board,
+    start: ActivePiece,
+    hold: bool,
+    supports_180: bool,
+) -> MoveSet {
     let kind = start.kind;
     let unique = MOVEGEN.with(|cell| {
         let mut movegen = cell.borrow_mut();
-        unique_by_cells(movegen.generate_from(board, start))
+        unique_by_cells(movegen.generate_from_with_180(board, start, supports_180))
     });
     let mut placements = Vec::with_capacity(unique.len());
     let mut by_cells = HashMap::with_capacity(unique.len());
@@ -166,6 +188,31 @@ mod tests {
 
     fn empty_board() -> Board {
         Board::new()
+    }
+
+    #[test]
+    fn supports_180_false_drops_the_180_only_placement() {
+        // The bot-dev fixture: 36 placements with 180, 35 without; the
+        // difference is exactly one 180-only placement.
+        let mut board = Board::new();
+        board.set_row(0, 0b1101110111);
+        board.set_row(1, 0b1111110011);
+        board.set_row(2, 0b1111111001);
+        let start = spawn_state(PieceKind::Z);
+        // Compare the raw (rotation, x, y) lists; `generate` deduplicates by
+        // cell set, which would hide the one-placement difference.
+        let with = generate_all_with_180(&board, start, false, true);
+        let without = generate_all_with_180(&board, start, false, false);
+        assert_eq!(with.len(), 36);
+        assert_eq!(without.len(), 35);
+        let with_cells: std::collections::HashSet<_> =
+            with.iter().map(|placement| placement.cells).collect();
+        for placement in &without {
+            assert!(
+                with_cells.contains(&placement.cells),
+                "the 180-less set must be a subset"
+            );
+        }
     }
 
     #[test]

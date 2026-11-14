@@ -98,6 +98,14 @@ pub struct BotRecord {
     pub commit: Option<String>,
     pub args: Vec<String>,
     pub visible_rows: u32,
+    /// Whether the bot's input set includes 180-degree rotations (protocol
+    /// v1.28 capability-aware forfeit). Older replays default to true.
+    #[serde(default = "default_true")]
+    pub supports_180: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl From<&BotDescriptor> for BotRecord {
@@ -105,6 +113,7 @@ impl From<&BotDescriptor> for BotRecord {
         Self {
             name: descriptor.name.clone(),
             visible_rows: descriptor.visible_rows,
+            supports_180: descriptor.supports_180,
             version: descriptor.version.clone(),
             commit: descriptor.commit.clone(),
             args: descriptor.args.clone(),
@@ -334,6 +343,16 @@ pub fn verify_replay_with_visible_rows(
     path: &Path,
     override_rows: Option<[u32; 2]>,
 ) -> Result<VerifyReport, VerifyError> {
+    verify_replay_with_options(path, override_rows, None)
+}
+
+/// Like [`verify_replay_with_visible_rows`], but also overrides the bots'
+/// 180-degree capability (capability-aware forfeit classification).
+pub fn verify_replay_with_options(
+    path: &Path,
+    override_rows: Option<[u32; 2]>,
+    override_supports_180: Option<[bool; 2]>,
+) -> Result<VerifyReport, VerifyError> {
     let records = read_replay(path)?;
     let header = match records.first() {
         Some(ReplayRecord::Header(header)) => header.clone(),
@@ -357,6 +376,20 @@ pub fn verify_replay_with_visible_rows(
                 .get("1")
                 .map(|bot| bot.visible_rows)
                 .unwrap_or(0),
+        ]
+    });
+    let supports_180 = override_supports_180.unwrap_or_else(|| {
+        [
+            header
+                .bots
+                .get("0")
+                .map(|bot| bot.supports_180)
+                .unwrap_or(true),
+            header
+                .bots
+                .get("1")
+                .map(|bot| bot.supports_180)
+                .unwrap_or(true),
         ]
     });
     let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
@@ -572,7 +605,7 @@ pub fn verify_replay_with_visible_rows(
                 }
             }
             ReplayRecord::Result(result) => {
-                verify_result(&mut engine, result, visible_rows, &mut report);
+                verify_result(&mut engine, result, visible_rows, supports_180, &mut report);
                 index += 1;
             }
             other => {
@@ -592,6 +625,7 @@ fn verify_result(
     engine: &mut Engine,
     result: &ResultRecord,
     visible_rows: [u32; 2],
+    supports_180: [bool; 2],
     report: &mut VerifyReport,
 ) {
     let over: Vec<usize> = (0..2)
@@ -610,7 +644,9 @@ fn verify_result(
         // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
         // placement even though the game is not block-out.
         match result.winner.map(|winner| 1 - winner as usize) {
-            Some(loser) if !engine.has_legal_move(loser) => (result.winner, "TopOut".to_string()),
+            Some(loser) if !engine.has_legal_move(loser, supports_180[loser]) => {
+                (result.winner, "TopOut".to_string())
+            }
             _ => (None, "TurnCap".to_string()),
         }
     } else {
@@ -648,7 +684,12 @@ fn verify_result(
             .or_else(|| result.winner.map(|winner| 1 - winner as usize));
         if candidate_failure {
             if let Some(loser) = loser {
-                let actual = crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
+                let actual = crate::referee::classify_forfeit(
+                    engine,
+                    loser,
+                    visible_rows[loser],
+                    supports_180[loser],
+                );
                 report.forfeit_cause = Some(actual);
                 if let Some(recorded) = result.forfeit_cause {
                     if recorded != ForfeitCause::Unknown && actual != recorded {
@@ -708,6 +749,15 @@ fn verify_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_bot_record_defaults_supports_180_true() {
+        // Pre-v1.28 replays have no supports_180 field. They must verify with
+        // the full (180-inclusive) movegen unless explicitly overridden.
+        let json = r#"{"name":"attax","args":[],"visible_rows":40}"#;
+        let record: BotRecord = serde_json::from_str(json).unwrap();
+        assert!(record.supports_180);
+    }
 
     #[test]
     fn piece_and_spin_names_roundtrip() {

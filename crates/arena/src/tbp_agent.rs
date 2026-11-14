@@ -31,6 +31,8 @@ pub struct TbpAgentConfig {
     pub name: Option<String>,
     /// Rows the bot can see (default 20). Used for forfeit classification.
     pub visible_rows: u32,
+    /// Whether the bot's input set includes 180-degree rotations (attax: no).
+    pub supports_180: bool,
     /// Delay before each `suggest`, giving a continuously-searching bot a
     /// budget (CC2/clys have no think-time option). Included in `think_ms`.
     pub suggest_delay_ms: u64,
@@ -52,6 +54,7 @@ impl TbpAgentConfig {
             decision_log: None,
             name: None,
             visible_rows: 40,
+            supports_180: true,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             transcript: None,
@@ -87,6 +90,7 @@ impl TbpAgent {
             version: None,
             commit: config.commit.clone(),
             visible_rows: config.visible_rows,
+            supports_180: config.supports_180,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());

@@ -48,7 +48,7 @@ fn usage() {
          \x20   [--attax-dir DIR] [--attax-bun bun] [--attax-commit SHA]\n\
          \x20   [--cc2-program P] [--cc2-args a,b] [--cc2-commit SHA] [--cc2-visible-rows 40]\n\
          \x20   [--clys-program P] [--clys-args a,b] [--clys-commit SHA] [--clys-visible-rows 40]\n\
-         \x20   [--gate-attax 50] [--gate-cc2 48] [--gate-clys 48]\n\
+         \x20   [--gate-cc2 50] [--gate-clys 50] [--gate-attax 48]\n\
          \x20   [--ms 100] [--threads 8] [--turns 1000] [--max-stages 3] [--dry-run]"
     );
 }
@@ -89,6 +89,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut cc2_commit: Option<String> = None;
     let mut cc2_patch: Option<String> = None;
     let mut cc2_visible_rows = 40u32;
+    let mut cc2_supports_180 = true;
     let mut cc2_suggest_delay_ms = 100u64;
     let mut cc2_retry_empty_ms = 2000u64;
     let mut cc2_cwd: Option<PathBuf> = None;
@@ -98,11 +99,13 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_commit: Option<String> = None;
     let mut clys_patch: Option<String> = None;
     let mut clys_visible_rows = 40u32;
+    let mut clys_supports_180 = true;
     let mut clys_suggest_delay_ms = 0u64;
     let mut clys_retry_empty_ms = 0u64;
     let mut clys_cwd: Option<PathBuf> = None;
     let mut clys_env: Vec<(String, String)> = Vec::new();
-    let mut gates = [50u32, 48, 48];
+    // Stage order is CC2 -> clys -> attax; the gates array follows that order.
+    let mut gates = [50u32, 50, 48];
     let mut ms = 100u64;
     let mut threads = 8usize;
     let mut turn_cap = 1000u32;
@@ -199,6 +202,18 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 cc2_patch = Some(value(1)?);
                 index += 2;
             }
+            "--cc2-supports-180" => {
+                cc2_supports_180 = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--cc2-supports-180: {error}"))?;
+                index += 2;
+            }
+            "--clys-supports-180" => {
+                clys_supports_180 = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--clys-supports-180: {error}"))?;
+                index += 2;
+            }
             "--cc2-visible-rows" => {
                 cc2_visible_rows = value(1)?
                     .parse()
@@ -268,19 +283,19 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--gate-attax" => {
-                gates[0] = value(1)?
+                gates[2] = value(1)?
                     .parse()
                     .map_err(|error| format!("--gate-attax: {error}"))?;
                 index += 2;
             }
             "--gate-cc2" => {
-                gates[1] = value(1)?
+                gates[0] = value(1)?
                     .parse()
                     .map_err(|error| format!("--gate-cc2: {error}"))?;
                 index += 2;
             }
             "--gate-clys" => {
-                gates[2] = value(1)?
+                gates[1] = value(1)?
                     .parse()
                     .map_err(|error| format!("--gate-clys: {error}"))?;
                 index += 2;
@@ -421,6 +436,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             let mut config = TbpOpponentConfig::new("cc2", program, cc2_args);
             config.commit = cc2_commit.clone();
             config.visible_rows = cc2_visible_rows;
+            config.supports_180 = cc2_supports_180;
             config.suggest_delay_ms = cc2_suggest_delay_ms;
             config.retry_empty_suggest_ms = cc2_retry_empty_ms;
             config.cwd = cc2_cwd;
@@ -448,6 +464,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             let mut config = TbpOpponentConfig::new("clys", program, clys_args);
             config.commit = clys_commit.clone();
             config.visible_rows = clys_visible_rows;
+            config.supports_180 = clys_supports_180;
             config.suggest_delay_ms = clys_suggest_delay_ms;
             config.retry_empty_suggest_ms = clys_retry_empty_ms;
             config.cwd = clys_cwd;
@@ -491,7 +508,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         turn_cap,
         profile: intetrigence_arena::engine::Profile::Official,
         gates,
-        opponents: [attax, cc2, clys],
+        opponents: [cc2, clys, attax],
         notes: vec![
             "Staged round (protocol v1.13 §1.4); evaluation seeds are pre-committed and burned after use.".into(),
         ],

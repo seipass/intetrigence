@@ -575,6 +575,7 @@ impl Engine {
         &mut self,
         slot: usize,
         suggestion: &crate::agent::Suggestion,
+        supports_180: bool,
     ) -> Result<Adopted, AdoptError> {
         let active = self.players[slot]
             .game
@@ -614,7 +615,7 @@ impl Engine {
         // Two-stage decision (protocol v1.6 §7): if the referee has any legal
         // placement, the bot's empty/unreachable suggestion is a forfeit;
         // otherwise the board is stuck and the round ends as a top-out.
-        if self.has_legal_move(slot) {
+        if self.has_legal_move(slot, supports_180) {
             Err(AdoptError::NoLegalCandidate {
                 candidates: suggestion.candidates.len(),
             })
@@ -625,13 +626,13 @@ impl Engine {
 
     /// True when the player has at least one reachable grounded placement with
     /// the current piece or, if hold is available, with the hold piece.
-    pub fn has_legal_move(&mut self, slot: usize) -> bool {
+    pub fn has_legal_move(&mut self, slot: usize, supports_180: bool) -> bool {
         let player = &mut self.players[slot];
         let Some(active) = player.game.active() else {
             return false;
         };
         let board = player.game.board().clone();
-        if !movegen::generate(&board, active, false).is_empty() {
+        if !movegen::generate_with_180(&board, active, false, supports_180).is_empty() {
             return true;
         }
         if player.game.can_hold() {
@@ -640,7 +641,14 @@ impl Engine {
                 .held_piece()
                 .or_else(|| player.game.preview(1).first().copied())
             {
-                if !movegen::generate(&board, movegen::spawn_state(kind), true).is_empty() {
+                if !movegen::generate_with_180(
+                    &board,
+                    movegen::spawn_state(kind),
+                    true,
+                    supports_180,
+                )
+                .is_empty()
+                {
                     return true;
                 }
             }
@@ -857,9 +865,9 @@ mod tests {
     fn empty_suggestion_is_a_forfeit_when_the_referee_has_moves() {
         let mut engine = Engine::new(1, Sheet::A, 12);
         engine.begin_turn();
-        assert!(engine.has_legal_move(0));
+        assert!(engine.has_legal_move(0, true));
         let suggestion = crate::agent::Suggestion::default();
-        let error = engine.adopt(0, &suggestion).unwrap_err();
+        let error = engine.adopt(0, &suggestion, true).unwrap_err();
         assert!(matches!(
             error,
             AdoptError::NoLegalCandidate { candidates: 0 }

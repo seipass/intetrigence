@@ -17,8 +17,10 @@
 #   CC2_ARGS       comma separated CC2 arguments
 #   CC2_COMMIT     CC2 commit
 #   CC2_VISIBLE_ROWS  default 40
+#   CC2_SUPPORTS_180 / CLYS_SUPPORTS_180  default true (check the bot's movegen)
 #   CLYS_PROGRAM / CLYS_ARGS / CLYS_COMMIT / CLYS_VISIBLE_ROWS
-#   GATE_ATTAX / GATE_CC2 / GATE_CLYS   default 50 / 48 / 48
+#   GATE_CC2 / GATE_CLYS / GATE_ATTAX   default 50 / 50 / 48
+#   Stage order is CC2 -> clys -> attax (new staged goal).
 #   MS / THREADS / TURNS                default 100 / 8 / 1000
 #   MAX_STAGES                          default 3
 #   DRY_RUN=1                           run stage 1 only
@@ -34,9 +36,11 @@ ATTAX_PATCH_NOTE="${ATTAX_PATCH_NOTE:-attax-vision-40.patch (68 lines): ROWS 40,
 ATTAX_PATCH_SHA256="${ATTAX_PATCH_SHA256:-e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70}"
 ATTAX_VISIBLE_ROWS="${ATTAX_VISIBLE_ROWS:-0}"
 ATTAX_ENV="${ATTAX_ENV:-}"
-GATE_ATTAX="${GATE_ATTAX:-50}"
-GATE_CC2="${GATE_CC2:-48}"
-GATE_CLYS="${GATE_CLYS:-48}"
+GATE_CC2="${GATE_CC2:-50}"
+GATE_CLYS="${GATE_CLYS:-50}"
+GATE_ATTAX="${GATE_ATTAX:-48}"
+CC2_SUPPORTS_180="${CC2_SUPPORTS_180:-true}"
+CLYS_SUPPORTS_180="${CLYS_SUPPORTS_180:-true}"
 MS="${MS:-100}"
 THREADS="${THREADS:-8}"
 TURNS="${TURNS:-1000}"
@@ -61,10 +65,10 @@ if [ -n "$ATTAX_ENV" ]; then
   done
 fi
 if [ -n "${CC2_PROGRAM:-}" ]; then
-  ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}")
+  ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}" --cc2-supports-180 "$CC2_SUPPORTS_180")
 fi
 if [ -n "${CLYS_PROGRAM:-}" ]; then
-  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}")
+  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180")
 fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
   ARGS+=(--dry-run)

@@ -71,10 +71,12 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_args: Vec<String> = Vec::new();
     let mut tbp_cwd: Option<PathBuf> = None;
     let mut tbp_visible_rows = 40u32;
+    let mut tbp_supports_180 = true;
     let mut tbp_suggest_delay_ms = 0u64;
     let mut tbp_retry_empty_ms = 0u64;
     let mut tbp_name = "tbp-bot".to_string();
     let mut attax_visible_rows = 0u32;
+    let mut attax_supports_180 = false;
     let mut weight_overrides: Vec<(String, String)> = Vec::new();
     let mut attax_patch_sha256: Option<String> = None;
     let mut attax_env: Vec<(String, String)> = Vec::new();
@@ -229,6 +231,18 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 tbp_name = value(1)?;
                 index += 2;
             }
+            "--tbp-supports-180" => {
+                tbp_supports_180 = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--tbp-supports-180: {error}"))?;
+                index += 2;
+            }
+            "--attax-supports-180" => {
+                attax_supports_180 = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--attax-supports-180: {error}"))?;
+                index += 2;
+            }
             "--attax-visible-rows" => {
                 attax_visible_rows = value(1)?
                     .parse()
@@ -259,6 +273,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         let mut opponent = TbpOpponentConfig::new(tbp_name, program, tbp_args);
         opponent.cwd = tbp_cwd;
         opponent.visible_rows = tbp_visible_rows;
+        opponent.supports_180 = tbp_supports_180;
         opponent.suggest_delay_ms = tbp_suggest_delay_ms;
         opponent.retry_empty_suggest_ms = tbp_retry_empty_ms;
         config.tbp_opponent = Some(opponent);
@@ -281,6 +296,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.commit = commit;
         attax_config.bun_version = bun_version;
         attax_config.visible_rows = attax_visible_rows;
+        attax_config.supports_180 = attax_supports_180;
         attax_config.patch_sha256 = attax_patch_sha256;
         attax_config.env = attax_env;
         attax_config.timeout = Duration::from_secs(timeout);
@@ -582,6 +598,7 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
 fn cmd_reclassify(args: &[String]) -> Result<(), String> {
     let mut path: Option<PathBuf> = None;
     let mut visible_rows = 40u32;
+    let mut supports_180 = true;
     let mut index = 0;
     while index < args.len() {
         let flag = args[index].clone();
@@ -595,6 +612,12 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
                 visible_rows = value(1)?
                     .parse()
                     .map_err(|error| format!("--visible-rows: {error}"))?;
+                index += 2;
+            }
+            "--supports-180" => {
+                supports_180 = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--supports-180: {error}"))?;
                 index += 2;
             }
             other => {
@@ -644,9 +667,10 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         let Some(result) = result else {
             continue;
         };
-        let report = intetrigence_arena::replay::verify_replay_with_visible_rows(
+        let report = intetrigence_arena::replay::verify_replay_with_options(
             file,
             Some([visible_rows, visible_rows]),
+            Some([true, supports_180]),
         )
         .map_err(|error| format!("verify {}: {error}", file.display()))?;
         games += 1;
