@@ -135,6 +135,12 @@ pub struct SearchResult {
     pub iterations: usize,
     /// True when `best` came from `greedy` rather than from the beam.
     pub fallback: bool,
+    /// Longest single level of the winning iteration.
+    ///
+    /// The level boundary is the only place a deterministic search can stop,
+    /// so the real worst case is `abort_time + max_level_time`, not
+    /// `abort_time`.
+    pub max_level_time: Duration,
     /// True when a deterministic search hit `DETERMINISTIC_DEADLINE` before
     /// finishing its fixed schedule and returned the last completed level.
     ///
@@ -322,6 +328,7 @@ impl Searcher {
                 iterations: iterations + 1,
                 fallback: false,
                 aborted: false,
+                max_level_time: start.elapsed(),
                 elapsed: start.elapsed(),
                 candidates,
                 line,
@@ -371,6 +378,7 @@ impl Searcher {
         // the only time-dependent branch in the beam, and removing it is what
         // makes the merge thread-invariant. The real cap stays at the level
         // boundary, so a level that does not fit the budget is detected there.
+        let level_start = Instant::now();
         let outcome = if self.config.threads <= 1 {
             self.run_sequential(root, &sequence, depth, width, deadline)
         } else {
@@ -383,6 +391,10 @@ impl Searcher {
                 start + Duration::from_secs(3600),
             )
         };
+        // One iteration, so its duration divided by the levels it finished is
+        // the per-level cost; `run_parallel_with` cannot report per-level
+        // timing without threading a clock through the job loop.
+        let max_level_time = level_start.elapsed();
         let Some((nodes, candidates, line, completed)) = outcome else {
             return self.greedy(root, start).map(|mut result| {
                 result.fallback = true;
@@ -404,6 +416,7 @@ impl Searcher {
             iterations: 1,
             fallback: false,
             aborted,
+            max_level_time,
             elapsed: start.elapsed(),
             candidates,
             line,
@@ -444,6 +457,7 @@ impl Searcher {
             iterations: 0,
             fallback: true,
             aborted: false,
+            max_level_time: Duration::ZERO,
             elapsed: start.elapsed(),
             candidates: vec![Candidate {
                 first,

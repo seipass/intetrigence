@@ -32,6 +32,8 @@ pub struct SearchStats {
     pub fallback: bool,
     /// True when a deterministic search hit its 95 ms cap.
     pub aborted: bool,
+    /// Longest iteration of the search behind this move.
+    pub max_level_time: std::time::Duration,
 }
 
 /// Per-game statistics.
@@ -219,6 +221,7 @@ pub fn play_game_with_setup(
                 iterations: result.iterations,
                 fallback: result.fallback,
                 aborted: result.aborted,
+                max_level_time: result.max_level_time,
             });
             (
                 result.best.hold,
