@@ -250,6 +250,19 @@ pub fn write_replay(path: &Path, records: &[ReplayRecord]) -> std::io::Result<()
     file.flush()
 }
 
+/// Rebuilds the initial engine for a replay header (profile start garbage
+/// included). Periodic harness injections are in the record stream; apply the
+/// `garbage` records with `from == 2` at the same turns.
+pub fn engine_from_header(header: &Header) -> Engine {
+    let sheet = Sheet::parse(&header.sheet).unwrap_or(Sheet::A);
+    Engine::with_start_garbage(
+        header.seed,
+        sheet,
+        header.frames_per_turn,
+        &header.start_garbage,
+    )
+}
+
 pub fn read_replay(path: &Path) -> Result<Vec<ReplayRecord>, VerifyError> {
     let file = std::fs::File::open(path).map_err(|error| VerifyError::Io(error.to_string()))?;
     let mut records = Vec::new();
@@ -305,7 +318,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             ));
         }
     };
-    let sheet = Sheet::parse(&header.sheet)
+    Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
     let visible_rows = [
         header
@@ -320,12 +333,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             .unwrap_or(0),
     ];
     let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
-    let mut engine = Engine::with_start_garbage(
-        header.seed,
-        sheet,
-        header.frames_per_turn,
-        &header.start_garbage,
-    );
+    let mut engine = engine_from_header(&header);
     let mut report = VerifyReport {
         seed: header.seed,
         sheet: header.sheet.clone(),

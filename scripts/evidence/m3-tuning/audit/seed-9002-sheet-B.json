@@ -1,42 +1,58 @@
 {
   "seed": 9002,
   "sheet": "B",
-  "started_at": "unix:1794634758",
+  "started_at": "unix:1794637305",
+  "profile": "official",
   "winner": 0,
   "reason": "Forfeit",
   "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
   "turns": 158,
   "totals": [
     {
       "sent_total": 84,
       "received_total": 41,
       "attack_total": 134,
-      "pieces_placed": 157
+      "pieces_placed": 157,
+      "lines_cleared": 99
     },
     {
       "sent_total": 91,
       "received_total": 53,
       "attack_total": 119,
-      "pieces_placed": 157
+      "pieces_placed": 157,
+      "lines_cleared": 93
+    }
+  ],
+  "heights": [
+    {
+      "max": 18,
+      "mean": 5.92,
+      "final_height": 2
+    },
+    {
+      "max": 20,
+      "mean": 5.04,
+      "final_height": 20
     }
   ],
   "think": [
     {
       "count": 157,
-      "median_ms": 96.861,
-      "p95_ms": 98.605,
-      "p99_ms": 99.085,
-      "max_ms": 99.45,
-      "mean_ms": 97.037,
+      "median_ms": 97.084,
+      "p95_ms": 98.719,
+      "p99_ms": 99.326,
+      "max_ms": 99.387,
+      "mean_ms": 97.173,
       "over_budget": 0
     },
     {
       "count": 158,
-      "median_ms": 31.224,
-      "p95_ms": 37.718,
-      "p99_ms": 41.388,
-      "max_ms": 43.075,
-      "mean_ms": 31.347,
+      "median_ms": 36.089,
+      "p95_ms": 43.572,
+      "p99_ms": 49.085,
+      "max_ms": 52.524,
+      "mean_ms": 35.699,
       "over_budget": 0
     }
   ],
@@ -209,9 +225,9 @@
     "bun_version": "1.4.0",
     "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
     "decision_log": "scripts/evidence/m3-tuning\\logs\\seed-9002-sheet-B-attax.jsonl",
-    "decisions_logged": 158,
+    "decisions_logged": 316,
     "nodes_total": 1571392,
-    "extra_ms_total": 4827.6,
+    "extra_ms_total": 5500.3,
     "suggestions_with_stats": 158,
     "cells_above_row20": false,
     "hold_matches": 157,
@@ -221,13 +237,14 @@
     {
       "name": "intetrigence",
       "version": "0.1.0",
-      "commit": "a723bf3",
+      "commit": "47df03e",
       "args": [
         "--ms",
         "100",
         "--threads",
         "8"
-      ]
+      ],
+      "visible_rows": 40
     },
     {
       "name": "Attax",
@@ -236,7 +253,8 @@
       "args": [
         "bun",
         "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
-      ]
+      ],
+      "visible_rows": 20
     }
   ],
   "replay": "replays/seed-9002-sheet-B.jsonl",

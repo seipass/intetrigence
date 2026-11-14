@@ -1,0 +1,144 @@
+{
+  "seed": 9005,
+  "sheet": "B",
+  "started_at": "unix:1794638579",
+  "profile": "garbage-pressure:8:4",
+  "winner": 1,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 244,
+  "totals": [
+    {
+      "sent_total": 93,
+      "received_total": 115,
+      "attack_total": 275,
+      "pieces_placed": 244,
+      "lines_cleared": 180
+    },
+    {
+      "sent_total": 179,
+      "received_total": 108,
+      "attack_total": 282,
+      "pieces_placed": 244,
+      "lines_cleared": 192
+    }
+  ],
+  "heights": [
+    {
+      "max": 25,
+      "mean": 6.79,
+      "final_height": 25
+    },
+    {
+      "max": 24,
+      "mean": 8.79,
+      "final_height": 4
+    }
+  ],
+  "think": [
+    {
+      "count": 244,
+      "median_ms": 96.515,
+      "p95_ms": 97.671,
+      "p99_ms": 98.005,
+      "max_ms": 98.322,
+      "mean_ms": 96.192,
+      "over_budget": 0
+    },
+    {
+      "count": 244,
+      "median_ms": 96.539,
+      "p95_ms": 97.744,
+      "p99_ms": 98.155,
+      "max_ms": 98.476,
+      "mean_ms": 95.814,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 244,
+      "accepted_first": 244,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 244,
+      "accepted_first": 244,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 244,
+      "spin_checked": 244,
+      "spin_matches": 244,
+      "spin_mismatches": 0,
+      "attack_checked": 244,
+      "attack_matches": 244,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 275,
+      "recomputed_total": 275,
+      "examples": []
+    },
+    {
+      "placements": 244,
+      "spin_checked": 244,
+      "spin_matches": 244,
+      "spin_mismatches": 0,
+      "attack_checked": 244,
+      "attack_matches": 244,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 282,
+      "recomputed_total": 282,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "47df03e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "4"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "47df03e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "4"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9005-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9005,
+    "sheet": "B",
+    "turns": 244,
+    "placements": 488,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 1,
+  "bot_nodes_total": 156386
+}

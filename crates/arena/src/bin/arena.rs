@@ -60,6 +60,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut start_rows = 12u8;
     let mut interval = 8u32;
     let mut pressure_rows = 4u32;
+    let mut from_turn = 200u32;
     let mut self_play = false;
 
     let mut index = 0;
@@ -163,6 +164,12 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--pressure-rows: {error}"))?;
                 index += 2;
             }
+            "--from-turn" => {
+                from_turn = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--from-turn: {error}"))?;
+                index += 2;
+            }
             "--self-play" => {
                 self_play = true;
                 index += 1;
@@ -199,12 +206,19 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
             interval,
             rows: pressure_rows,
         },
+        "composite" => Profile::Composite {
+            start_rows,
+            interval,
+            rows: pressure_rows,
+            from_turn,
+        },
         other => {
             return Err(format!(
-                "unknown --profile `{other}` (official|defense-stress|garbage-pressure)"
+                "unknown --profile `{other}` (official|defense-stress|garbage-pressure|composite)"
             ));
         }
     };
+    config.self_play = self_play;
     config.bot = match bot.as_str() {
         "baseline" => BotChoice::Baseline,
         "search" => BotChoice::Search(Box::new(SearchConfig {

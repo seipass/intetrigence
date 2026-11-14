@@ -322,8 +322,20 @@ impl std::error::Error for AdoptError {}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Profile {
     Official,
-    DefenseStress { rows: u8 },
-    GarbagePressure { interval: u32, rows: u32 },
+    DefenseStress {
+        rows: u8,
+    },
+    GarbagePressure {
+        interval: u32,
+        rows: u32,
+    },
+    /// Start-board stress plus a delayed spike schedule (diagnostic).
+    Composite {
+        start_rows: u8,
+        interval: u32,
+        rows: u32,
+        from_turn: u32,
+    },
 }
 
 impl Profile {
@@ -348,6 +360,30 @@ impl Profile {
                 let rows = parts.next()?.parse().ok()?;
                 Some(Profile::GarbagePressure { interval, rows })
             }
+            "composite" => {
+                let start_rows = match parts.next() {
+                    Some(value) => value.parse().ok()?,
+                    None => 8,
+                };
+                let interval = match parts.next() {
+                    Some(value) => value.parse().ok()?,
+                    None => 20,
+                };
+                let rows = match parts.next() {
+                    Some(value) => value.parse().ok()?,
+                    None => 8,
+                };
+                let from_turn = match parts.next() {
+                    Some(value) => value.parse().ok()?,
+                    None => 200,
+                };
+                Some(Profile::Composite {
+                    start_rows,
+                    interval,
+                    rows,
+                    from_turn,
+                })
+            }
             _ => None,
         }
     }
@@ -359,6 +395,12 @@ impl Profile {
             Profile::GarbagePressure { interval, rows } => {
                 format!("garbage-pressure:{interval}:{rows}")
             }
+            Profile::Composite {
+                start_rows,
+                interval,
+                rows,
+                from_turn,
+            } => format!("composite:{start_rows}:{interval}:{rows}:{from_turn}"),
         }
     }
 
@@ -366,7 +408,10 @@ impl Profile {
     /// top). Only `DefenseStress` has any.
     pub fn start_garbage(self, seed: u64) -> Vec<u8> {
         match self {
-            Profile::DefenseStress { rows } => {
+            Profile::DefenseStress { rows }
+            | Profile::Composite {
+                start_rows: rows, ..
+            } => {
                 let mut rng = intetrigence_core::SplitMix64::new(seed ^ 0x5EED_5EED_5EED_5EED);
                 (0..rows).map(|_| rng.below(10) as u8).collect()
             }
@@ -380,6 +425,14 @@ impl Profile {
             Profile::GarbagePressure { interval, rows }
                 if interval > 0 && turn > 0 && turn % interval == 0 =>
             {
+                Some(rows)
+            }
+            Profile::Composite {
+                interval,
+                rows,
+                from_turn,
+                ..
+            } if interval > 0 && turn >= from_turn && (turn - from_turn) % interval == 0 => {
                 Some(rows)
             }
             _ => None,
@@ -403,6 +456,15 @@ pub struct Engine {
 impl Engine {
     pub fn new(seed: u64, sheet: Sheet, frames_per_turn: u64) -> Self {
         Self::with_start_garbage(seed, sheet, frames_per_turn, &[])
+    }
+
+    /// Builds an engine for `profile`, applying its deterministic start garbage.
+    ///
+    /// Periodic injections are not applied here: the caller (or replay
+    /// verifier) applies them at the recorded turns.
+    pub fn with_profile(seed: u64, sheet: Sheet, frames_per_turn: u64, profile: Profile) -> Self {
+        let start_garbage = profile.start_garbage(seed);
+        Self::with_start_garbage(seed, sheet, frames_per_turn, &start_garbage)
     }
 
     /// Builds an engine and inserts `start_garbage` into both players' boards.

@@ -137,6 +137,9 @@ def main():
     header = None
     with open(first_replay, encoding="utf-8") as handle:
         header = json.loads(handle.readline())
+    self_play = summary.get("attax") is None
+    label0 = "slot 0" if self_play else "intetrigence"
+    label1 = "slot 1" if self_play else "attax"
     bot = summary["bots"][0]
     attax = summary["bots"][1]
     bot_think = [game["think_median_ms"][0] for game in games]
@@ -176,28 +179,40 @@ def main():
         )
     lines.append(f"- games: {len(games)} (tuning seeds 9001-9010 x sheets A/B)")
     lines.append("- held-out: seeds 10001+ were **not** used (tuning seeds only)")
+    args0 = " ".join(header["bots"]["0"].get("args", []))
     lines.append(
-        f"- intetrigence: real search, `--ms 100`, 8 threads, commit "
+        f"- intetrigence: real search (`{args0}`), commit "
         f"`{header['bots']['0'].get('commit', '?')}`"
     )
     attax_info = summary.get("attax") or {}
-    lines.append(
-        f"- attax: `{attax_info.get('commit', '?')}`, bun `{attax_info.get('bun_version', '?')}`"
-    )
+    if self_play:
+        lines.append("- opponent: intetrigence (self-play; both slots run the same search)")
+    else:
+        lines.append(
+            f"- attax: `{attax_info.get('commit', '?')}`, bun `{attax_info.get('bun_version', '?')}`"
+        )
     lines.append(f"- rules: `{header.get('rules', '?')}` / `{header.get('protocol', '?')}`")
     lines.append(
         f"- environment: {platform.platform()}, {os.cpu_count()} logical CPUs"
     )
-    lines.append(
-        f"- commands: intetrigence `intetrigence {' '.join(header['bots']['0'].get('args', []))}`; "
-        f"attax `{attax_info.get('command_line', '?')}`"
-    )
+    if self_play:
+        lines.append(
+            f"- command: `intetrigence {' '.join(header['bots']['0'].get('args', []))}` (both slots)"
+        )
+    else:
+        lines.append(
+            f"- commands: intetrigence `intetrigence {' '.join(header['bots']['0'].get('args', []))}`; "
+            f"attax `{attax_info.get('command_line', '?')}`"
+        )
     lines.append("")
     lines.append("## Result\n")
     lines.append(f"- wins / losses / draws: **{wins} / {losses} / {draws}**")
-    lines.append(
-        f"- forfeits: attax **{forfeit_wins}** (20-row view), intetrigence **{bot_forfeits}**"
-    )
+    if self_play:
+        lines.append("- forfeits: none (self-play; both slots are full-vision)")
+    else:
+        lines.append(
+            f"- forfeits: attax **{forfeit_wins}** (20-row view), intetrigence **{bot_forfeits}**"
+        )
     lines.append(
         f"- win rate: **{wins / len(games) * 100:.1f}%** (Wilson 95% CI {low * 100:.1f}%..{high * 100:.1f}%)"
     )
@@ -239,38 +254,64 @@ def main():
     lines.append("")
     lines.append("## Think time\n")
     lines.append(
-        f"- intetrigence: median {sum(bot_think) / len(bot_think):.1f} ms, "
+        f"- {label0}: median {sum(bot_think) / len(bot_think):.1f} ms, "
         f"p95 {sum(bot_p95) / len(bot_p95):.1f} ms, p99 {sum(bot_p99) / len(bot_p99):.1f} ms, "
         f"max {max(bot_max):.1f} ms (median/p95/p99 are means of per-game values; max is the match worst)"
     )
     lines.append(
-        f"- attax: median {sum(attax_think) / len(attax_think):.1f} ms, "
+        f"- {label1}: median {sum(attax_think) / len(attax_think):.1f} ms, "
         f"p95 {sum(attax_p95) / len(attax_p95):.1f} ms, p99 {sum(attax_p99) / len(attax_p99):.1f} ms, "
         f"max {max(attax_max):.1f} ms"
     )
-    lines.append(f"- placements over the 200 ms budget: intetrigence {bot['think_over_budget']}, attax {attax['think_over_budget']}")
     lines.append(
-        f"- first-choice acceptance (mean over games): intetrigence "
-        f"{sum(bot_first) / len(bot_first):.2f}, attax {sum(attax_first) / len(attax_first):.2f}"
+        f"- placements over the 200 ms budget: {label0} {bot['think_over_budget']}, {label1} {attax['think_over_budget']}"
+    )
+    lines.append(
+        f"- first-choice acceptance (mean over games): {label0} "
+        f"{sum(bot_first) / len(bot_first):.2f}, {label1} {sum(attax_first) / len(attax_first):.2f}"
     )
     lines.append("")
     lines.append("## Attack and garbage\n")
     lines.append(
-        f"- attack/piece: intetrigence **{bot['attack_per_piece']:.3f}**, attax **{attax['attack_per_piece']:.3f}**"
+        f"- attack/piece: {label0} **{bot['attack_per_piece']:.3f}**, {label1} **{attax['attack_per_piece']:.3f}**"
     )
     lines.append(
-        f"- received garbage per game: intetrigence **{bot['received_per_game']:.1f}**, attax **{attax['received_per_game']:.1f}**"
+        f"- received garbage per game: {label0} **{bot['received_per_game']:.1f}**, {label1} **{attax['received_per_game']:.1f}**"
     )
-    lines.append(f"- intetrigence search: {nodes:,} nodes total, {fallbacks} fallback placements")
-    lines.append(f"- `start` resends (attax): {start_resends}; `cellsAboveRow20`: {cells20}")
+    lines.append(f"- {label0} search: {nodes:,} nodes total, {fallbacks} fallback placements")
+    if not self_play:
+        lines.append(f"- `start` resends (attax): {start_resends}; `cellsAboveRow20`: {cells20}")
+    lines.append("")
+    lines.append("## Board height and survival\n")
+    turns = [game["turns"] for game in games]
+    turncap = sum(1 for game in games if game["reason"] == "TurnCap")
+    topout = sum(1 for game in games if game["reason"] == "TopOut")
+    lines.append(
+        f"- mean turns {sum(turns) / len(turns):.1f}; turn-cap games {turncap}; TopOut games {topout}"
+    )
+    heights = [audits[(game["seed"], game["sheet"])].get("heights") for game in games]
+    if all(height is not None for height in heights):
+        for slot in (0, 1):
+            maxes = [height[slot]["max"] for height in heights]
+            means = [height[slot]["mean"] for height in heights]
+            finals = [height[slot]["final_height"] for height in heights]
+            cleared = [
+                audits[(game["seed"], game["sheet"])]["totals"][slot].get("lines_cleared", 0)
+                for game in games
+            ]
+            lines.append(
+                f"- slot {slot}: max height {sum(maxes) / len(maxes):.1f}, "
+                f"mean height {sum(means) / len(means):.1f}, final {sum(finals) / len(finals):.1f}, "
+                f"lines cleared/game {sum(cleared) / len(cleared):.1f}"
+            )
     lines.append("")
     lines.append("## Scoring audit\n")
     lines.append(
-        f"- intetrigence: spin mismatches {bot['spin_mismatches']} / {bot['spin_checked']}, "
+        f"- {label0}: spin mismatches {bot['spin_mismatches']} / {bot['spin_checked']}, "
         f"same-spin attack mismatches {bot['attack_mismatches_same_spin']} / {bot['attack_checked']}"
     )
     lines.append(
-        f"- attax: spin mismatches {attax['spin_mismatches']} / {attax['spin_checked']}, "
+        f"- {label1}: spin mismatches {attax['spin_mismatches']} / {attax['spin_checked']}, "
         f"same-spin attack mismatches {attax['attack_mismatches_same_spin']} / {attax['attack_checked']}"
     )
     lines.append("")
@@ -278,7 +319,9 @@ def main():
     for label, count in sorted(classes.items(), key=lambda item: -item[1]):
         lines.append(f"- {label}: {count}")
     lines.append("")
-    lines.append("| seed | sheet | reason | turns | bot recv | attax recv | bot attack/piece | classification |")
+    lines.append(
+        f"| seed | sheet | reason | turns | {label0} recv | {label1} recv | {label0} attack/piece | classification |"
+    )
     lines.append("|---|---|---|---|---|---|---|---|")
     for game, audit, label in loss_rows:
         bot_total = audit["totals"][0]
@@ -298,7 +341,12 @@ def main():
     lines.append("- Tuning seeds only. Held-out seeds (10001+) were not used.")
     lines.append("")
     lines.append("## Reproduction\n")
-    lines.append("- `scripts/m2-match.sh` (tuning seeds 9001-9010, `--ms 100`, 8 threads)")
+    if self_play:
+        lines.append("- `scripts/m3-garbage-pressure-selfplay.sh`")
+    elif profile.startswith("defense-stress"):
+        lines.append("- `scripts/m3-defense.sh`")
+    else:
+        lines.append("- `scripts/m2-match.sh` (tuning seeds 9001-9010)")
     lines.append("- `arena verify scripts/evidence/m2-tuning`")
     lines.append("- `python scripts/analyze-m2.py`")
     lines.append("")

@@ -135,13 +135,13 @@ below measures them.
 | wins / losses | 18 / 2 | **20 / 0** |
 | win rate | 90.0% | **100.0%** (Wilson 95% CI 83.9%..100.0%) |
 | replay verified | 20/20 | **20/20** |
-| 40-row top-out / turn-cap games | 0/2 | **2/2 wins** |
-| attack/piece | 0.986 | 0.961 |
-| received garbage per game | 75.7 | 111.0 |
-| think median / p95 | 97.1 / 98.7 ms | 97.1 / 99.4 ms |
+| forfeit-vision wins / turn-cap games | 0 / 0 | **19 / 1** |
+| attack/piece | 0.986 | 0.962 |
+| received garbage per game | 75.7 | 109.4 |
+| think median / p95 | 97.1 / 98.7 ms | 97.1 / 99.0 ms |
 | placements over the 200 ms budget | 0 | 0 |
-| spin mismatches (ours) | 0 / 5934 | 0 / 8070 |
-| same-spin attack mismatches | 0 / 5934 | 0 / 8070 |
+| spin mismatches (ours) | 0 / 5934 | 0 / 7892 |
+| same-spin attack mismatches | 0 / 5934 | 0 / 7892 |
 
 ### The two M2 loss cases
 

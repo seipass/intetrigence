@@ -214,10 +214,15 @@ sleep を足すだけで、状態には影響しない。
 |---|---|---|---|
 | `official` | 空盤面 | M0 / M2 / 最終マッチ | **使える(これのみ)** |
 | `defense-stress:N` | 両者に決定論的な N 行のゴミ(穴は seed から決定論的) | M3 の防御・downstack 診断 | 使えない(診断専用) |
+| `garbage-pressure:I:R` | 空盤面 + 両者に I turn ごとに R 行を注入 | M3 の防御診断(自己対戦向け) | 使えない(診断専用) |
 
 - replay header に `profile` と `start_garbage`(挿入順の穴列)を記録し、verify は同じ初期盤面から再実行する。
 - 開始ゴミは `received_total` に含まれる(両者同数なので turn-cap の比較は対称)。
-- `--profile defense-stress --start-rows 12` で選択。診断値は `official` の勝率と混ぜない。
+- `--profile defense-stress --start-rows 12` / `--profile garbage-pressure --interval 8 --pressure-rows 4` で選択。
+- `garbage-pressure` の注入は turn の先頭で両者に `receive(rows, frame)` し、replay に
+  `from=2` の `garbage` レコードとして turn レコードの前に記録する。verify は profile の
+  turn/行数/arrival_frame を照合して同じ順序で再現する。
+- 自己対戦は `--self-play`(両 slot を in-process search)。診断値は `official` の勝率と混ぜない。
 
 ### D10. ベースライン bot は M0 の暫定
 
