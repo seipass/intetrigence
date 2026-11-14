@@ -88,6 +88,8 @@ pub struct View {
     pub can_hold: bool,
     /// Five preview pieces (`docs/s2-spec.md` §2.6).
     pub preview: Vec<PieceKind>,
+    /// Pieces left in the current 7-bag (TBP `start.randomizer`).
+    pub bag_state: Vec<PieceKind>,
     /// Combo before this placement (0 = no chain).
     pub combo: u32,
     /// Consecutive difficult clears `N` before this placement.
@@ -522,6 +524,7 @@ impl Engine {
             hold: player.game.held_piece(),
             can_hold: player.game.can_hold(),
             preview: player.game.preview(5),
+            bag_state: player.game.bag_state().remaining,
             combo: player.scoring.state.combo,
             b2b_streak: player.scoring.state.b2b_streak,
             pending_garbage: player.garbage.queue_total(),

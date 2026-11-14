@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use intetrigence_core::PieceKind;
 use intetrigence_tbp::{
-    Host, HostConfig, Mirror, Move, Piece, SpinLabel, StartPayload, location_cells,
+    Host, HostConfig, Mirror, Move, Piece, Randomizer, SpinLabel, StartPayload, location_cells,
     location_of_core,
 };
 
@@ -113,6 +113,7 @@ impl TbpAgent {
     fn start_payload(
         board: &intetrigence_core::Board,
         queue: &[PieceKind],
+        bag_state: &[PieceKind],
         hold: Option<PieceKind>,
         combo: u32,
         b2b_streak: u32,
@@ -123,7 +124,13 @@ impl TbpAgent {
             hold: hold.map(Piece::from_core),
             combo,
             back_to_back: b2b_streak >= 1,
-            randomizer: None,
+            randomizer: if bag_state.is_empty() {
+                None
+            } else {
+                Some(Randomizer::SevenBag {
+                    bag_state: bag_state.iter().copied().map(Piece::from_core).collect(),
+                })
+            },
         }
     }
 }
@@ -181,6 +188,7 @@ impl Agent for TbpAgent {
         let payload = Self::start_payload(
             &context.initial.board,
             &queue,
+            &context.initial.bag_state,
             context.initial.hold,
             context.initial.combo,
             context.initial.b2b_streak,
@@ -270,6 +278,7 @@ impl Agent for TbpAgent {
             let payload = Self::start_payload(
                 &commit.board,
                 &commit.queue,
+                &commit.bag_state,
                 commit.hold_piece,
                 commit.combo,
                 commit.b2b_streak,

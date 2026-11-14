@@ -315,6 +315,7 @@ pub fn run_round(
                 board: engine.players[slot].game.board().clone(),
                 board_hash: applied.board_hash,
                 queue,
+                bag_state: engine.players[slot].game.bag_state().remaining,
                 hold_piece: engine.players[slot].game.held_piece(),
                 combo: applied.combo_after,
                 b2b_streak: applied.b2b_after,
