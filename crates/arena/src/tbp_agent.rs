@@ -26,6 +26,13 @@ pub struct TbpAgentConfig {
     pub bun_version: Option<String>,
     /// `ATTAX_TBP_LOG` output path for this game.
     pub decision_log: Option<PathBuf>,
+    /// Display name for the bot (default `tbp-bot`).
+    pub name: Option<String>,
+    /// Rows the bot can see (default 20). Used for forfeit classification.
+    pub visible_rows: u32,
+    /// Delay before each `suggest`, giving a continuously-searching bot a
+    /// budget (CC2/clys have no think-time option). Included in `think_ms`.
+    pub suggest_delay_ms: u64,
 }
 
 impl TbpAgentConfig {
@@ -35,6 +42,9 @@ impl TbpAgentConfig {
             commit: None,
             bun_version: None,
             decision_log: None,
+            name: None,
+            visible_rows: 20,
+            suggest_delay_ms: 0,
         }
     }
 }
@@ -61,10 +71,10 @@ pub struct TbpAgent {
 impl TbpAgent {
     pub fn new(config: TbpAgentConfig) -> Self {
         let descriptor = BotDescriptor {
-            name: "tbp-bot".into(),
+            name: config.name.clone().unwrap_or_else(|| "tbp-bot".into()),
             version: None,
             commit: config.commit.clone(),
-            visible_rows: 20,
+            visible_rows: config.visible_rows,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());
@@ -176,6 +186,10 @@ impl Agent for TbpAgent {
     }
 
     fn suggest(&mut self, _view: &View) -> Result<Suggestion, AgentError> {
+        let delay = self.config.suggest_delay_ms;
+        if delay > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+        }
         let host = self
             .host
             .as_mut()
@@ -183,7 +197,7 @@ impl Agent for TbpAgent {
         let payload = host
             .suggest()
             .map_err(|error| AgentError::Io(error.to_string()))?;
-        let think_ms = host.think_ms.last().copied().unwrap_or(0.0);
+        let think_ms = delay as f64 + host.think_ms.last().copied().unwrap_or(0.0);
         let (nodes, extra_ms) = match &payload.move_info {
             Some(info) => {
                 self.suggestions_with_stats += 1;

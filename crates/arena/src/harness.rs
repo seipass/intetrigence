@@ -45,6 +45,39 @@ impl AttaxConfig {
     }
 }
 
+/// A generic TBP opponent (CC2, clys through a TBP adapter, ...).
+#[derive(Clone, Debug)]
+pub struct TbpOpponentConfig {
+    /// Display name recorded in the replay header and audit.
+    pub name: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub cwd: Option<PathBuf>,
+    pub env: Vec<(String, String)>,
+    pub commit: Option<String>,
+    /// Rows the bot can see (20 for attax, 40 for full-board bots).
+    pub visible_rows: u32,
+    /// Delay before each `suggest` (budget for continuously-searching bots).
+    pub suggest_delay_ms: u64,
+    pub timeout: Duration,
+}
+
+impl TbpOpponentConfig {
+    pub fn new(name: impl Into<String>, program: impl Into<String>, args: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            program: program.into(),
+            args,
+            cwd: None,
+            env: Vec::new(),
+            commit: None,
+            visible_rows: 40,
+            suggest_delay_ms: 0,
+            timeout: Duration::from_secs(30),
+        }
+    }
+}
+
 /// Which bot plays slot 0 (intetrigence).
 #[derive(Clone, Debug)]
 pub enum BotChoice {
@@ -62,6 +95,8 @@ pub struct MatchConfig {
     pub frames_per_turn: u64,
     pub out_dir: PathBuf,
     pub attax: Option<AttaxConfig>,
+    /// Generic TBP opponent (takes precedence over `attax` when set).
+    pub tbp_opponent: Option<TbpOpponentConfig>,
     pub started_at: String,
     /// Provenance string recorded in every replay header.
     pub rules: String,
@@ -87,6 +122,7 @@ impl MatchConfig {
             frames_per_turn: 12,
             out_dir: out_dir.into(),
             attax: None,
+            tbp_opponent: None,
             started_at: now_stamp(),
             rules: version_string("docs/s2-spec.md", "v1.3.11"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
@@ -627,6 +663,18 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
                 bot_config.commit = git_short_head();
                 Box::new(crate::bot_agent::BotAgent::new(bot_config))
+            } else if let Some(tbp) = &config.tbp_opponent {
+                let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
+                host.cwd = tbp.cwd.clone();
+                host.env = tbp.env.clone();
+                host.timeout = tbp.timeout;
+                host.stderr_path = Some(stderr_path.clone());
+                let mut tbp_config = TbpAgentConfig::new(host);
+                tbp_config.commit = tbp.commit.clone();
+                tbp_config.name = Some(tbp.name.clone());
+                tbp_config.visible_rows = tbp.visible_rows;
+                tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
+                Box::new(TbpAgent::new(tbp_config))
             } else {
                 match &config.attax {
                     Some(attax) => {
