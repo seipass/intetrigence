@@ -47,12 +47,18 @@ fn deterministic_schedule_cost() {
             .filter(|t| **t > Duration::from_millis(100))
             .count();
         let aborted = report.search_stats.iter().filter(|s| s.aborted).count();
+        let worst_level = report
+            .search_stats
+            .iter()
+            .map(|s| s.max_level_time)
+            .max()
+            .unwrap_or_default();
         println!(
             "d{depth} w{width:<14} {n:6} {:>8.1} {:>8.1} {:>8.1} {over:7}",
             median.as_secs_f64() * 1000.0,
             p99.as_secs_f64() * 1000.0,
             max.as_secs_f64() * 1000.0,
         );
-        println!("  aborted {aborted}");
+        println!("  aborted {aborted}  worst iteration {:?}", worst_level);
     }
 }
