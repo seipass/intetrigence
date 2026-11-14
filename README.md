@@ -19,25 +19,34 @@ forfeit も勝ちに含めない。時間切れで攻撃量が多い方を勝ち
 
 ## 現在の測定値
 
-**パッチ適用 attax(40 行視野、SHA-256 `e22aab7b…`)とのスモーク 10 ゲーム: TopOut 勝ち 6 / TopOut 負け 2 / 未決着 2、forfeit 0、replay 10/10 検証。**
+**40 行視野 + S2 spawn パッチを適用した attax(upstream `7b38f51` + `adapters/attax-vision-40.patch`)との 10 ゲーム(seeds 11001–11005 × 両シート):**
 
-- **勝ちは TopOut のみ数える。** 1000 turn 到達(TurnCap)は「未決着」であり、**勝者を決めない**
-  (TETR.IO に「時間切れで攻撃力が高い方の勝ち」というルールは存在しない。レフェリーは winner を記録しない)
-- 決着した 8 ゲームの勝率は 6/8 = 75%。10 ゲーム全体では 6/10
-- 敗因は 2 件とも TopOut(スタック管理)。forfeit ではない
-- 未決着 2 件は、1000 turn 以内に attax を潰せなかったことを意味する
-- attax の探索は正常(nodes ≈ 10,000、depth 6、35 ms/手)
+| 内訳 | 件数 |
+|---|---|
+| **TopOut 勝ち** | **0** |
+| **TopOut 負け** | **9** |
+| **未決着(ターン上限)** | **1** |
+| forfeit(no contest) | 0 |
+
+- replay 検証 10/10
+- 盤面の最大高さ: intetrigence 20–23 / attax 10–19(attax はほぼ崩れない)
+- attack/piece: intetrigence 0.50–0.98 / attax 0.71–0.96
+- 思考時間 median: intetrigence 97.1–97.4 ms / attax 28.1–38.5 ms
+
+**つまり、まともな 40 行 attax に対して TopOut で 1 本も勝てていません。** 現在のボットは目標(50 勝 0 敗)から遠く、強化が必要です。
 
 ### 過去の数字について
 
-以前に報告した「attax に 94%」「M4 ゲート 95%」は **無効** です。原因は 3 つの計測バグでした:
+以前に報告した「attax に 94%」「M4 ゲート 95%」「スモーク 8 勝 2 敗」は **すべて無効** です。原因は 5 つの計測バグでした:
 
 1. `classify_forfeit` の判定が tautology で、forfeit が常に「vision」に分類されていた
 2. attax アダプタが active ピースをグリッド最上段に置き、レフェリーの S2 spawn と 18 行ずれていた
 3. upstream attax の視野は 20 行で、S2 の spawn(row 21)が可視領域の外だった
+4. **ターン上限で「攻撃量が多い方の勝ち」にしていた**(TETR.IO にそんなルールはない)
+5. **0 ライン設置に直前の combo 乗数が乗り、攻撃が発生していた**
 
 旧 220 ゲームの真の内訳は **TopOut 勝ち 0 / TurnCap 勝ち 13 / TopOut 負け 13 / forfeit 194** で、実質勝率 5.9% でした。
-詳細と無効化の記録は [docs/seed-registry.md](docs/seed-registry.md) §5。
+詳細と無効化の記録は [docs/seed-registry.md](docs/seed-registry.md) §5、監査は [docs/s2-rule-audit.md](docs/s2-rule-audit.md) と [docs/core-rule-audit.md](docs/core-rule-audit.md)。
 
 ## 構成
 
