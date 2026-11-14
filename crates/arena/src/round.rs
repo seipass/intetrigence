@@ -85,6 +85,9 @@ pub struct StageReport {
     pub commit: Option<String>,
     pub patch_note: Option<String>,
     pub patch_sha256: Option<String>,
+    /// Extra environment passed to the opponent process (absolute paths).
+    #[serde(default)]
+    pub env: Vec<(String, String)>,
     pub games: u32,
     pub wins: u32,
     pub losses: u32,
@@ -480,6 +483,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
                 patch_sha256: opponent.patch_sha256.clone(),
+                env: Vec::new(),
                 games: 0,
                 wins: 0,
                 losses: 0,
@@ -542,6 +546,11 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
                 patch_sha256: opponent.patch_sha256.clone(),
+                env: match &opponent.kind {
+                    OpponentKind::Tbp(config) => config.env.clone(),
+                    OpponentKind::Attax { env, .. } => env.clone(),
+                    OpponentKind::Missing => Vec::new(),
+                },
                 games: summary.games.len() as u32,
                 wins: summary.wins,
                 losses: summary.losses,
@@ -659,6 +668,9 @@ fn stage_section(
     }
     if let Some(sha) = &stage.patch_sha256 {
         writeln!(out, "- compatibility patch SHA-256: `{sha}`")?;
+    }
+    for (key, value) in &stage.env {
+        writeln!(out, "- environment: `{key}={value}`")?;
     }
     writeln!(
         out,
@@ -792,7 +804,7 @@ fn stage_section(
         )?;
         writeln!(
             out,
-            "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}**",
+            "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}** (overlapping 5-turn windows, not burst events)",
             bot.max_burst_1, bot.max_burst_5, bot.burst_over_capacity
         )?;
     }
