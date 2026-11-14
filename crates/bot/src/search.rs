@@ -114,6 +114,13 @@ pub struct SearchResult {
     pub width: usize,
     /// Nodes expanded by the winning iteration.
     pub nodes: u64,
+    /// Anytime iterations that completed. Zero means the search never got past
+    /// the root and the move came from the 1-ply `greedy` path -- the audit
+    /// signal for the `91ec267` bug class, where a bot burned its whole budget
+    /// and still played a one-ply move.
+    pub iterations: usize,
+    /// True when `best` came from `greedy` rather than from the beam.
+    pub fallback: bool,
     pub elapsed: Duration,
     /// Every root move that survived, best first.
     pub candidates: Vec<Candidate>,
@@ -268,6 +275,7 @@ impl Searcher {
         let mut depth = max_depth.clamp(1, START_DEPTH);
         let mut best: Option<SearchResult> = None;
         let mut width = self.config.width.max(1);
+        let mut iterations = 0usize;
         loop {
             let sequence = PieceSequence::new(root.current, &root.preview, depth);
             let outcome = if self.config.threads <= 1 {
@@ -288,23 +296,36 @@ impl Searcher {
                 depth: completed,
                 width,
                 nodes,
+                iterations: iterations + 1,
+                fallback: false,
                 elapsed: start.elapsed(),
                 candidates,
                 line,
             });
+            iterations += 1;
             if Instant::now() >= deadline {
                 break;
             }
-            if width < self.config.max_width {
-                width = (width * 3 / 2).min(self.config.max_width);
-            } else if depth < max_depth {
+            // Deepen before widening. Measured on a real garbage-pressure game
+            // (`search_distribution.rs`), widening first spent the whole budget
+            // on cheap depth-2 iterations and the completed depth never rose
+            // above 2.2, so the bot was effectively playing two plies.
+            if depth < max_depth {
                 depth = (depth + 2).min(max_depth);
+            } else if width < self.config.max_width {
+                width = (width * 3 / 2).min(self.config.max_width);
             } else {
                 break;
             }
         }
 
-        best.or_else(|| self.greedy(root, start))
+        best.or_else(|| {
+            self.greedy(root, start).map(|mut result| {
+                result.fallback = true;
+                result.iterations = 0;
+                result
+            })
+        })
     }
 
     /// One-ply fallback that always returns a move unless the piece cannot be
@@ -338,6 +359,8 @@ impl Searcher {
             depth: 1,
             width: 1,
             nodes: 1,
+            iterations: 0,
+            fallback: true,
             elapsed: start.elapsed(),
             candidates: vec![Candidate {
                 first,

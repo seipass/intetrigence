@@ -17,6 +17,21 @@ use crate::eval::EvalContext;
 use crate::movegen::spawn_piece;
 use crate::search::{RootState, SearchConfig, Searcher};
 
+/// What the anytime loop completed for one move.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SearchStats {
+    /// Depth of the last completed iteration.
+    pub depth: usize,
+    /// Beam width of the last completed iteration.
+    pub width: usize,
+    /// Nodes expanded by the last completed iteration.
+    pub nodes: u64,
+    /// Anytime iterations that completed.
+    pub iterations: usize,
+    /// True when the move came from the 1-ply `greedy` path.
+    pub fallback: bool,
+}
+
 /// Per-game statistics.
 #[derive(Clone, Debug)]
 pub struct GameReport {
@@ -43,6 +58,8 @@ pub struct GameReport {
     pub actions: Vec<Action>,
     /// Surge burst sizes released in this game, in order.
     pub surge_releases: Vec<u32>,
+    /// Per-move search statistics, in turn order.
+    pub search_stats: Vec<SearchStats>,
     /// Deepest garbage queue seen (rows). The failure mode the M5 provisional
     /// losses share is the queue building to 8-12 rows and then landing in
     /// two waves, so this is the diagnostic that matters.
@@ -150,6 +167,7 @@ pub fn play_game_with_setup(
         think_times: Vec::new(),
         actions: Vec::new(),
         surge_releases: Vec::new(),
+        search_stats: Vec::new(),
         max_pending: 0,
         heights: Vec::new(),
     };
@@ -189,6 +207,13 @@ pub fn play_game_with_setup(
                 break;
             };
             report.think_times.push(start.elapsed());
+            report.search_stats.push(SearchStats {
+                depth: result.depth,
+                width: result.width,
+                nodes: result.nodes,
+                iterations: result.iterations,
+                fallback: result.fallback,
+            });
             (
                 result.best.hold,
                 result.best.placement,
