@@ -1317,12 +1317,14 @@ exact movegen の実装を本書と突き合わせた結果。**`main`(core `08e
 1. **§2.2 の「共有 7-bag」→「プレイヤーごとの袋(同一 `piece_seed`)」**(protocol v1.1)。共有袋だと hold が列に影響せず、TETR.IO より hold が強くなる。
 2. **§6.1 の「同一 turn で両者トップアウト → 引き分け」は到達不能**(protocol v1.2)。先に死んだ側で打ち切るため。実装の「即終了・相手の勝ち」に統一。
 
-**残るリスク・未追随(2 件)**:
+**解消済み・残件**:
 
-| 種別 | 内容 | 対応 |
+| 種別 | 内容 | 状態 |
 |---|---|---|
-| リスク | **movegen の二重実装**。`crates/arena/src/movegen.rs` が `crates/bot` の BFS を独立実装している(bot 未統合のため)。片方だけ直すと**合法手集合がずれ、正当な着手が拒否される** — §4.3 の FRONT 表バグと同じ構造 | bot 統合後に `(cells, spin)` の**完全一致テストを恒久化**する。差し替え後も残す |
-| 到達不能(仕様として明記) | **空の候補の 2 段判定**(protocol §7)。`NoMoves`(レフェリーの movegen にも合法手が無い)は**実戦では到達しない** — 生きている active は定義上 spawn から到達可能なので movegen は必ず 1 個以上返す。実装は防御分岐として保持(`c50397d`) | 対応済み。テストは構成できないので、コードに理由コメントを残す扱い(§6.1 の同時トップアウトと同じ) |
+| ~~リスク~~ **解消** | **movegen の二重実装**。以前は `crates/arena/src/movegen.rs` が `crates/bot` の BFS を独立実装していた(片方だけ直すと合法手集合がずれ、正当な着手が拒否される — §4.3 の FRONT 表バグと同じ構造) | **`f1c2e79` で一本化**。arena の movegen は `intetrigence_bot::movegen` への薄いアダプタになり、BFS は 1 実装だけ。`crates/arena/tests/movegen_crosscheck.rs` が **`(sorted cells, spin)` の集合一致**を恒久的に検証する(ドリフト検出器) |
+| 到達不能(仕様として明記) | **空の候補の 2 段判定**(protocol §7)。`NoMoves` は**実戦では到達しない** — 生きている active は定義上 spawn から到達可能なので movegen は必ず 1 個以上返す | 実装は防御分岐として保持(`c50397d`)。テストは構成できないので理由コメントで残す(§6.1 の同時トップアウトと同じ) |
+| 解消 | **`vision` 判定**(protocol §7.1.2)。当初の「スタック上端 >= 可視高」だけでは 9 件以上を `other` に誤分類した | protocol **v1.9** で 3 条件に修正。`045c66f` で実装 |
+| 解消 | **`notes` のハードコード**(M0 の文言が M2 にも出ていた) | `b46eba5` で `MatchConfig.notes` に。M2 の summary も再生成済み |
 
 ### 12.6 attax 現行版との差分(レフェリー設計上の注意)
 
@@ -1374,7 +1376,22 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 - `vision` forfeit 勝ちがある場合、**「フル視野相手の勝率」を主張してはならない**
 - フル視野相手の推定は `TopOut` 決着のみを別掲し、n と CI を併記して「参考値」と明記
 
-**エビデンス側の不備(要修正)**: `scripts/evidence/m2-tuning/summary.json` の `notes` が **M0 の文言のままハードコード**されており、「the intetrigence side is the in-process M0 baseline stand-in, not the real bot」と書かれている。M2 は**本物の bot**(`think_median_ms = 96.9`、`--ms 100`)で走っているので、この注記は**事実と異なる**。`crates/arena/src/harness.rs` の `notes` が固定文字列であることが原因。最終レポートの前に必ず直すこと。
+**エビデンス側の不備(修正済み)**: 以前の `scripts/evidence/m2-tuning/summary.json` の `notes` が **M0 の文言のままハードコード**されており、「the intetrigence side is the in-process M0 baseline stand-in, not the real bot」と書かれていた。M2 は本物の bot(`think_median_ms = 96.9`、`--ms 100`)で走っているので事実と異なっていた。`MatchConfig.notes` をマッチごとに渡す形に修正され(`b46eba5`)、M2 の summary も再生成済み。
+
+**`vision` 判定の修正(protocol v1.9)**: 当初の「スタック上端 >= 可視高」だけでは**足りない**ことが実測で判明した。M2 の forfeit は「active ピースがゴミで隠しバッファ(行 20+)に押し上げられ、アダプタが 20 行グリッドの上端に置いてスタックと重なる」ケースが大半で、**スタック上端は 18 など 20 未満**だった。protocol v1.9 で 3 条件(スタック上端 / active の最下セル行 / 可視行に収まる合法配置の不在)に修正。条件 1 のみだと 9 件以上が `other`(= 無効)に誤分類される。
+
+**再実行後の M2 内訳**(`045c66f` / `46c2c5f` / `b46eba5`):
+
+| 項目 | 値 |
+|---|---|
+| 勝敗 | **18 勝 2 敗 0 分**(90.0%、Wilson 69.9–97.2%) |
+| 勝ち | TopOut 0 / **forfeit-vision 18** / forfeit-other 0 |
+| 負け | **TopOut 2**(9006-A downstack、9010-A buried)、forfeit 0、turncap 0 |
+| 非 forfeit ゲーム | **0 勝 2 敗** |
+| attack/piece | 1.000 vs 0.876 |
+| 受信ゴミ/ゲーム | 72.0 vs 105.0 |
+| think median | 97.1 ms vs 37.0 ms(200 ms 超 0) |
+| 採点不一致 | intetrigence 0/0、attax spin 78 / same-spin attack 0 |
 
 ## 13. 改訂履歴
 
@@ -1394,3 +1411,5 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.8 | 2026-11-13 | §12.5 の残件を更新。movegen 二重実装に加えて、**空の候補の 2 段判定(protocol §7 / v1.6)が未追随**であることを記録。 |
 | v1.3.9 | 2026-11-13 | §12.5 の「空の候補の 2 段判定」を**未追随 → 到達不能(実装済み)**に更新(harness-dev `c50397d`)。`NoMoves` が到達しない証明を protocol §7 に追加。 |
 | v1.3.10 | 2026-11-13 | §12.7 を追加。M2 ゲートの内訳(18 forfeit 勝ち / 2 top-out 負け)と、`summary.json` の `notes` が M0 の文言のままハードコードされている不備を記録。扱いは protocol §7.1(v1.8)で決定。 |
+| v1.3.11 | 2026-11-13 | §12.7 を更新。`notes` のハードコードを修正済みに。`vision` 判定を protocol v1.9 の 3 条件に追随(スタック上端だけでは 9 件以上を誤分類)。再実行後の M2 内訳を反映。 |
+| v1.3.12 | 2026-11-13 | §12.5 を更新。movegen の二重実装を**解消済み**に(`f1c2e79` で `intetrigence_bot::movegen` に一本化、`movegen_crosscheck.rs` が `(cells, spin)` の集合一致を恒久検証)。`vision` 判定と `notes` の修正も解消済みに。 |
