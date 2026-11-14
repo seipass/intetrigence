@@ -116,8 +116,10 @@ enum End {
         loser: usize,
     },
     /// No legal placement with the current piece or hold (protocol v1.6 §7).
-    /// Recorded as a top-out with an explanatory detail.
+    /// Not an S2 rule: a live active piece is reachable from its spawn, so this
+    /// branch is defensive and unreachable. Recorded as unresolved (no winner).
     Stuck {
+        #[allow(dead_code)]
         loser: usize,
     },
     TurnCap,
@@ -351,10 +353,15 @@ pub fn run_round(
     let end = end.unwrap_or(End::TurnCap);
     let (winner, reason, detail, forfeit_cause) = match &end {
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
-        End::Stuck { loser } => (
-            Some(1 - loser),
+        // "No legal placement" is not an S2 rule: a live active piece is by
+        // definition reachable from its spawn, so this branch is defensive and
+        // unreachable. It is recorded as unresolved (no winner) rather than
+        // inventing a TopOut; the gate rejects any game that is not a TopOut
+        // decision, so a stuck game fails the round.
+        End::Stuck { loser: _ } => (
+            None,
             "Stuck".to_string(),
-            Some("no legal placement".to_string()),
+            Some("unresolved: no legal placement".to_string()),
             None,
         ),
         // A turn-cap is not a decision. TETR.IO has no "higher attack wins on
