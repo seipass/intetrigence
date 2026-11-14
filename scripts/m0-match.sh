@@ -29,6 +29,6 @@ rm -rf "$OUT_DIR"
 
 cargo run --release -p intetrigence-arena --bin arena -- match \
   --seeds "$SEEDS" --sheets A,B --turns "$TURNS" \
-  --attax "$ATTAX_DIR" --out "$OUT_DIR"
+  --attax "$ATTAX_DIR" --out "$OUT_DIR"   --note "M0 gate: plumbing / audit / replay proof. The intetrigence side is the in-process M0 baseline stand-in, not the real bot."
 
 cargo run --release -p intetrigence-arena --bin arena -- verify "$OUT_DIR"

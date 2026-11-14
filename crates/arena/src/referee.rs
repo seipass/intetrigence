@@ -24,8 +24,8 @@ use crate::audit::{
 };
 use crate::engine::{Engine, Sheet, board_hash};
 use crate::replay::{
-    BotRecord, GarbageRecord, HashRecord, Header, PlacementRecord, PlayerRecord, ReplayRecord,
-    ResultRecord, SCHEMA, TurnRecord, piece_name, spin_name,
+    BotRecord, ForfeitCause, GarbageRecord, HashRecord, Header, PlacementRecord, PlayerRecord,
+    ReplayRecord, ResultRecord, SCHEMA, TurnRecord, piece_name, spin_name,
 };
 
 #[derive(Clone, Debug)]
@@ -46,8 +46,8 @@ impl RoundConfig {
             sheet,
             turn_cap: 1000,
             frames_per_turn: 12,
-            rules: "docs/s2-spec.md@v1.3.9".into(),
-            protocol: "docs/s2-referee-protocol.md@v1.7".into(),
+            rules: "docs/s2-spec.md@v1.3.11".into(),
+            protocol: "docs/s2-referee-protocol.md@v1.9".into(),
             started_at: String::new(),
         }
     }
@@ -75,6 +75,7 @@ pub struct RoundOutcome {
     pub winner: Option<usize>,
     pub reason: String,
     pub detail: Option<String>,
+    pub forfeit_cause: Option<ForfeitCause>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: [PlayerSummary; 2],
@@ -118,6 +119,7 @@ enum End {
     Forfeit {
         slot: usize,
         detail: String,
+        cause: ForfeitCause,
     },
 }
 
@@ -176,6 +178,7 @@ pub fn run_round(
                     end = Some(End::Forfeit {
                         slot,
                         detail: error.to_string(),
+                        cause: ForfeitCause::Other,
                     });
                     push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
                     break 'turns;
@@ -192,9 +195,12 @@ pub fn run_round(
                 }
                 Err(error) => {
                     reachability_rejections += 1;
+                    let cause =
+                        classify_forfeit(&engine, slot, agents[slot].descriptor().visible_rows);
                     end = Some(End::Forfeit {
                         slot,
                         detail: error.to_string(),
+                        cause,
                     });
                     push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
                     break 'turns;
@@ -290,6 +296,7 @@ pub fn run_round(
                 end = Some(End::Forfeit {
                     slot,
                     detail: error.to_string(),
+                    cause: ForfeitCause::Other,
                 });
                 push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
                 break 'turns;
@@ -306,12 +313,13 @@ pub fn run_round(
     }
 
     let end = end.unwrap_or(End::TurnCap);
-    let (winner, reason, detail) = match &end {
-        End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None),
+    let (winner, reason, detail, forfeit_cause) = match &end {
+        End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
         End::Stuck { loser } => (
             Some(1 - loser),
             "TopOut".to_string(),
             Some("no legal placement".to_string()),
+            None,
         ),
         End::TurnCap => {
             let a = &engine.players[0];
@@ -331,11 +339,18 @@ pub fn run_round(
             } else {
                 None
             };
-            (winner, "TurnCap".to_string(), None)
+            (winner, "TurnCap".to_string(), None, None)
         }
-        End::Forfeit { slot, detail } => {
-            (Some(1 - slot), "Forfeit".to_string(), Some(detail.clone()))
-        }
+        End::Forfeit {
+            slot,
+            detail,
+            cause,
+        } => (
+            Some(1 - slot),
+            "Forfeit".to_string(),
+            Some(detail.clone()),
+            Some(*cause),
+        ),
     };
 
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
@@ -343,6 +358,7 @@ pub fn run_round(
         winner,
         reason: reason.clone(),
         detail: detail.clone(),
+        forfeit_cause,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.clone(),
@@ -352,6 +368,7 @@ pub fn run_round(
         winner: winner.map(|slot| slot as u8),
         reason,
         detail,
+        forfeit_cause,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.iter().map(player_record).collect(),
@@ -384,6 +401,7 @@ pub fn run_round(
         winner: winner.map(|slot| slot as u8),
         reason: outcome.reason.clone(),
         detail: outcome.detail.clone(),
+        forfeit_cause,
         turns: turns_played,
         totals: [
             crate::audit::PlayerTotals {
@@ -529,6 +547,7 @@ fn forfeit_report(
             winner: winner.map(|slot| slot as u8),
             reason: "Forfeit".to_string(),
             detail: Some(detail.clone()),
+            forfeit_cause: Some(ForfeitCause::Unknown),
             turns: 0,
             final_frame: 0,
             per_player: per_player.iter().map(player_record).collect(),
@@ -538,6 +557,7 @@ fn forfeit_report(
         winner,
         reason: "Forfeit".to_string(),
         detail: Some(detail.clone()),
+        forfeit_cause: Some(ForfeitCause::Unknown),
         turns: 0,
         final_frame: 0,
         per_player: per_player.clone(),
@@ -549,6 +569,7 @@ fn forfeit_report(
         winner: winner.map(|slot| slot as u8),
         reason: "Forfeit".to_string(),
         detail: Some(detail),
+        forfeit_cause: Some(ForfeitCause::Unknown),
         turns: 0,
         totals: [crate::audit::PlayerTotals::default(); 2],
         think: [ThinkStats::default(), ThinkStats::default()],
@@ -572,6 +593,54 @@ fn forfeit_report(
         records,
         audit,
         agent_audits: [AgentAudit::default(), AgentAudit::default()],
+    }
+}
+
+/// Classifies a forfeit (protocol v1.8 §7.1).
+///
+/// `Vision` when the bot's declared visible rows cannot contain any legal
+/// placement: the stack reaches the visible rows, or every legal placement uses
+/// the hidden buffer. `Other` when a legal placement exists entirely inside the
+/// bot's visible rows (its own movegen is broken). `Unknown` when the bot did
+/// not declare `visible_rows`.
+pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) -> ForfeitCause {
+    if visible_rows == 0 {
+        return ForfeitCause::Unknown;
+    }
+    let player = &engine.players[slot];
+    let Some(active) = player.game.active() else {
+        return ForfeitCause::Other;
+    };
+    // A piece entirely in the hidden buffer cannot be represented by the bot's
+    // visible rows: the adapter places it at the top of its grid, overlapping
+    // the stack, and its movegen returns nothing.
+    let lowest_cell = active.cells().iter().map(|&(_, y)| y).min().unwrap_or(0);
+    if lowest_cell as u32 >= visible_rows {
+        return ForfeitCause::Vision;
+    }
+    let board = player.game.board();
+    let stack_top = (0..intetrigence_core::Board::HEIGHT)
+        .rev()
+        .find(|&y| board.row(y) != 0);
+    if let Some(top) = stack_top {
+        if top as u32 >= visible_rows {
+            return ForfeitCause::Vision;
+        }
+    }
+    let moves = crate::movegen::generate(board, active, false);
+    if moves.is_empty() {
+        return ForfeitCause::Other;
+    }
+    let any_visible = moves.placements().iter().any(|placement| {
+        placement
+            .cells
+            .iter()
+            .all(|&(_, y)| (y as u32) < visible_rows)
+    });
+    if any_visible {
+        ForfeitCause::Other
+    } else {
+        ForfeitCause::Vision
     }
 }
 

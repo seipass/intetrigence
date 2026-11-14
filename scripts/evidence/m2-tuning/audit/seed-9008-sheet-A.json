@@ -1,10 +1,11 @@
 {
   "seed": 9008,
   "sheet": "A",
-  "started_at": "unix:1794631582",
+  "started_at": "unix:1794633281",
   "winner": 0,
   "reason": "Forfeit",
   "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
   "turns": 243,
   "totals": [
     {
@@ -23,20 +24,20 @@
   "think": [
     {
       "count": 243,
-      "median_ms": 96.941,
-      "p95_ms": 98.613,
-      "p99_ms": 99.374,
-      "max_ms": 99.578,
-      "mean_ms": 97.077,
+      "median_ms": 97.01,
+      "p95_ms": 98.831,
+      "p99_ms": 99.417,
+      "max_ms": 99.607,
+      "mean_ms": 97.138,
       "over_budget": 0
     },
     {
       "count": 243,
-      "median_ms": 29.82,
-      "p95_ms": 36.76,
-      "p99_ms": 38.451,
-      "max_ms": 39.906,
-      "mean_ms": 29.911,
+      "median_ms": 36.53,
+      "p95_ms": 46.307,
+      "p99_ms": 49.8,
+      "max_ms": 50.73,
+      "mean_ms": 36.508,
       "over_budget": 0
     }
   ],
@@ -289,10 +290,10 @@
     "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
     "bun_version": "1.4.0",
     "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
-    "decision_log": "scripts/evidence/m2-tuning\\logs\\seed-9008-sheet-A-attax.jsonl",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m2-tuning\\logs\\seed-9008-sheet-A-attax.jsonl",
     "decisions_logged": 243,
     "nodes_total": 2444440,
-    "extra_ms_total": 7096.0,
+    "extra_ms_total": 8679.0,
     "suggestions_with_stats": 243,
     "cells_above_row20": true,
     "hold_matches": 242,
@@ -302,13 +303,14 @@
     {
       "name": "intetrigence",
       "version": "0.1.0",
-      "commit": "f1c2e79",
+      "commit": "045c66f",
       "args": [
         "--ms",
         "100",
         "--threads",
         "8"
-      ]
+      ],
+      "visible_rows": 40
     },
     {
       "name": "Attax",
@@ -317,7 +319,8 @@
       "args": [
         "bun",
         "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
-      ]
+      ],
+      "visible_rows": 20
     }
   ],
   "replay": "replays/seed-9008-sheet-A.jsonl",

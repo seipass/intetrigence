@@ -132,6 +132,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--threads: {error}"))?;
                 index += 2;
             }
+            "--note" => {
+                config.notes.push(value(1)?);
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -252,17 +256,36 @@ fn cmd_verify(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_report(args: &[String]) -> Result<(), String> {
-    let dir = args
-        .first()
-        .ok_or_else(|| "report needs a match directory".to_string())?;
-    let dir = Path::new(dir);
-    let audits = load_audits(dir)?;
+    let mut dir: Option<PathBuf> = None;
+    let mut notes = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--note" => {
+                notes.push(
+                    args.get(index + 1)
+                        .cloned()
+                        .ok_or_else(|| "--note needs a value".to_string())?,
+                );
+                index += 2;
+            }
+            other => {
+                dir = Some(PathBuf::from(other));
+                index += 1;
+            }
+        }
+    }
+    let dir = dir.ok_or_else(|| "report needs a match directory".to_string())?;
+    if notes.is_empty() {
+        notes.push("The intetrigence side is the bot recorded in each replay header.".into());
+    }
+    let audits = load_audits(&dir)?;
     if audits.is_empty() {
         return Err(format!("no audits under {}", dir.join("audit").display()));
     }
-    let summary = summarize(&audits);
+    let summary = summarize(&audits, notes);
     summary
-        .write(dir)
+        .write(&dir)
         .map_err(|error| format!("write summary: {error}"))?;
     println!(
         "{} games: wins {} losses {} draws {} forfeits {}, verified {}/{}",

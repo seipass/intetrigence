@@ -64,6 +64,7 @@ impl TbpAgent {
             name: "tbp-bot".into(),
             version: None,
             commit: config.commit.clone(),
+            visible_rows: 20,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());

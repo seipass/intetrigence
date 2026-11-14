@@ -23,6 +23,10 @@ pub struct BotDescriptor {
     pub version: Option<String>,
     pub commit: Option<String>,
     pub args: Vec<String>,
+    /// Rows the bot can actually see (attax = 20, intetrigence = 40). Used to
+    /// classify a forfeit as `vision` when the empty suggestion is explained by
+    /// the hidden buffer (protocol v1.8 §7.1).
+    pub visible_rows: u32,
 }
 
 /// One candidate placement, identified by its absolute cell set.

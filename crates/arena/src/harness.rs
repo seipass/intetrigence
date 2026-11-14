@@ -67,7 +67,11 @@ pub struct MatchConfig {
     pub rules: String,
     pub protocol: String,
     /// Slot 0 bot.
+    /// Slot 0 bot.
     pub bot: BotChoice,
+    /// Notes written into the summary. Set per match so the M0 plumbing run and
+    /// the M2 real-bot run cannot inherit each other's wording.
+    pub notes: Vec<String>,
 }
 
 impl MatchConfig {
@@ -80,9 +84,10 @@ impl MatchConfig {
             out_dir: out_dir.into(),
             attax: None,
             started_at: now_stamp(),
-            rules: version_string("docs/s2-spec.md", "v1.3.9"),
-            protocol: version_string("docs/s2-referee-protocol.md", "v1.7"),
+            rules: version_string("docs/s2-spec.md", "v1.3.11"),
+            protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
+            notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
         }
     }
 }
@@ -148,6 +153,8 @@ pub struct GameSummary {
     pub sheet: String,
     pub winner: Option<u8>,
     pub reason: String,
+    /// `vision` | `other` | `unknown` for Forfeit results.
+    pub forfeit_cause: Option<String>,
     pub turns: u32,
     pub verified: bool,
     pub verify_mismatches: usize,
@@ -194,6 +201,7 @@ pub struct BotAggregate {
     pub think_over_budget: u32,
     pub attack_per_piece: f64,
     pub received_per_game: f64,
+    pub visible_rows: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -205,6 +213,13 @@ pub struct MatchSummary {
     pub losses: u32,
     pub draws: u32,
     pub forfeits: u32,
+    /// Win/loss breakdown (protocol v1.8 §7.1).
+    pub wins_topout: u32,
+    pub wins_forfeit_vision: u32,
+    pub wins_forfeit_other: u32,
+    pub losses_topout: u32,
+    pub losses_forfeit: u32,
+    pub turncap: u32,
     pub win_rate: f64,
     pub wilson_low: f64,
     pub wilson_high: f64,
@@ -247,6 +262,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         sheet: audit.sheet.clone(),
         winner: audit.winner,
         reason: audit.reason.clone(),
+        forfeit_cause: audit.forfeit_cause.map(|cause| cause.as_str().to_string()),
         turns: audit.turns,
         verified: audit.verify.ok,
         verify_mismatches: audit.verify.mismatches.len(),
@@ -287,12 +303,41 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
 }
 
 /// Aggregates audit records into the match summary (used by `arena report`).
-pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
+pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
     let games: Vec<GameSummary> = audits.iter().map(game_summary).collect();
     let wins = games.iter().filter(|game| game.winner == Some(0)).count() as u32;
     let losses = games.iter().filter(|game| game.winner == Some(1)).count() as u32;
     let draws = games.iter().filter(|game| game.winner.is_none()).count() as u32;
     let forfeits = games.iter().filter(|game| game.reason == "Forfeit").count() as u32;
+    let wins_topout = games
+        .iter()
+        .filter(|game| game.winner == Some(0) && game.reason == "TopOut")
+        .count() as u32;
+    let wins_forfeit_vision = games
+        .iter()
+        .filter(|game| {
+            game.winner == Some(0)
+                && game.reason == "Forfeit"
+                && game.forfeit_cause.as_deref() == Some("vision")
+        })
+        .count() as u32;
+    let wins_forfeit_other = games
+        .iter()
+        .filter(|game| {
+            game.winner == Some(0)
+                && game.reason == "Forfeit"
+                && game.forfeit_cause.as_deref() != Some("vision")
+        })
+        .count() as u32;
+    let losses_topout = games
+        .iter()
+        .filter(|game| game.winner == Some(1) && game.reason == "TopOut")
+        .count() as u32;
+    let losses_forfeit = games
+        .iter()
+        .filter(|game| game.winner == Some(1) && game.reason == "Forfeit")
+        .count() as u32;
+    let turncap = games.iter().filter(|game| game.reason == "TurnCap").count() as u32;
     let verified = games.iter().filter(|game| game.verified).count() as u32;
     let (wilson_low, wilson_high) = wilson_interval(wins, games.len() as u32, 1.959_964);
     let attax = audits
@@ -361,6 +406,10 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
                 .round()
                 / 1000.0
         },
+        visible_rows: audits
+            .first()
+            .map(|audit| audit.bots[slot].visible_rows)
+            .unwrap_or(0),
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
@@ -373,6 +422,12 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
         losses,
         draws,
         forfeits,
+        wins_topout,
+        wins_forfeit_vision,
+        wins_forfeit_other,
+        losses_topout,
+        losses_forfeit,
+        turncap,
         win_rate: rate(wins, games.len() as u32),
         wilson_low: (wilson_low * 10000.0).round() / 10000.0,
         wilson_high: (wilson_high * 10000.0).round() / 10000.0,
@@ -380,14 +435,7 @@ pub fn summarize(audits: &[GameAudit]) -> MatchSummary {
         verify_failures: games.len() as u32 - verified,
         attax,
         bots,
-        notes: vec![
-            "M0 gate: plumbing / audit / replay proof. The intetrigence side is the in-process \
-             M0 baseline stand-in, not the real bot (crates/bot is still a skeleton)."
-                .into(),
-            "attax at this commit is guideline-scored and has a 20-row vision limit, so the \
-             win/loss numbers are reference only."
-                .into(),
-        ],
+        notes,
     }
 }
 
@@ -421,6 +469,15 @@ impl MatchSummary {
             self.games.len(),
             self.verify_failures
         ));
+        text.push_str(&format!(
+            "- win breakdown: TopOut {}, forfeit-vision {}, forfeit-other {}; losses: TopOut {}, forfeit {}; turn-cap games {}\n",
+            self.wins_topout,
+            self.wins_forfeit_vision,
+            self.wins_forfeit_other,
+            self.losses_topout,
+            self.losses_forfeit,
+            self.turncap,
+        ));
         if let Some(attax) = &self.attax {
             text.push_str(&format!(
                 "- attax: {} {} commit {} bun {}\n",
@@ -433,9 +490,9 @@ impl MatchSummary {
         }
         text.push_str("\n## Games\n\n");
         text.push_str(
-            "| seed | sheet | winner | reason | turns | verified | think median (ms) | think p95 (ms) | first-choice | spin match | start resends |\n",
+            "| seed | sheet | winner | reason | forfeit cause | turns | verified | think median (ms) | think p95 (ms) | first-choice | spin match | start resends |\n",
         );
-        text.push_str("|---|---|---|---|---|---|---|---|---|---|---|\n");
+        text.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for game in &self.games {
             let winner = match game.winner {
                 Some(0) => "intetrigence".to_string(),
@@ -444,11 +501,12 @@ impl MatchSummary {
                 None => "draw".to_string(),
             };
             text.push_str(&format!(
-                "| {} | {} | {} | {} | {} | {} | {:.1} / {:.1} | {:.1} / {:.1} | {:.2} / {:.2} | {:.2} / {:.2} | {} |\n",
+                "| {} | {} | {} | {} | {} | {} | {} | {:.1} / {:.1} | {:.1} / {:.1} | {:.2} / {:.2} | {:.2} / {:.2} | {} |\n",
                 game.seed,
                 game.sheet,
                 winner,
                 game.reason,
+                game.forfeit_cause.as_deref().unwrap_or("-"),
                 game.turns,
                 if game.verified { "yes" } else { "NO" },
                 game.think_median_ms[0],
@@ -464,14 +522,15 @@ impl MatchSummary {
         }
         text.push_str("\n## Per-bot audit\n\n");
         text.push_str(
-            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
+            "| slot | bot | visible rows | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
         );
-        text.push_str("|---|---|---|---|---|---|---|---|\n");
+        text.push_str("|---|---|---|---|---|---|---|---|---|\n");
         for bot in &self.bots {
             text.push_str(&format!(
-                "| {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
+                "| {} | {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
                 bot.slot,
                 bot.name,
+                bot.visible_rows,
                 bot.placements,
                 bot.spin_mismatches,
                 bot.spin_checked,
@@ -575,7 +634,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         }
     }
 
-    let summary = summarize(&audits);
+    let summary = summarize(&audits, config.notes.clone());
     summary
         .write(&config.out_dir)
         .map_err(|error| format!("write summary: {error}"))?;
@@ -647,6 +706,12 @@ mod tests {
             losses: 0,
             draws: 0,
             forfeits: 0,
+            wins_topout: 0,
+            wins_forfeit_vision: 0,
+            wins_forfeit_other: 0,
+            losses_topout: 0,
+            losses_forfeit: 0,
+            turncap: 0,
             win_rate: 0.0,
             wilson_low: 0.0,
             wilson_high: 1.0,
@@ -666,6 +731,7 @@ mod tests {
                     think_over_budget: 0,
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
+                    visible_rows: 0,
                 },
                 BotAggregate {
                     slot: 1,
@@ -679,6 +745,7 @@ mod tests {
                     think_over_budget: 0,
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
+                    visible_rows: 0,
                 },
             ],
             notes: vec!["note".into()],

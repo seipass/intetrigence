@@ -219,6 +219,8 @@ pub struct GameAudit {
     pub winner: Option<u8>,
     pub reason: String,
     pub detail: Option<String>,
+    /// Forfeit cause (protocol v1.8 §7.1); `None` for non-forfeit results.
+    pub forfeit_cause: Option<crate::replay::ForfeitCause>,
     pub turns: u32,
     pub totals: [PlayerTotals; 2],
     pub think: [ThinkStats; 2],

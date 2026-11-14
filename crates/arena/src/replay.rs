@@ -53,6 +53,30 @@ pub struct Header {
     pub preview: usize,
 }
 
+/// Why a bot forfeited (protocol v1.8 §7.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ForfeitCause {
+    /// The bot's visible rows are full: every legal placement uses the hidden
+    /// buffer, which the bot cannot see.
+    Vision,
+    /// The referee had a legal placement inside the bot's visible rows, so the
+    /// bot's own movegen is broken. The game is invalid and must be rerun.
+    Other,
+    /// The bot's `visible_rows` was not declared (or the round never started).
+    Unknown,
+}
+
+impl ForfeitCause {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ForfeitCause::Vision => "vision",
+            ForfeitCause::Other => "other",
+            ForfeitCause::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BotRecord {
     pub name: String,
@@ -61,12 +85,14 @@ pub struct BotRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<String>,
     pub args: Vec<String>,
+    pub visible_rows: u32,
 }
 
 impl From<&BotDescriptor> for BotRecord {
     fn from(descriptor: &BotDescriptor) -> Self {
         Self {
             name: descriptor.name.clone(),
+            visible_rows: descriptor.visible_rows,
             version: descriptor.version.clone(),
             commit: descriptor.commit.clone(),
             args: descriptor.args.clone(),
@@ -138,6 +164,9 @@ pub struct ResultRecord {
     pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Set only for `Forfeit` (protocol v1.8 §7.1).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forfeit_cause: Option<ForfeitCause>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: Vec<PlayerRecord>,
@@ -272,6 +301,18 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     };
     let sheet = Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
+    let visible_rows = [
+        header
+            .bots
+            .get("0")
+            .map(|bot| bot.visible_rows)
+            .unwrap_or(0),
+        header
+            .bots
+            .get("1")
+            .map(|bot| bot.visible_rows)
+            .unwrap_or(0),
+    ];
     let mut engine = Engine::new(header.seed, sheet, header.frames_per_turn);
     let mut report = VerifyReport {
         seed: header.seed,
@@ -453,7 +494,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
                 }
             }
             ReplayRecord::Result(result) => {
-                verify_result(&mut engine, result, &mut report);
+                verify_result(&mut engine, result, visible_rows, &mut report);
                 index += 1;
             }
             other => {
@@ -469,7 +510,12 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     Ok(report)
 }
 
-fn verify_result(engine: &mut Engine, result: &ResultRecord, report: &mut VerifyReport) {
+fn verify_result(
+    engine: &mut Engine,
+    result: &ResultRecord,
+    visible_rows: [u32; 2],
+    report: &mut VerifyReport,
+) {
     let over: Vec<usize> = (0..2)
         .filter(|&slot| engine.players[slot].game.is_over())
         .collect();
@@ -522,6 +568,30 @@ fn verify_result(engine: &mut Engine, result: &ResultRecord, report: &mut Verify
             "result turns: recorded {}, recomputed {}",
             result.turns, report.turns
         ));
+    }
+    if result.reason == "Forfeit" {
+        let candidate_failure = result
+            .detail
+            .as_deref()
+            .unwrap_or("")
+            .contains("candidates is reachable");
+        if candidate_failure {
+            if let Some(recorded) = result.forfeit_cause {
+                if recorded != ForfeitCause::Unknown {
+                    if let Some(loser) = result.winner.map(|winner| 1 - winner as usize) {
+                        let actual =
+                            crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
+                        if actual != recorded {
+                            report.mismatches.push(format!(
+                                "result forfeit_cause: recorded {}, recomputed {}",
+                                recorded.as_str(),
+                                actual.as_str()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
     if result.reason != "Forfeit" && result.final_frame != engine.frame {
         report.mismatches.push(format!(
