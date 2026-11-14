@@ -512,6 +512,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.notes = spec.notes.clone();
             config.resume = spec.resume;
             config.weights_note = spec.weights_note.clone();
+            config.build_commit = spec.build_commit.clone();
             match &opponent.kind {
                 OpponentKind::Attax {
                     dir,

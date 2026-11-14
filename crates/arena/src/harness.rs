@@ -138,6 +138,11 @@ pub struct MatchConfig {
     pub notes: Vec<String>,
     /// Weight overrides applied to the search, recorded in the replay header.
     pub weights_note: Vec<String>,
+    /// Build commit recorded in every replay header. Captured once at the
+    /// start of the match: the repository HEAD can move while a long match is
+    /// running, and the recorded commit must be the binary's build, not the
+    /// HEAD at the time of each game.
+    pub build_commit: Option<String>,
 }
 
 impl MatchConfig {
@@ -159,6 +164,7 @@ impl MatchConfig {
             resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
             weights_note: Vec::new(),
+            build_commit: None,
         }
     }
 }
@@ -1117,6 +1123,7 @@ fn check_opponent_log(
 }
 
 pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
+    let build_commit = config.build_commit.clone().or_else(git_short_head);
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
@@ -1165,7 +1172,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 BotChoice::Search(search) => {
                     let mut bot_config =
                         crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
-                    bot_config.commit = git_short_head();
+                    bot_config.commit = build_commit.clone();
                     bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
                 }
