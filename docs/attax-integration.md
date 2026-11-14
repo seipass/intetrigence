@@ -642,3 +642,11 @@ summary: 10 games, wins 8 losses 2 draws 0 forfeits 0, verified 10/10
 - パッチ適用後の作業ツリーは 40 行に見えるが、それは `adapters/attax-vision-40.patch` の結果。
 - `visible_rows` は **upstream では 20、パッチ適用後は 40**。パッチとセットで宣言を上げる。
 - パッチ SHA-256: `e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70`(68 行)。
+
+## 14. 180° capability
+
+- attax の movegen は **CW/CCW のみ**(`src/ai/bot/movegen.ts:198` の `for (let dir = 0; dir < 2; dir += 1)`)。
+  **180° の kick 遷移は無い**。
+- したがって **`supports_180 = false`**。レフェリーの S2 180° でしか到達できない配置は attax には出せない。
+- レフェリー側は `supports_180` を尊重し、180° 限定の合法手を「ボットの capability 限界」として扱う必要がある
+  (harness-dev に依頼済み)。

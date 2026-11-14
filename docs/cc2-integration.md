@@ -387,3 +387,25 @@ round 0: cc2 2-0-0 PASSED
 - 以前の forfeit(turn 30〜46)は、`bag_state` のずれ + `insert_garbage` の active 位置上書き + CC2 の hold バグの
   3 つが重なったもの。3 つとも修正済み。
 - エビデンス: `scripts/evidence/cc2-smoke/{summary.json,audit/}`
+
+## 13. 180° capability
+
+- CC2 の movegen は 4 回転の**休息配置**を生成するが、kick は **SRS 90° のみ**(`src/movegen.rs` の
+  `Rotation::North/East/South/West` + 90° kick table)。**S2 180° の kick 遷移は無い**。
+- したがって **`supports_180 = false`**。レフェリーの 180° 限定合法手は CC2 には出せない。
+- スモーク(seed 9001–9010、sheet A、1000 turn)では **forfeit 0 / no-contest 0 / unresolved 0**、verified 10/10。
+  3 敗は TopOut(CC2 勝ち)で、接続の問題ではない。
+
+### 12.1 10 ゲームスモーク(2026-11-15)
+
+seed 9001–9010、sheet A、1000 turn、`--ms 100`/8t。
+
+```text
+summary: 10 games, wins 7 losses 3 unresolved 0 no-contest 0, verified 10/10
+```
+
+- **forfeit 0 / no-contest 0 / unresolved 0**。3 敗はすべて TopOut(CC2 勝ち)。
+- 接続は透明 TBP シム(`--attax DIR` の `tbp/attax-tbp.ts` が CC2 バイナリを exec)経由。
+- エビデンス: `scripts/evidence/cc2-10/{summary.json,audit/}`
+- CC2 はネイティブの decision log を持たないため `measurement incomplete (opponent_log=false)` と表示される。
+  replay / audit は完全。

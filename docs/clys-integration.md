@@ -420,3 +420,23 @@ round 0: clys 1-1-0 (gate 2) FAILED — gate failed: 1 wins / 2 games
   および `bag_state` が袋境界で空になる問題の 2 つ。両方修正済み。
 - clys はフル 40 行視野で強く、intetrigence に対して 1-1。48/50 の達成は bot-dev の課題。
 - エビデンス: `scripts/evidence/clys-smoke/{summary.json,audit/}`
+
+## 13. 180° capability
+
+- clys の movegen は `SRS_LUT` の **90° kick のみ**(`core/move.cpp` の `expand`)。**S2 180° の kick 遷移は無い**。
+- したがって **`supports_180 = false`**。
+- スモーク(seed 9001–9010、sheet A、1000 turn)では **forfeit 0 / no-contest 0 / unresolved 0**、verified 10/10。
+  8 敗は TopOut(clys 勝ち)で、接続の問題ではない。clys はフル 40 行視野で強い。
+
+### 12.1 10 ゲームスモーク(2026-11-15)
+
+seed 9001–9010、sheet A、1000 turn、`--ms 100`/8t。
+
+```text
+summary: 10 games, wins 2 losses 8 unresolved 0 no-contest 0, verified 10/10
+```
+
+- **forfeit 0 / no-contest 0 / unresolved 0**。8 敗はすべて TopOut(clys 勝ち)。
+- clys はフル 40 行視野で強く、現状の intetrigence では 2-8。強度の課題。
+- エビデンス: `scripts/evidence/clys-10/{summary.json,audit/}`
+- clys はネイティブの decision log を持たないため `measurement incomplete (opponent_log=false)` と表示される。
