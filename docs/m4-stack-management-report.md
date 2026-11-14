@@ -63,10 +63,27 @@ Height improves, attack drops. That is the same trade the rejected
 same shape as above: attack advantage (506 vs 476, 707 vs 681), received
 advantage (150 vs 180, 234 vs 265), stack death.
 
+### Second attempt: a flatness term
+
+`flatness = max_height - median_height` prices a tower directly (bumpiness only
+sees adjacent steps, so a smooth tower is invisible to it). With weight -3 on
+the composite proxy:
+
+| seeds | mean height 150-250 | attack/piece |
+|---|---|---|
+| 1-12 | 6.92 -> **6.42** (-7.2%) | 0.765 -> 0.740 (-3.3%) |
+| 13-24 | 7.26 -> **6.91** (-4.8%) | 0.749 -> 0.728 (-2.8%) |
+
+The same trade as `DANGER_BASE` 10, which already failed on fresh seeds
+(18-2, non-forfeit 2/4). Not shipped, and the fresh-seed run was not repeated
+for it: two independent height-penalty variants producing the same trade is
+enough evidence that the direction is wrong.
+
 ## 3. Conclusion
 
-Lowering the danger threshold trades attack for height and does not fix the
-losses. The remaining gap is **stacking style**: attax builds attack from a
+Three height-penalty variants (`garbage_buried`, `DANGER_BASE` 10, `flatness`)
+all trade attack for height, and the one that reached fresh seeds lost. Lowering
+the danger threshold trades attack for height and does not fix the losses. The remaining gap is **stacking style**: attax builds attack from a
 flat stack (final height 3-5) while we build it by stacking up, so over 500-800
 turn games our stack is the thing that kills us. Closing that needs an
 evaluation that prices "keep the stack flat while attacking" directly — for
