@@ -233,26 +233,6 @@ impl Agent for TbpAgent {
     }
 
     fn suggest(&mut self, view: &View) -> Result<Suggestion, AgentError> {
-<<<<<<< HEAD
-        // Opt-in board dump for desync diagnosis: the referee's board at the
-        // moment of `suggest`, in the same 40-row `|`-joined format as the
-        // attax adapter's `ATTAX_TBP_BOARD_LOG`. Default off.
-        if let Ok(path) = std::env::var("TBP_BOARD_LOG") {
-            let mut rows = Vec::with_capacity(intetrigence_core::Board::HEIGHT);
-            for y in 0..intetrigence_core::Board::HEIGHT {
-                let bits = view.board.row(y);
-                rows.push(
-                    (0..intetrigence_core::Board::WIDTH)
-                        .map(|x| if bits & (1 << x) != 0 { '1' } else { '0' })
-                        .collect::<String>(),
-                );
-            }
-            let line = serde_json::json!({
-                "turn": view.turn,
-                "board": rows.join("|"),
-                "hold": format!("{:?}", view.hold),
-                "active": format!("{:?}", view.active.kind),
-=======
         // Opt-in referee board dump for adapter desync diagnosis. The attax
         // adapter writes its own board with `ATTAX_TBP_BOARD_LOG`; both are
         // one line per `suggest`, row 0 = bottom.
@@ -276,7 +256,6 @@ impl Agent for TbpAgent {
                     "x": view.active.x,
                     "y": view.active.y,
                 },
->>>>>>> 7ac1499
                 "combo": view.combo,
                 "b2b": view.b2b_streak,
             });
@@ -285,10 +264,7 @@ impl Agent for TbpAgent {
                 .append(true)
                 .open(&path)
             {
-<<<<<<< HEAD
-=======
                 use std::io::Write;
->>>>>>> 7ac1499
                 let _ = writeln!(file, "{line}");
             }
         }
