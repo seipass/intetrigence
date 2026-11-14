@@ -314,15 +314,16 @@ impl std::fmt::Display for AdoptError {
 impl std::error::Error for AdoptError {}
 
 /// Match profile (protocol v1.11 §1.3).
-/// Match profile (protocol v1.11 §1.3).
 ///
 /// `Official` is the empty start board and the only profile usable for final
-/// claims. `DefenseStress` starts both players with deterministic garbage rows
-/// so M3 can measure downstacking; it is diagnostic only.
+/// claims. `DefenseStress` starts both players with deterministic garbage rows;
+/// `GarbagePressure` injects garbage packets every `interval` turns. Both are
+/// diagnostic only.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Profile {
     Official,
     DefenseStress { rows: u8 },
+    GarbagePressure { interval: u32, rows: u32 },
 }
 
 impl Profile {
@@ -331,9 +332,22 @@ impl Profile {
     }
 
     pub fn parse(text: &str) -> Option<Self> {
-        match text.trim() {
+        let text = text.trim();
+        let mut parts = text.split(':');
+        match parts.next()? {
             "official" => Some(Profile::Official),
-            "defense-stress" => Some(Profile::DefenseStress { rows: 12 }),
+            "defense-stress" => {
+                let rows = match parts.next() {
+                    Some(value) => value.parse().ok()?,
+                    None => 12,
+                };
+                Some(Profile::DefenseStress { rows })
+            }
+            "garbage-pressure" => {
+                let interval = parts.next()?.parse().ok()?;
+                let rows = parts.next()?.parse().ok()?;
+                Some(Profile::GarbagePressure { interval, rows })
+            }
             _ => None,
         }
     }
@@ -342,18 +356,33 @@ impl Profile {
         match self {
             Profile::Official => "official".into(),
             Profile::DefenseStress { rows } => format!("defense-stress:{rows}"),
+            Profile::GarbagePressure { interval, rows } => {
+                format!("garbage-pressure:{interval}:{rows}")
+            }
         }
     }
 
     /// Deterministic start garbage, in insertion order (`holes[0]` ends up on
-    /// top). `Official` has none.
+    /// top). Only `DefenseStress` has any.
     pub fn start_garbage(self, seed: u64) -> Vec<u8> {
         match self {
-            Profile::Official => Vec::new(),
             Profile::DefenseStress { rows } => {
                 let mut rng = intetrigence_core::SplitMix64::new(seed ^ 0x5EED_5EED_5EED_5EED);
                 (0..rows).map(|_| rng.below(10) as u8).collect()
             }
+            Profile::Official | Profile::GarbagePressure { .. } => Vec::new(),
+        }
+    }
+
+    /// Rows to inject into both players at the start of `turn`, if any.
+    pub fn injection_amount(self, turn: u32) -> Option<u32> {
+        match self {
+            Profile::GarbagePressure { interval, rows }
+                if interval > 0 && turn > 0 && turn % interval == 0 =>
+            {
+                Some(rows)
+            }
+            _ => None,
         }
     }
 }

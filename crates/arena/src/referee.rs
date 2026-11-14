@@ -162,6 +162,7 @@ pub fn run_round(
     let mut indices: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
     let mut scoring: [ScoringAudit; 2] = [ScoringAudit::default(), ScoringAudit::default()];
     let mut reachability_rejections = 0u32;
+    let mut heights: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
 
     let mut end: Option<End> = None;
     let mut turns_played = 0u32;
@@ -170,6 +171,25 @@ pub fn run_round(
         engine.turn = t;
         engine.begin_turn();
         turns_played = t + 1;
+
+        // Diagnostic garbage pressure: inject a packet to both players at the
+        // start of the turn and record it before the turn record so the
+        // verifier replays the same injection order.
+        if let Some(rows) = config.profile.injection_amount(t) {
+            for slot in 0..2 {
+                engine.players[slot].garbage.receive(rows, engine.frame);
+                records.push(ReplayRecord::Garbage(GarbageRecord {
+                    t,
+                    from: 2,
+                    to: slot as u8,
+                    amount: rows,
+                    arrival_frame: engine.frame,
+                }));
+            }
+        }
+
+        heights[0].push(engine.players[0].game.board().height() as u32);
+        heights[1].push(engine.players[1].game.board().height() as u32);
 
         let mut turn_record = TurnRecord {
             t,
@@ -413,18 +433,24 @@ pub fn run_round(
         detail: outcome.detail.clone(),
         forfeit_cause,
         turns: turns_played,
+        heights: [
+            crate::audit::HeightStats::from_samples(&heights[0]),
+            crate::audit::HeightStats::from_samples(&heights[1]),
+        ],
         totals: [
             crate::audit::PlayerTotals {
                 sent_total: per_player[0].sent_total,
                 received_total: per_player[0].received_total,
                 attack_total: per_player[0].attack_total,
                 pieces_placed: per_player[0].pieces_placed,
+                lines_cleared: per_player[0].lines_cleared,
             },
             crate::audit::PlayerTotals {
                 sent_total: per_player[1].sent_total,
                 received_total: per_player[1].received_total,
                 attack_total: per_player[1].attack_total,
                 pieces_placed: per_player[1].pieces_placed,
+                lines_cleared: per_player[1].lines_cleared,
             },
         ],
         think: [
@@ -586,6 +612,7 @@ fn forfeit_report(
         forfeit_cause: Some(ForfeitCause::Unknown),
         turns: 0,
         totals: [crate::audit::PlayerTotals::default(); 2],
+        heights: [crate::audit::HeightStats::default(); 2],
         think: [ThinkStats::default(), ThinkStats::default()],
         first_choice: [FirstChoiceAudit::default(), FirstChoiceAudit::default()],
         scoring: [ScoringAudit::default(), ScoringAudit::default()],

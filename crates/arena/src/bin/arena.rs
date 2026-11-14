@@ -58,6 +58,9 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut threads = 8usize;
     let mut profile = "official".to_string();
     let mut start_rows = 12u8;
+    let mut interval = 8u32;
+    let mut pressure_rows = 4u32;
+    let mut self_play = false;
 
     let mut index = 0;
     while index < args.len() {
@@ -148,11 +151,27 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--start-rows: {error}"))?;
                 index += 2;
             }
+            "--interval" => {
+                interval = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--interval: {error}"))?;
+                index += 2;
+            }
+            "--pressure-rows" => {
+                pressure_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--pressure-rows: {error}"))?;
+                index += 2;
+            }
+            "--self-play" => {
+                self_play = true;
+                index += 1;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
 
-    if !no_attax {
+    if !no_attax && !self_play {
         let dir = attax.ok_or_else(|| "match needs --attax DIR or --no-attax".to_string())?;
         let entry = dir.join("tbp").join("attax-tbp.ts");
         if !entry.exists() {
@@ -176,9 +195,13 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     config.profile = match profile.as_str() {
         "official" => Profile::Official,
         "defense-stress" => Profile::DefenseStress { rows: start_rows },
+        "garbage-pressure" => Profile::GarbagePressure {
+            interval,
+            rows: pressure_rows,
+        },
         other => {
             return Err(format!(
-                "unknown --profile `{other}` (official|defense-stress)"
+                "unknown --profile `{other}` (official|defense-stress|garbage-pressure)"
             ));
         }
     };

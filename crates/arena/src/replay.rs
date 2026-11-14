@@ -21,7 +21,7 @@ use intetrigence_core::{PieceKind, Rotation, SpinType};
 use serde::{Deserialize, Serialize};
 
 use crate::agent::BotDescriptor;
-use crate::engine::{Engine, PlacementTarget, Sheet, board_hash};
+use crate::engine::{Engine, PlacementTarget, Profile, Sheet, board_hash};
 
 pub const SCHEMA: &str = "intetrigence/s2-replay/1";
 
@@ -319,6 +319,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             .map(|bot| bot.visible_rows)
             .unwrap_or(0),
     ];
+    let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
     let mut engine = Engine::with_start_garbage(
         header.seed,
         sheet,
@@ -334,6 +335,37 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     let mut index = 1;
     while index < records.len() {
         match &records[index] {
+            ReplayRecord::Garbage(garbage) if garbage.from == 2 => {
+                // Harness injection (garbage-pressure profile). It is recorded
+                // before the turn it applies to, so the verifier applies it at
+                // the same point.
+                if profile.injection_amount(garbage.t) != Some(garbage.amount) {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: profile {:?} does not inject {} rows",
+                        garbage.t, header.profile, garbage.amount
+                    ));
+                }
+                if garbage.to > 1 {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: bad target slot {}",
+                        garbage.t, garbage.to
+                    ));
+                }
+                if garbage.arrival_frame != u64::from(garbage.t) * header.frames_per_turn {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: arrival_frame {} != {}",
+                        garbage.t,
+                        garbage.arrival_frame,
+                        u64::from(garbage.t) * header.frames_per_turn
+                    ));
+                }
+                if garbage.to <= 1 {
+                    engine.players[garbage.to as usize]
+                        .garbage
+                        .receive(garbage.amount, garbage.arrival_frame);
+                }
+                index += 1;
+            }
             ReplayRecord::Turn(turn) => {
                 engine.turn = turn.t;
                 engine.begin_turn();
