@@ -173,6 +173,7 @@ pub fn run_round(
     let mut end: Option<End> = None;
     let mut turns_played = 0u32;
 
+    let mut search: [Vec<crate::audit::SearchTurn>; 2] = [Vec::new(), Vec::new()];
     'turns: for t in 0..config.turn_cap {
         engine.turn = t;
         engine.begin_turn();
@@ -220,6 +221,13 @@ pub fn run_round(
                 }
             };
             think[slot].push(suggestion.think_ms);
+            search[slot].push(crate::audit::SearchTurn {
+                turn: t,
+                depth: suggestion.depth,
+                width: suggestion.width,
+                nodes: suggestion.nodes,
+                fallback: suggestion.fallback,
+            });
 
             let adopted =
                 match engine.adopt(slot, &suggestion, agents[slot].descriptor().supports_180) {
@@ -492,6 +500,7 @@ pub fn run_round(
         queue_invariant_violations: agent_audits[1].queue_invariant_violations,
         bot_fallbacks: agent_audits[0].clutch_fallbacks,
         bot_nodes_total: agent_audits[0].nodes_total,
+        search,
     };
 
     Ok(RoundReport {
@@ -652,6 +661,7 @@ fn forfeit_report(
         queue_invariant_violations: 0,
         bot_fallbacks: 0,
         bot_nodes_total: 0,
+        search: [Vec::new(), Vec::new()],
     };
     for agent in agents.iter_mut() {
         let _ = agent.end_round();

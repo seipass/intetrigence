@@ -321,6 +321,9 @@ impl Agent for TbpAgent {
             think_ms,
             nodes,
             extra_ms,
+            depth: None,
+            width: None,
+            fallback: false,
         })
     }
 

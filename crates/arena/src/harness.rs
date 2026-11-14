@@ -304,6 +304,31 @@ pub fn now_stamp() -> String {
     format!("unix:{seconds}")
 }
 
+/// Per-game search statistics (protocol v1.31 §8.4.1).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SearchGameSummary {
+    pub turns: u32,
+    pub fallback_turns: u32,
+    #[serde(default)]
+    pub depth_median: Option<f64>,
+    #[serde(default)]
+    pub depth_p95: Option<f64>,
+    #[serde(default)]
+    pub depth_max: Option<u32>,
+    #[serde(default)]
+    pub width_median: Option<f64>,
+    #[serde(default)]
+    pub width_p95: Option<f64>,
+    #[serde(default)]
+    pub width_max: Option<u32>,
+    #[serde(default)]
+    pub nodes_median: Option<f64>,
+    #[serde(default)]
+    pub nodes_p95: Option<f64>,
+    #[serde(default)]
+    pub nodes_max: Option<u64>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GameSummary {
     pub seed: u64,
@@ -342,6 +367,9 @@ pub struct GameSummary {
     pub cells_above_row20: bool,
     pub queue_invariant_violations: u64,
     pub replay: String,
+    /// Per-slot search statistics (protocol v1.31 §8.4.1).
+    #[serde(default)]
+    pub search: [SearchGameSummary; 2],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -355,7 +383,7 @@ pub struct AttaxSummary {
 
 /// Match-level audit totals for one bot. The final report must separate spin
 /// label mismatches from same-spin attack mismatches (protocol v1.3 §8.4).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BotAggregate {
     pub slot: u8,
     pub name: String,
@@ -373,6 +401,31 @@ pub struct BotAggregate {
     pub mean_height: f64,
     /// Mean over games of the per-game max board height.
     pub max_height: f64,
+    /// Search turns with a reported depth/width (protocol v1.31 §8.4.1).
+    #[serde(default)]
+    pub search_turns: u32,
+    #[serde(default)]
+    pub fallback_turns: u32,
+    #[serde(default)]
+    pub fallback_rate: f64,
+    #[serde(default)]
+    pub depth_median: Option<f64>,
+    #[serde(default)]
+    pub depth_p95: Option<f64>,
+    #[serde(default)]
+    pub depth_max: Option<u32>,
+    #[serde(default)]
+    pub width_median: Option<f64>,
+    #[serde(default)]
+    pub width_p95: Option<f64>,
+    #[serde(default)]
+    pub width_max: Option<u32>,
+    #[serde(default)]
+    pub nodes_median: Option<f64>,
+    #[serde(default)]
+    pub nodes_p95: Option<f64>,
+    #[serde(default)]
+    pub nodes_max: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -463,6 +516,103 @@ fn attack_rate(audit: &GameAudit, slot: usize) -> f64 {
     rate(scoring.attack_matches, scoring.attack_checked)
 }
 
+fn percentile(values: &[f64], p: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let index = ((sorted.len() - 1) as f64 * p / 100.0).round() as usize;
+    Some(sorted[index])
+}
+
+fn median(values: &[f64]) -> Option<f64> {
+    percentile(values, 50.0)
+}
+
+fn max_f64(values: &[f64]) -> Option<f64> {
+    values.iter().cloned().fold(None, |acc, value| {
+        Some(acc.map_or(value, |a: f64| a.max(value)))
+    })
+}
+
+fn search_game_summary(turns: &[crate::audit::SearchTurn]) -> SearchGameSummary {
+    let depths: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.depth.map(f64::from))
+        .collect();
+    let widths: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.width.map(f64::from))
+        .collect();
+    let nodes: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.nodes.map(|nodes| nodes as f64))
+        .collect();
+    SearchGameSummary {
+        turns: turns.len() as u32,
+        fallback_turns: turns.iter().filter(|turn| turn.fallback).count() as u32,
+        depth_median: median(&depths),
+        depth_p95: percentile(&depths, 95.0),
+        depth_max: max_f64(&depths).map(|value| value as u32),
+        width_median: median(&widths),
+        width_p95: percentile(&widths, 95.0),
+        width_max: max_f64(&widths).map(|value| value as u32),
+        nodes_median: median(&nodes),
+        nodes_p95: percentile(&nodes, 95.0),
+        nodes_max: max_f64(&nodes).map(|value| value as u64),
+    }
+}
+
+struct SearchAggregate {
+    turns: u32,
+    fallback_turns: u32,
+    fallback_rate: f64,
+    depth_median: Option<f64>,
+    depth_p95: Option<f64>,
+    depth_max: Option<u32>,
+    width_median: Option<f64>,
+    width_p95: Option<f64>,
+    width_max: Option<u32>,
+    nodes_median: Option<f64>,
+    nodes_p95: Option<f64>,
+    nodes_max: Option<u64>,
+}
+
+fn search_aggregate(audits: &[GameAudit], slot: usize) -> SearchAggregate {
+    let turns: Vec<&crate::audit::SearchTurn> = audits
+        .iter()
+        .flat_map(|audit| audit.search[slot].iter())
+        .collect();
+    let depths: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.depth.map(f64::from))
+        .collect();
+    let widths: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.width.map(f64::from))
+        .collect();
+    let nodes: Vec<f64> = turns
+        .iter()
+        .filter_map(|turn| turn.nodes.map(|nodes| nodes as f64))
+        .collect();
+    let fallback_turns = turns.iter().filter(|turn| turn.fallback).count() as u32;
+    SearchAggregate {
+        turns: turns.len() as u32,
+        fallback_turns,
+        fallback_rate: ratio(fallback_turns, turns.len() as u32),
+        depth_median: median(&depths),
+        depth_p95: percentile(&depths, 95.0),
+        depth_max: max_f64(&depths).map(|value| value as u32),
+        width_median: median(&widths),
+        width_p95: percentile(&widths, 95.0),
+        width_max: max_f64(&widths).map(|value| value as u32),
+        nodes_median: median(&nodes),
+        nodes_p95: percentile(&nodes, 95.0),
+        nodes_max: max_f64(&nodes).map(|value| value as u64),
+    }
+}
+
 fn game_summary(audit: &GameAudit) -> GameSummary {
     GameSummary {
         seed: audit.seed,
@@ -511,6 +661,10 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
             .unwrap_or(false),
         queue_invariant_violations: audit.queue_invariant_violations,
         replay: audit.replay.clone(),
+        search: [
+            search_game_summary(&audit.search[0]),
+            search_game_summary(&audit.search[1]),
+        ],
     }
 }
 
@@ -590,90 +744,105 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             bun_version: attax.bun_version.clone(),
             command_line: attax.command_line.clone(),
         });
-    let bots = [0usize, 1].map(|slot| BotAggregate {
-        slot: slot as u8,
-        name: audits
-            .first()
-            .map(|audit| audit.bots[slot].name.clone())
-            .unwrap_or_default(),
-        placements: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].placements)
-            .sum(),
-        spin_checked: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].spin_checked)
-            .sum(),
-        spin_mismatches: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].spin_mismatches)
-            .sum(),
-        attack_checked: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].attack_checked)
-            .sum(),
-        attack_mismatches: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].attack_mismatches)
-            .sum(),
-        attack_mismatches_same_spin: audits
-            .iter()
-            .map(|audit| audit.scoring[slot].attack_mismatches_same_spin)
-            .sum(),
-        think_over_budget: audits
-            .iter()
-            .map(|audit| audit.think[slot].over_budget)
-            .sum(),
-        attack_per_piece: ratio(
-            audits
+    let bots = [0usize, 1].map(|slot| {
+        let search = search_aggregate(audits, slot);
+        BotAggregate {
+            slot: slot as u8,
+            name: audits
+                .first()
+                .map(|audit| audit.bots[slot].name.clone())
+                .unwrap_or_default(),
+            placements: audits
                 .iter()
-                .map(|audit| audit.totals[slot].attack_total)
+                .map(|audit| audit.scoring[slot].placements)
                 .sum(),
-            audits
+            spin_checked: audits
                 .iter()
-                .map(|audit| audit.totals[slot].pieces_placed)
+                .map(|audit| audit.scoring[slot].spin_checked)
                 .sum(),
-        ),
-        received_per_game: if audits.is_empty() {
-            0.0
-        } else {
-            (audits
+            spin_mismatches: audits
                 .iter()
-                .map(|audit| f64::from(audit.totals[slot].received_total))
-                .sum::<f64>()
-                / audits.len() as f64
-                * 1000.0)
-                .round()
-                / 1000.0
-        },
-        visible_rows: audits
-            .first()
-            .map(|audit| audit.bots[slot].visible_rows)
-            .unwrap_or(0),
-        mean_height: if audits.is_empty() {
-            0.0
-        } else {
-            (audits
+                .map(|audit| audit.scoring[slot].spin_mismatches)
+                .sum(),
+            attack_checked: audits
                 .iter()
-                .map(|audit| audit.heights[slot].mean)
-                .sum::<f64>()
-                / audits.len() as f64
-                * 100.0)
-                .round()
-                / 100.0
-        },
-        max_height: if audits.is_empty() {
-            0.0
-        } else {
-            (audits
+                .map(|audit| audit.scoring[slot].attack_checked)
+                .sum(),
+            attack_mismatches: audits
                 .iter()
-                .map(|audit| f64::from(audit.heights[slot].max))
-                .sum::<f64>()
-                / audits.len() as f64
-                * 100.0)
-                .round()
-                / 100.0
-        },
+                .map(|audit| audit.scoring[slot].attack_mismatches)
+                .sum(),
+            attack_mismatches_same_spin: audits
+                .iter()
+                .map(|audit| audit.scoring[slot].attack_mismatches_same_spin)
+                .sum(),
+            think_over_budget: audits
+                .iter()
+                .map(|audit| audit.think[slot].over_budget)
+                .sum(),
+            attack_per_piece: ratio(
+                audits
+                    .iter()
+                    .map(|audit| audit.totals[slot].attack_total)
+                    .sum(),
+                audits
+                    .iter()
+                    .map(|audit| audit.totals[slot].pieces_placed)
+                    .sum(),
+            ),
+            received_per_game: if audits.is_empty() {
+                0.0
+            } else {
+                (audits
+                    .iter()
+                    .map(|audit| f64::from(audit.totals[slot].received_total))
+                    .sum::<f64>()
+                    / audits.len() as f64
+                    * 1000.0)
+                    .round()
+                    / 1000.0
+            },
+            visible_rows: audits
+                .first()
+                .map(|audit| audit.bots[slot].visible_rows)
+                .unwrap_or(0),
+            mean_height: if audits.is_empty() {
+                0.0
+            } else {
+                (audits
+                    .iter()
+                    .map(|audit| audit.heights[slot].mean)
+                    .sum::<f64>()
+                    / audits.len() as f64
+                    * 100.0)
+                    .round()
+                    / 100.0
+            },
+            max_height: if audits.is_empty() {
+                0.0
+            } else {
+                (audits
+                    .iter()
+                    .map(|audit| f64::from(audit.heights[slot].max))
+                    .sum::<f64>()
+                    / audits.len() as f64
+                    * 100.0)
+                    .round()
+                    / 100.0
+            },
+            search_turns: search.turns,
+            fallback_turns: search.fallback_turns,
+            fallback_rate: search.fallback_rate,
+            depth_median: search.depth_median,
+            depth_p95: search.depth_p95,
+            depth_max: search.depth_max,
+            width_median: search.width_median,
+            width_p95: search.width_p95,
+            width_max: search.width_max,
+            nodes_median: search.nodes_median,
+            nodes_p95: search.nodes_p95,
+            nodes_max: search.nodes_max,
+        }
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
@@ -865,7 +1034,8 @@ impl MatchSummary {
 /// replay's total turns.
 fn check_opponent_log(
     path: &std::path::Path,
-    opponent_turns: u32,
+    expected_suggestions: u32,
+    expected_plays: u32,
     forfeit_by_opponent: bool,
     tbp: bool,
 ) -> Result<(), String> {
@@ -921,9 +1091,9 @@ fn check_opponent_log(
         if initial_starts != 1 {
             return Err(format!("initial start count {initial_starts} != 1"));
         }
-        if suggestions != opponent_turns {
+        if suggestions != expected_suggestions {
             return Err(format!(
-                "suggestion count {suggestions} != opponent turns {opponent_turns}"
+                "suggestion count {suggestions} != expected {expected_suggestions}"
             ));
         }
         if !forfeit_by_opponent && nonempty_suggestions != suggestions {
@@ -935,17 +1105,12 @@ fn check_opponent_log(
         if nonempty_suggestions == 0 {
             return Err("no suggestion with a candidate".into());
         }
-        let expected_plays = if forfeit_by_opponent {
-            opponent_turns.saturating_sub(1)
-        } else {
-            opponent_turns
-        };
         if plays != expected_plays {
             return Err(format!("play count {plays} != expected {expected_plays}"));
         }
-    } else if lines != opponent_turns {
+    } else if lines != expected_suggestions {
         return Err(format!(
-            "decision count {lines} != opponent turns {opponent_turns}"
+            "decision count {lines} != expected {expected_suggestions}"
         ));
     }
     Ok(())
@@ -1087,19 +1252,29 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
             };
             // `exists()` is not proof of completeness: a 0-byte file, a
             // truncated final line, or a log that stops mid-game all exist.
-            // Check the content against the opponent's turn count instead.
-            // The opponent (slot 1) does not play the last turn when it wins
-            // (the game ends on the loser's turn). A forfeit by the opponent
-            // logs its last suggestion but not its play.
-            let opponent_turns = match audit.reason.as_str() {
-                "TopOut" if audit.winner == Some(1) => audit.turns.saturating_sub(1),
-                "Forfeit" if audit.forfeit_slot != Some(1) => audit.turns.saturating_sub(1),
-                _ => audit.turns,
-            };
+            // Count the opponent's actual placements from the replay; do not
+            // derive the count from the winner (the seat that dies first
+            // decides whether the opponent gets the last turn; protocol v1.33
+            // §8.3.1.2).
+            let opponent_plays = report
+                .records
+                .iter()
+                .filter(|record| {
+                    matches!(
+                        record,
+                        crate::replay::ReplayRecord::Turn(turn)
+                            if turn.placements.iter().any(|placement| placement.slot == 1)
+                    )
+                })
+                .count() as u32;
             let forfeit_by_opponent = audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
+            // A forfeit by the opponent logs the forfeit turn's suggestion
+            // but no play; every other game has one suggestion per play.
+            let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
             let log_check = check_opponent_log(
                 &opponent_log,
-                opponent_turns,
+                expected_suggestions,
+                opponent_plays,
                 forfeit_by_opponent,
                 tbp_opponent,
             );
@@ -1206,7 +1381,7 @@ mod tests {
             );
         }
         std::fs::write(&path, &text).unwrap();
-        assert!(check_opponent_log(&path, 3, false, true).is_ok());
+        assert!(check_opponent_log(&path, 3, 3, false, true).is_ok());
 
         // A log that stops after 2 of 3 turns exists but is not complete.
         let truncated = text.lines().take(5).collect::<Vec<_>>().join(
@@ -1214,11 +1389,17 @@ mod tests {
 ",
         );
         std::fs::write(&path, truncated).unwrap();
-        assert!(check_opponent_log(&path, 3, false, true).is_err());
+        assert!(check_opponent_log(&path, 3, 3, false, true).is_err());
 
         // A 0-byte file exists but carries no evidence.
         std::fs::write(&path, "").unwrap();
-        assert!(check_opponent_log(&path, 3, false, true).is_err());
+        assert!(check_opponent_log(&path, 3, 3, false, true).is_err());
+
+        // The log has one more suggestion than expected: the old
+        // "winner does not play the last turn" rule produced exactly this
+        // mismatch (s2-spec-lead's failure 8).
+        std::fs::write(&path, &text).unwrap();
+        assert!(check_opponent_log(&path, 2, 3, false, true).is_err());
 
         // A partial final line is not valid JSON.
         std::fs::write(
@@ -1227,7 +1408,7 @@ mod tests {
 {\"type\":\"suggestion\"",
         )
         .unwrap();
-        assert!(check_opponent_log(&path, 1, false, true).is_err());
+        assert!(check_opponent_log(&path, 1, 1, false, true).is_err());
 
         // A forfeit has one fewer play than suggestions.
         let mut forfeit = String::from(
@@ -1247,7 +1428,7 @@ mod tests {
 ",
         );
         std::fs::write(&path, forfeit).unwrap();
-        assert!(check_opponent_log(&path, 2, true, true).is_ok());
+        assert!(check_opponent_log(&path, 2, 1, true, true).is_ok());
 
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -1313,6 +1494,7 @@ mod tests {
                     visible_rows: 0,
                     mean_height: 0.0,
                     max_height: 0.0,
+                    ..Default::default()
                 },
                 BotAggregate {
                     slot: 1,
@@ -1329,6 +1511,7 @@ mod tests {
                     visible_rows: 0,
                     mean_height: 0.0,
                     max_height: 0.0,
+                    ..Default::default()
                 },
             ],
             notes: vec!["note".into()],

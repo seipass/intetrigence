@@ -240,6 +240,20 @@ impl HeightStats {
     }
 }
 
+/// Per-turn search statistics (protocol v1.31 §8.4.1).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SearchTurn {
+    pub turn: u32,
+    #[serde(default)]
+    pub depth: Option<u32>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub nodes: Option<u64>,
+    #[serde(default)]
+    pub fallback: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GameAudit {
     pub seed: u64,
@@ -283,6 +297,10 @@ pub struct GameAudit {
     pub bot_fallbacks: u64,
     /// intetrigence search nodes summed over the round.
     pub bot_nodes_total: u64,
+    /// Per-turn search statistics per slot (protocol v1.31 §8.4.1). Empty for
+    /// TBP opponents and for the baseline.
+    #[serde(default)]
+    pub search: [Vec<SearchTurn>; 2],
 }
 
 impl GameAudit {
