@@ -42,7 +42,7 @@ impl OpenerPhase {
     /// Additional cancellation budget for one attack event.
     ///
     /// The caller's total cancellation is `attack + cancel_budget(attack, ..)`,
-    /// i.e. `2 * attack` while the opener condition holds. U5 provisional:
+    /// i.e. `2 * attack` while the opener condition holds. U5 (decided):
     /// `queue_total >= sent_total`.
     pub fn cancel_budget(&self, attack: u32, queue_total: u32) -> u32 {
         let queue_ok = if OPENER_QUEUE_GE_SENT {
