@@ -37,14 +37,20 @@ pub const COMBO_CAP: u32 = 4;
 /// Column height above which the non-linear danger term starts to bite.
 pub const DANGER_THRESHOLD: u32 = 12;
 
+/// Projected height (`max_height + pending`) at which the evaluation switches
+/// to survival mode: the spawn's lowest cell is row 21, so this is the row at
+/// which the next zero-line placement kills.
+pub const SURVIVAL_PROJECTED: u32 = 21;
+
+/// Projected height at which zero-line placements start to be discouraged.
+pub const WARNING_PROJECTED: u32 = 18;
+
 /// Garbage queued (rows) at which the evaluation switches to survival mode.
-pub const SURVIVAL_PENDING: u32 = 8;
 
 /// Stack height at which the evaluation switches to survival mode.
-pub const SURVIVAL_HEIGHT: u32 = 15;
 
 /// Height above which the stack starts to be punished quadratically.
-pub const DANGER_BASE: i32 = 12;
+pub const DANGER_BASE: i32 = 15;
 
 /// Board shape features, all in "count" units so a weight is a plain scale.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -335,10 +341,15 @@ impl Default for Weights {
             garbage_rows: -6.0,
 
             attack: 28.0,
+            // `attack/line` is the only lever on attack/piece (lines/piece is
+            // pinned by the cell budget), and at combo 0 it is: single 0.00,
+            // double 0.50, triple 0.67, quad 1.25, TSS 3.00, TSD 2.50. A TSD
+            // is therefore worth twice a quad, and the measured spin line
+            // ratio is 16% against the 23% that attack/line 1.73 needs.
             clear: [
                 [0.0, -14.0, -6.0, 2.0, 20.0],
                 [0.0, -5.0, 2.0, 8.0, 30.0],
-                [0.0, 8.0, 20.0, 40.0, 50.0],
+                [0.0, 20.0, 40.0, 40.0, 50.0],
             ],
             perfect_clear: 120.0,
             b2b_break: -20.0,
@@ -466,8 +477,15 @@ pub fn apply_placement(
         && context.t_slot > 0
         && placement.spin == SpinType::None;
 
-    let survival = weights.survival
-        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
+    // Survival is decided by the *projected* height, not by either term alone.
+    // Every spawn's lowest cell is row 21 and `insert_garbage` re-spawns the
+    // active piece, topping out on the spot if it cannot be placed, so the
+    // bot dies exactly when `height + pending >= 21`. The old condition was an
+    // OR (`incoming >= 8 || height >= 15`), which switched to defence at
+    // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
+    // (safe: 13 <= 20) -- it threw away attack while still alive.
+    let projected = board.height() as u32 + context.incoming;
+    let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.attack * f64::from(attack.total);
     value += if survival {
         weights.survival_line * f64::from(clear.lines)
@@ -544,8 +562,15 @@ pub fn leaf_value(
     t_available: usize,
 ) -> f64 {
     let BoardAnalysis { heights, features } = analyse(board);
-    let survival = weights.survival
-        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
+    // Survival is decided by the *projected* height, not by either term alone.
+    // Every spawn's lowest cell is row 21 and `insert_garbage` re-spawns the
+    // active piece, topping out on the spot if it cannot be placed, so the
+    // bot dies exactly when `height + pending >= 21`. The old condition was an
+    // OR (`incoming >= 8 || height >= 15`), which switched to defence at
+    // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
+    // (safe: 13 <= 20) -- it threw away attack while still alive.
+    let projected = board.height() as u32 + context.incoming;
+    let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.danger_height * features.danger_height
@@ -747,7 +772,8 @@ mod tests {
             analysis.features,
             Features {
                 max_height: 20.0,
-                height_sq: 64.0,
+                // max_height 20 against DANGER_BASE 15 -> 5^2.
+                height_sq: 25.0,
                 // Column-wise sum of max(0, h - 12)^2 on the fixture: the
                 // tallest column contributes 64 and the rest 409.
                 danger_height: 473.0,
