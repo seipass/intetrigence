@@ -23,6 +23,7 @@ SEED_RANGE = os.environ.get("SEED_RANGE", "tuning seeds 9001-9010")
 SEED_NOTE = os.environ.get(
     "SEED_NOTE", "held-out: seeds 10001+ were **not** used (tuning seeds only)"
 )
+HELDOUT = os.environ.get("HELDOUT", "")
 REPRO = os.environ.get("REPRO", "scripts/m2-match.sh")
 
 
@@ -184,6 +185,8 @@ def main():
         )
     lines.append(f"- games: {len(games)} ({SEED_RANGE} x sheets A/B)")
     lines.append(f"- {SEED_NOTE}")
+    if HELDOUT:
+        lines.append(f"- held-out basis: {HELDOUT}")
     args0 = " ".join(header["bots"]["0"].get("args", []))
     lines.append(
         f"- intetrigence: real search (`{args0}`), commit "
