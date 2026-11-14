@@ -41,6 +41,10 @@ pub struct GameReport {
     pub think_times: Vec<Duration>,
     /// Every input applied, in order, so the game can be replayed.
     pub actions: Vec<Action>,
+    /// Stack height after each placement. A checkpoint height (say turn 200)
+    /// is a defence metric that does not saturate at the turn cap, unlike
+    /// survival turns.
+    pub heights: Vec<u32>,
 }
 
 impl GameReport {
@@ -139,6 +143,7 @@ pub fn play_game_with_setup(
         clutch_fallbacks: 0,
         think_times: Vec::new(),
         actions: Vec::new(),
+        heights: Vec::new(),
     };
 
     while report.turns < max_turns && !game.is_over() {
@@ -229,6 +234,7 @@ pub fn play_game_with_setup(
         report.lines += u32::from(clear.lines);
         report.garbage_cleared += u32::from(clear.garbage_lines);
         report.turns += 1;
+        report.heights.push(game.board().height() as u32);
 
         // The referee inserts garbage only when the placement cleared nothing.
         if clear.lines == 0 && !game.is_over() {
