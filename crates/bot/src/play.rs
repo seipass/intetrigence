@@ -185,6 +185,8 @@ pub fn play_game_with_setup(
         let board = game.board().clone();
         let preview = game.preview(5);
         let context = EvalContext {
+            sent_total: report.sent_total,
+            received_total: report.garbage_inserted,
             b2b_streak: scoring.state.b2b_streak,
             combo: scoring.state.combo,
             pieces_placed: game.stats().pieces_placed,

@@ -25,7 +25,10 @@ pub mod movegen;
 pub mod play;
 pub mod search;
 
-pub use eval::{EvalContext, Features, Reward, Weights, apply_placement, features, leaf_value};
+pub use eval::{
+    EvalContext, Features, Reward, Weights, analyse, apply_placement, features, leaf_value,
+    t_slot_cutout,
+};
 pub use movegen::{
     ActionSeq, Arrival, Movegen, Placement, State, generate, generate_from, reachable_states,
     spawn_piece, unique_by_cells,
