@@ -86,6 +86,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut max_stages: Option<usize> = None;
     let mut report_path: Option<PathBuf> = None;
     let mut dry_run = false;
+    let mut check_only = false;
 
     let mut index = 0;
     while index < args.len() {
@@ -234,6 +235,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 dry_run = true;
                 index += 1;
             }
+            "--check-only" => {
+                check_only = true;
+                index += 1;
+            }
             other => return Err(format!("unknown round flag `{other}`")),
         }
     }
@@ -257,6 +262,20 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             "a round needs 25 evaluation seeds, found {}",
             seeds.len()
         ));
+    }
+
+    if check_only {
+        println!(
+            "seeds: {} values ({} .. {}) from {}",
+            seeds.len(),
+            seeds.first().copied().unwrap_or(0),
+            seeds.last().copied().unwrap_or(0),
+            seeds_source
+        );
+        println!("seeds commit: {}", seeds_commit.as_deref().unwrap_or("uncommitted"));
+        println!("build commit: {}", build_commit.as_deref().unwrap_or("unknown"));
+        println!("gates: {:?}", gates);
+        return Ok(());
     }
 
     let attax = match attax_dir {

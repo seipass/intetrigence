@@ -205,6 +205,21 @@ pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// True when the working tree has uncommitted changes.
+pub fn working_tree_dirty() -> Option<bool> {
+    let root = crate::harness::repo_root();
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
+}
+
 /// Full HEAD commit.
 pub fn head_commit() -> Option<String> {
     let root = crate::harness::repo_root();
@@ -245,11 +260,6 @@ pub fn check_seed_discipline(
     let Some(head) = build_commit else {
         return Err("cannot read the current git HEAD".into());
     };
-    if !head.starts_with(build) && !build.starts_with(head) {
-        return Err(format!(
-            "seeds file build `{build}` does not match the running build `{head}`"
-        ));
-    }
     if let Some(count) = file.count {
         if count != file.seeds.len() {
             return Err(format!(
@@ -264,6 +274,11 @@ pub fn check_seed_discipline(
             file.seeds.len()
         ));
     }
+    if !is_ancestor(build, head) {
+        return Err(format!(
+            "seeds file build `{build}` is not an ancestor of HEAD `{head}`"
+        ));
+    }
     let Some(seeds_commit) = file_commit(path) else {
         return Err(format!(
             "{} is not committed; commit the seeds before running",
@@ -272,8 +287,26 @@ pub fn check_seed_discipline(
     };
     if !is_ancestor(&seeds_commit, head) {
         return Err(format!(
-            "seeds commit {seeds_commit} is not an ancestor of the build {head}"
+            "seeds commit {seeds_commit} is not an ancestor of HEAD {head}"
         ));
+    }
+    if seeds_commit == build {
+        return Err(format!(
+            "seeds must be committed after the build commit (both are {build})"
+        ));
+    }
+    if !is_ancestor(build, &seeds_commit) {
+        return Err(format!(
+            "seeds commit {seeds_commit} is not after the build commit {build}"
+        ));
+    }
+    if let Some(dirty) = working_tree_dirty() {
+        if dirty {
+            return Err(
+                "working tree is dirty; commit the build and the seeds before running a round"
+                    .into(),
+            );
+        }
     }
     Ok(Some(seeds_commit))
 }
