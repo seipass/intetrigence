@@ -10,16 +10,21 @@ TETR.IO Season 2(TETRA LEAGUE デフォルト相当)ルールで動く versus Te
 ## 目標
 
 attax(現行公開版)に **50 勝 0 敗**、Cold Clear 2 と clys に **48 勝以上 / 50 ゲーム**。
-勝数は **TopOut と TurnCap の決着のみ**を数える(forfeit は勝ちに含めない)。
+
+**勝ちは TopOut 決着のみ。** TurnCap(1000 turn 到達)は未決着として勝ちに数えず、1 件でも出ればゲート不通過。
+forfeit も勝ちに含めない。
 評価 seeds は実行前にコミットで確定し、チューニングには使わない。
 
 詳細は [PLAN.md](PLAN.md)。
 
 ## 現在の測定値
 
-**パッチ適用 attax(40 行視野、SHA-256 `e22aab7b…`)とのスモーク 10 ゲーム: 8 勝 2 敗、forfeit 0、replay 10/10 検証。**
+**パッチ適用 attax(40 行視野、SHA-256 `e22aab7b…`)とのスモーク 10 ゲーム: TopOut 勝ち 6 / TopOut 負け 2 / 未決着 2、forfeit 0、replay 10/10 検証。**
 
+- **勝ちは TopOut のみ数える。** 1000 turn 到達(TurnCap)は「未決着」であり勝ちではない
+- 決着した 8 ゲームの勝率は 6/8 = 75%。10 ゲーム全体では 6/10
 - 敗因は 2 件とも TopOut(スタック管理)。forfeit ではない
+- 未決着 2 件は、1000 turn 以内に attax を潰せなかったことを意味する
 - attax の探索は正常(nodes ≈ 10,000、depth 6、35 ms/手)
 
 ### 過去の数字について
