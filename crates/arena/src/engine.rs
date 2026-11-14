@@ -449,14 +449,27 @@ impl Profile {
 /// boundary. `Game::bag_state()` gives the current bag after the active piece;
 /// `preview(5 + tail_len)` then yields the tail bag's remaining pieces.
 pub fn tail_bag_state(game: &mut intetrigence_core::Game) -> Vec<PieceKind> {
-    let remaining = game.bag_state().remaining;
-    let r = remaining.len();
-    let tail_len = if r > 5 { r - 5 } else { 2 + r };
-    let preview = game.preview(5 + tail_len);
-    preview
-        .get(5..5 + tail_len)
-        .map(<[PieceKind]>::to_vec)
-        .unwrap_or_default()
+    use intetrigence_core::ALL_PIECES;
+    let mut current = game.bag_state().remaining;
+    let queue = game.preview(5);
+    let mut next: Option<Vec<PieceKind>> = None;
+    for piece in queue {
+        if let Some(position) = current.iter().position(|&candidate| candidate == piece) {
+            current.remove(position);
+        } else {
+            let next_bag = next.get_or_insert_with(|| ALL_PIECES.to_vec());
+            if let Some(position) = next_bag.iter().position(|&candidate| candidate == piece) {
+                next_bag.remove(position);
+            }
+            current = next_bag.clone();
+        }
+    }
+    if current.is_empty() {
+        // The queue ends exactly at a bag boundary: the tail bag is the next
+        // (full) bag.
+        current = ALL_PIECES.to_vec();
+    }
+    current
 }
 
 /// The referee's round state for both players.
