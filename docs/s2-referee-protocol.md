@@ -847,18 +847,45 @@ verify(replay) -> Result<(), Mismatch>:
 | `start` だけ書かれて中断(ゲーム途中で kill) | **true** | **suggestion が無い** |
 | 最終行が途中で切れている(バッファ未フラッシュ) | **true** | **JSON として壊れている** |
 
-**したがって `measurement_complete` は内容で判定する**:
+**したがって `measurement_complete` は内容で判定する**(v1.33 で 3 項目を修正):
 
 | 検査 | 条件 |
 |---|---|
 | 空でない | サイズ > 0 |
-| 完全な行のみ | 最終行が**完全な JSON** として parse できる |
-| `start` が 1 回 | メッセージ種別の数 |
-| **`suggestion` の件数 == replay の turn 数** | 両者とも |
-| 各 `suggestion` に候補が 1 つ以上 | 空の候補列を許さない |
-| `suggest` / `suggestion` の対応 | 各 `suggest` に 1 つの `suggestion` |
+| 完全な行のみ | **全行**が完全な JSON として parse できる |
+| **initial `start` がちょうど 1 回** | `reason` の無い `start`。**ゴミ挿入時の再送は `reason: "garbage"` 付きで複数回あってよい** |
+| **`suggestion` の件数 == 相手が実際に着手した turn 数** | §8.3.1.3 の注意を参照 |
+| 各 `suggestion` に候補が 1 つ以上 | 空の候補列を許さない。**ただし forfeit したゲームの最後の空 `suggestion` は許容**(それが forfeit の記録) |
+| `play` の件数 == 相手が着手した turn 数 | forfeit した側は -1 |
+| attax の decision log | 行数 == 相手が着手した turn 数 |
+
+> **`suggest` 行は transcript に無い**。TBP transcript が記録するのは `start` / `suggestion` / `play` / `new_piece` で、ホスト側の `suggest` は含まれない。したがって「各 `suggest` に 1 つの `suggestion`」という検査は**できない**(v1.32 の記述は誤り)。`suggestion` は 1 turn に 1 回(リトライは内部)なので、**`suggestion` 件数 == 着手 turn 数**で対応を検査する。
+
+#### 8.3.1.3 「`suggestion` 件数 == replay の turn 数」は**成り立たない**
+
+v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていたが、**これは誤り**。正しい条件は **「相手が実際に着手した turn 数」** で、`turns` との関係は**席順と敗者に依存する**。
+
+**理由**: ゲームは**トップアウトした turn で即終了**し、その turn の残りの設置は行わない(§6.1)。解決順は **seat 1 → seat 2**。したがって:
+
+| 敗者 | その turn に相手が打つか | 相手の `suggestion` 数 |
+|---|---|---|
+| **seat 1** | **打たない**(seat 1 が先に死んで打ち切り) | `turns - 1` |
+| **seat 2** | **打つ**(seat 1 は解決済み、seat 2 が死ぬ) | `turns` |
+
+> **「勝った側は最後の turn を打たない」は誤り**。反例: intetrigence = seat 2、CC2 = seat 1。CC2 が turn N でトップアウトすると、**CC2 は turn N を打って死ぬ**(勝者は intetrigence、CC2 の `suggestion` は `turns` 件)。勝者が最後の turn を打たないのは**敗者が seat 1 のときだけ**。
+
+**実測との一致**(harness-dev、2026-11-16):
+
+| ゲーム | replay turns | CC2 の `suggestion` | 解釈 |
+|---|---|---|---|
+| CC2 が勝った | 170 | 169 | intetrigence(seat 1)が turn 170 で死んだ → CC2 は打たない → `turns - 1` |
+| CC2 が負けた | 209 | 209 | CC2 が turn 209 で死んだ → CC2 は打った → `turns` |
+
+**実装上の要求**: `turns` から件数を決め打ちせず、**replay の各 turn の解決記録から「相手が着手した turn 数」を数える**。席順に依存する条件を `turns` だけから導くと、**席が入れ替わったゲームで誤判定する**(§10.2 の失敗 7 と同じ種類)。
 
 **負のテストが必須**: アダプタを**ゲーム途中で kill** し、`measurement_complete == false` になることを確認する。**正常系だけの確認では、この検査が効いているか分からない**(§10.2 の失敗 7)。
+
+- 代替として、**同じ失敗モード(0 バイト / 途中で切れた最終行 / `start` のみ / forfeit)をユニットテストで再現**する形でもよい。`run_match` に kill フックが無い場合、これが現実的な最小形。
 
 > **「10 ゲームのスモークで `measurement_complete = true` を確認した」は、正常系の確認にすぎない。** 壊れた入力で `false` になることを確かめていない。
 
@@ -1032,6 +1059,7 @@ verify(replay) -> Result<(), Mismatch>:
 | 5 | `docs/s2-attack-examples.json` に 19 件目を追加 → core のテストが `cases.len() == 18` をハードコードしていて CI が壊れた | **fixture を使っているテスト**(`grep -rn "s2-attack-examples" crates/`) |
 | 6 | `referee.rs` から「TurnCap の攻撃量順位付け」を削除 → **protocol §6.3 に同じ規則が残っていた**(実装と文書が食い違ったまま) | **その規則を記述している文書**(`grep -rn "順位付け\|受信ゴミ行数" docs/`) |
 | 7 | `measurement_complete` を `Path::exists()` で判定 → **0 バイト・途中で切れたファイルでも true** | **「その条件が偽になる入力」を 1 つ挙げたか**(負のテスト) |
+| 8 | §8.3.1.2「`suggestion` 件数 == replay の turn 数」 | **席順**(敗者が seat 1 なら相手は最終 turn を打たない)。**片方の席のデータだけで規則を作った** |
 
 **手順**:
 
@@ -1112,3 +1140,4 @@ verify(replay) -> Result<(), Mismatch>:
 | v1.30 | 2026-11-16 | §7.3.2 を新設。**attax の 180° 非対応は forfeit の原因ではない**ことを実測で確認(`supports_180=false` で再分類しても 2 件とも `forfeit-other` のまま。attax は 12 候補を返して全滅、レフェリー側には可視配置あり)。原因は board desync。 |
 | v1.31 | 2026-11-16 | **§8.4.1 を新設**。`think_ms` は探索の証明ではない。anytime ループが期限超過で反復を捨てて `None` を返し、**全設定で 1-ply greedy にフォールバック**していた事故を記録。レポートに「完了した探索の深さ・幅・ノード数」と「1-ply フォールバック率」を必須化。 |
 | v1.32 | 2026-11-16 | **§8.3.1.1 / §8.3.1.2 を新設**。相手ごとの decision log の実体(attax = `ATTAX_TBP_LOG`、CC2/clys = TBP transcript を decision log とみなす)を明記。**`measurement_complete` を `Path::exists()` で判定してはいけない**ことを明記(0 バイト・truncation・`suggestion` 欠落はすべて `exists() == true`)。内容による 6 検査と**負のテスト**(ゲーム途中で kill → `false`)を必須化。§10.2 に失敗 7 を追加。 |
+| v1.33 | 2026-11-16 | **§8.3.1.2 の 3 項目を修正**(harness-dev の実装報告より)。`start` は「1 回」ではなく「**initial `start`(reason なし)が 1 回**、ゴミ再送は許容」。`suggest` 行は transcript に無いので対応検査は不可。**「`suggestion` 件数 == replay の turn 数」は誤り** → §8.3.1.3 を新設し「**相手が実際に着手した turn 数**」に修正。`turns` との関係は**席順と敗者に依存**する(敗者が seat 1 なら `turns - 1`、seat 2 なら `turns`)。「勝った側は最後の turn を打たない」も**誤り**(反例を明記)。§10.2 に失敗 8 を追加。 |
