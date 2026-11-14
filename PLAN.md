@@ -229,3 +229,10 @@ intetrigence/
   - **パッチ適用 attax のスモーク**: seed 11012 A/B = **attax の 2-0**(TopOut 464/246 turn)、forfeit 0、replay 2/2。**forfeit が消えた瞬間、attax が勝つ** — これが真の実力差。
   - **計測基盤の整備完了**: `visible_rows` の自動検出(movegen.ts から)、`--weights key=value` による重み注入(replay header に記録)、ゲートは TopOut+TurnCap のみ、測定完全性チェック(replay+verify+audit+相手 decision log)、surge/B2B 指標。
   - **次の焦点**: bot-dev の surge 改善。surge は放出されている(1,602 回/372 ゲーム)が **80% が 4–7 ライン**で attax に吸収される。効くのは 9–13 ライン。charge の非線形価値 + hold ペナルティを self-play で A/B 中。
+
+- **🚫 2026-11-15 ルール変更(ユーザー指示): TurnCap を勝ちに数えない**。1000 turn 到達で attack_total の差により勝者を決めるのは実力の判定として不適切。**勝ちは TopOut のみ**。TurnCap は「未決着」として勝ちにも負けにも数えず、**1 件でも出ればゲート不通過**(50 ゲームすべてで TopOut 決着が必要)。
+  - **attax-40 スモークの訂正**: 「8 勝 2 敗」は誤り。正しくは **TopOut 勝ち 6 / TopOut 負け 2 / 未決着 2**。決着ゲームの勝率 6/8 = 75%、全 10 ゲームでは 6/10。
+  - TopOut 勝ち: 11001-B(804), 11002-B(411), 11003-A(351), 11003-B(723), 11004-B(938), 11005-B(322)
+  - TopOut 負け: 11004-A(724), 11005-A(191)
+  - 未決着(TurnCap 1000): 11001-A, 11002-A
+  - ゲート定義: 段階 1 = `wins_topout >= 50 && losses_topout == 0 && turncap == 0`、段階 2・3 = `wins_topout >= 48 && turncap == 0`
