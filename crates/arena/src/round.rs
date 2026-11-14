@@ -565,6 +565,16 @@ fn stage_section(
     )?;
     writeln!(
         out,
+        "- opponent vision: **{} rows**{}",
+        summary.bots[1].visible_rows,
+        if summary.bots[1].visible_rows < 40 {
+            " (vision forfeits are possible)"
+        } else {
+            " (full board: decisions are TopOut / turn-cap)"
+        }
+    )?;
+    writeln!(
+        out,
         "- result: **{} W / {} L / {} D** — {:.1}% (Wilson 95% CI {:.1}..{:.1}%)",
         summary.wins,
         summary.losses,
@@ -777,6 +787,11 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     writeln!(
         out,
         "- A `forfeit-other` win is an invalid game (protocol v1.13 §7.1.3-4) and fails the stage."
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "- Stage 1 (attax, 20-row vision) is largely decided by vision forfeits; stages 2-3 (CC2/clys, 40-row vision) are real TopOut battles. The stage win rates are therefore not directly comparable; the non-forfeit record per stage is the honest strength signal."
     )
     .map_err(|e| e.to_string())?;
     writeln!(out).map_err(|e| e.to_string())?;
