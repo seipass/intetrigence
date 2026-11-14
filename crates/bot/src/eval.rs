@@ -30,17 +30,23 @@ pub const COLUMNS: usize = 10;
 /// bursts are absorbed by a bot sitting at height 3-5.
 pub const SURGE_LETHAL: u32 = 8;
 
+/// Combo value above which the state term stops growing. Attack/piece peaks at
+/// combo 3-4 and declines after that.
+pub const COMBO_CAP: u32 = 4;
+
 /// Column height above which the non-linear danger term starts to bite.
 pub const DANGER_THRESHOLD: u32 = 12;
 
-/// Garbage queued (rows) at which the evaluation switches to survival mode.
-pub const SURVIVAL_PENDING: u32 = 8;
+/// Projected height (`max_height + pending`) at which the evaluation switches
+/// to survival mode: the spawn's lowest cell is row 21, so this is the row at
+/// which the next zero-line placement kills.
+pub const SURVIVAL_PROJECTED: u32 = 21;
 
-/// Stack height at which the evaluation switches to survival mode.
-pub const SURVIVAL_HEIGHT: u32 = 15;
+/// Projected height at which zero-line placements start to be discouraged.
+pub const WARNING_PROJECTED: u32 = 18;
 
 /// Height above which the stack starts to be punished quadratically.
-pub const DANGER_BASE: i32 = 12;
+pub const DANGER_BASE: i32 = 15;
 
 /// Board shape features, all in "count" units so a weight is a plain scale.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -50,6 +56,10 @@ pub struct Features {
     /// `max(0, max_height - DANGER_BASE)^2`.
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
+    /// Rows that are one cell short of full, with the hole at the top of its
+    /// column (so one piece clears it), capped at 2. This is the "combo
+    /// groove": a combo only continues if a clear is available every piece.
+    pub combo_potential: f64,
     /// Column-wise `sum(max(0, h - DANGER_THRESHOLD)^2)`.
     ///
     /// `height_sq` only looks at the tallest column and is always on, which
@@ -138,6 +148,14 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
     let over = (max_height - DANGER_BASE).max(0);
     features.max_height = max_height as f64;
     features.height_sq = (over * over) as f64;
+    features.combo_potential = (0..Board::HEIGHT)
+        .filter(|&row| {
+            let mask = board.row(row);
+            mask.count_ones() == 9
+                && (0..COLUMNS).any(|x| mask & (1 << x) == 0 && heights[x] as usize == row + 1)
+        })
+        .count()
+        .min(2) as f64;
     features.danger_height = heights
         .iter()
         .map(|&h| {
@@ -213,6 +231,13 @@ pub struct Weights {
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
     pub danger_height: f64,
+    /// Value of the combo state itself: `combo_state * ln(1.25*combo + 1)`.
+    /// S2 pays `base * (1 + 0.25*combo)` and lifts `base` to
+    /// `ln(1.25*combo + 1)` once combo >= 2, so a live combo is a *state* with
+    /// value: holding it is what makes the next clear worth 2-3 lines.
+    pub combo_state: f64,
+    /// Value of a board that can keep a combo going (`Features.combo_potential`).
+    pub combo_potential: f64,
     /// Value per line of race lead (`sent_total - received_total`). Nothing in
     /// the TBP stream exposes the opponent's board, so the score difference is
     /// the only signal that says "we are winning the race"; without it the
@@ -297,6 +322,8 @@ impl Default for Weights {
             height_sq: 0.0,
             danger_height: -12.0,
             race: 1.0,
+            combo_state: 40.0,
+            combo_potential: 6.0,
             holes: -30.0,
             hole_cover: -6.0,
             hole_rows: -16.0,
@@ -310,10 +337,15 @@ impl Default for Weights {
             garbage_rows: -6.0,
 
             attack: 28.0,
+            // `attack/line` is the only lever on attack/piece (lines/piece is
+            // pinned by the cell budget), and at combo 0 it is: single 0.00,
+            // double 0.50, triple 0.67, quad 1.25, TSS 3.00, TSD 2.50. A TSD
+            // is therefore worth twice a quad, and the measured spin line
+            // ratio is 16% against the 23% that attack/line 1.73 needs.
             clear: [
                 [0.0, -14.0, -6.0, 2.0, 20.0],
                 [0.0, -5.0, 2.0, 8.0, 30.0],
-                [0.0, 8.0, 20.0, 40.0, 50.0],
+                [0.0, 20.0, 40.0, 40.0, 50.0],
             ],
             perfect_clear: 120.0,
             b2b_break: -20.0,
@@ -441,8 +473,15 @@ pub fn apply_placement(
         && context.t_slot > 0
         && placement.spin == SpinType::None;
 
-    let survival = weights.survival
-        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
+    // Survival is decided by the *projected* height, not by either term alone.
+    // Every spawn's lowest cell is row 21 and `insert_garbage` re-spawns the
+    // active piece, topping out on the spot if it cannot be placed, so the
+    // bot dies exactly when `height + pending >= 21`. The old condition was an
+    // OR (`incoming >= 8 || height >= 15`), which switched to defence at
+    // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
+    // (safe: 13 <= 20) -- it threw away attack while still alive.
+    let projected = board.height() as u32 + context.incoming;
+    let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.attack * f64::from(attack.total);
     value += if survival {
         weights.survival_line * f64::from(clear.lines)
@@ -519,8 +558,15 @@ pub fn leaf_value(
     t_available: usize,
 ) -> f64 {
     let BoardAnalysis { heights, features } = analyse(board);
-    let survival = weights.survival
-        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
+    // Survival is decided by the *projected* height, not by either term alone.
+    // Every spawn's lowest cell is row 21 and `insert_garbage` re-spawns the
+    // active piece, topping out on the spot if it cannot be placed, so the
+    // bot dies exactly when `height + pending >= 21`. The old condition was an
+    // OR (`incoming >= 8 || height >= 15`), which switched to defence at
+    // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
+    // (safe: 13 <= 20) -- it threw away attack while still alive.
+    let projected = board.height() as u32 + context.incoming;
+    let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.danger_height * features.danger_height
@@ -554,7 +600,15 @@ pub fn leaf_value(
 
     let charge = f64::from(surge_charge_from_streak(context.b2b_streak));
     value += weights.surge_charge * charge.powf(weights.surge_exponent);
-    value += weights.combo * f64::from(context.combo);
+    value += weights.combo * f64::from(context.combo.min(COMBO_CAP));
+    // Capped at COMBO_CAP. Measured over 406 games (s2-spec-lead's
+    // decomposition): attack/piece peaks at combo 3-4 (1.196) and gets *worse*
+    // at combo 5+ (1.084) and 10+ (1.110), because holding a long combo means
+    // clearing singles, whose base is 0 -- only the ln lift applies. Rewarding
+    // combo 5+ therefore pushes the bot to trade TSDs and quads for singles.
+    let combo = f64::from(context.combo.min(COMBO_CAP));
+    value += weights.combo_state * (1.25 * combo + 1.0).ln();
+    value += weights.combo_potential * features.combo_potential;
     value -= weights.incoming * f64::from(context.incoming);
     let race = i64::from(context.sent_total) - i64::from(context.received_total);
     value += weights.race * race as f64;
@@ -714,10 +768,12 @@ mod tests {
             analysis.features,
             Features {
                 max_height: 20.0,
-                height_sq: 64.0,
+                // max_height 20 against DANGER_BASE 15 -> 5^2.
+                height_sq: 25.0,
                 // Column-wise sum of max(0, h - 12)^2 on the fixture: the
                 // tallest column contributes 64 and the rest 409.
                 danger_height: 473.0,
+                combo_potential: 0.0,
                 holes: 6.0,
                 hole_cover: 23.0,
                 hole_rows: 6.0,

@@ -96,6 +96,10 @@ impl BotAgent {
             sent_total: view.sent_total,
             received_total: view.received_total,
             t_slot: 0,
+            // Added by bot-dev with harness-dev's explicit consent so the
+            // workspace builds; harness-dev mirrors this on main.
+            sent_total: view.sent_total,
+            received_total: view.received_total,
         }
     }
 

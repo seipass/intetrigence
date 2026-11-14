@@ -1,0 +1,218 @@
+{
+  "seed": 9008,
+  "sheet": "A",
+  "started_at": "unix:1794682096",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 102,
+  "surge_released": [
+    0,
+    0
+  ],
+  "max_b2b_streak": [
+    3,
+    4
+  ],
+  "turns_with_b2b_ge_4": [
+    0,
+    2
+  ],
+  "totals": [
+    {
+      "sent_total": 66,
+      "received_total": 34,
+      "attack_total": 80,
+      "pieces_placed": 102,
+      "lines_cleared": 69
+    },
+    {
+      "sent_total": 48,
+      "received_total": 35,
+      "attack_total": 75,
+      "pieces_placed": 102,
+      "lines_cleared": 53
+    }
+  ],
+  "heights": [
+    {
+      "max": 21,
+      "mean": 10.43,
+      "final_height": 3
+    },
+    {
+      "max": 16,
+      "mean": 9.64,
+      "final_height": 16
+    }
+  ],
+  "think": [
+    {
+      "count": 102,
+      "median_ms": 97.229,
+      "p95_ms": 98.584,
+      "p99_ms": 98.957,
+      "max_ms": 99.239,
+      "mean_ms": 97.175,
+      "over_budget": 0
+    },
+    {
+      "count": 102,
+      "median_ms": 100.14,
+      "p95_ms": 100.193,
+      "p99_ms": 100.317,
+      "max_ms": 100.327,
+      "mean_ms": 100.147,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 102,
+      "accepted_first": 102,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 102,
+      "accepted_first": 102,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 102,
+      "spin_checked": 102,
+      "spin_matches": 102,
+      "spin_mismatches": 0,
+      "attack_checked": 102,
+      "attack_matches": 102,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 80,
+      "recomputed_total": 80,
+      "examples": []
+    },
+    {
+      "placements": 102,
+      "spin_checked": 102,
+      "spin_matches": 101,
+      "spin_mismatches": 1,
+      "attack_checked": 102,
+      "attack_matches": 102,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 75,
+      "recomputed_total": 75,
+      "examples": [
+        {
+          "turn": 78,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 2700785730427529142,
+      "turn": 18
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10065483673854545134,
+      "turn": 31
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13406144360903570804,
+      "turn": 58
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7743927791638328997,
+      "turn": 59
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15138720730724890397,
+      "turn": 69
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 18092145764589156163,
+      "turn": 70
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7184903807417624183,
+      "turn": 92
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17231787839951153400,
+      "turn": 94
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 18303323083563425516,
+      "turn": 97
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11313133555963330572,
+      "turn": 99
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10631095624613207470,
+      "turn": 100
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "2799058",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9008-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9008,
+    "sheet": "A",
+    "turns": 102,
+    "placements": 204,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 51986
+}
