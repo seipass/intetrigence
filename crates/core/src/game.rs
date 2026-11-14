@@ -458,6 +458,11 @@ impl Game {
     /// standard spawn position above the new stack rather than translated
     /// upward. If that spawn is blocked, the game tops out.
     ///
+    /// Clutch Clear is deliberately not applied here: the referee inserts
+    /// garbage only after a lock that cleared no lines (combo blocking), and
+    /// Clutch applies only when the previous lock cleared at least one line.
+    /// A blocked spawn after insertion is therefore a block-out.
+    ///
     /// Rows pushed past row 39 are discarded (`docs/s2-spec.md` §11-U6).
     pub fn insert_garbage(&mut self, holes: &[u8]) -> Result<(), GarbageError> {
         let count = holes.len();

@@ -237,6 +237,37 @@ fn game_garbage_insertion_tops_out_when_the_spawn_is_blocked() {
 }
 
 #[test]
+fn game_garbage_insertion_does_not_apply_clutch() {
+    // The standard T spawn is blocked after insertion, but the one-row-up
+    // position is free. Clutch only applies after a line clear; garbage
+    // insertion only happens after a non-clearing lock, so this must top out.
+    let mut board = Board::new();
+    board.set_cell(3, 20, Cell::Block);
+    let active = ActivePiece {
+        kind: PieceKind::T,
+        rotation: Rotation::Zero,
+        x: 3,
+        y: 20,
+    };
+    let mut game = Game::from_position(0, board, active).unwrap();
+
+    game.insert_garbage(&[0]).unwrap();
+
+    assert!(game.is_over());
+    let pushed = ActivePiece {
+        kind: PieceKind::T,
+        rotation: Rotation::Zero,
+        x: 3,
+        y: 21,
+    };
+    assert!(
+        game.board()
+            .can_place(pushed.kind, pushed.rotation, pushed.x, pushed.y),
+        "the push-up position is free; only the no-Clutch rule explains the top-out"
+    );
+}
+
+#[test]
 fn random_garbage_and_clears_keep_board_invariants() {
     let mut rng = SplitMix64::new(0xBEEF_CAFE_1234_5678);
 
