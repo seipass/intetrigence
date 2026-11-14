@@ -1,0 +1,198 @@
+{
+  "seed": 10006,
+  "sheet": "B",
+  "started_at": "unix:1794646804",
+  "profile": "official",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 51,
+  "totals": [
+    {
+      "sent_total": 46,
+      "received_total": 16,
+      "attack_total": 57,
+      "pieces_placed": 50,
+      "lines_cleared": 26
+    },
+    {
+      "sent_total": 27,
+      "received_total": 30,
+      "attack_total": 41,
+      "pieces_placed": 50,
+      "lines_cleared": 30
+    }
+  ],
+  "heights": [
+    {
+      "max": 19,
+      "mean": 5.88,
+      "final_height": 10
+    },
+    {
+      "max": 20,
+      "mean": 6.8,
+      "final_height": 20
+    }
+  ],
+  "think": [
+    {
+      "count": 50,
+      "median_ms": 96.591,
+      "p95_ms": 98.676,
+      "p99_ms": 99.251,
+      "max_ms": 99.251,
+      "mean_ms": 96.843,
+      "over_budget": 0
+    },
+    {
+      "count": 51,
+      "median_ms": 28.689,
+      "p95_ms": 36.308,
+      "p99_ms": 40.662,
+      "max_ms": 40.662,
+      "mean_ms": 29.124,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 50,
+      "accepted_first": 50,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 50,
+      "accepted_first": 50,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 50,
+      "spin_checked": 50,
+      "spin_matches": 50,
+      "spin_mismatches": 0,
+      "attack_checked": 50,
+      "attack_matches": 50,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 57,
+      "recomputed_total": 57,
+      "examples": []
+    },
+    {
+      "placements": 50,
+      "spin_checked": 50,
+      "spin_matches": 50,
+      "spin_mismatches": 0,
+      "attack_checked": 50,
+      "attack_matches": 50,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 41,
+      "recomputed_total": 41,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 9317254713579263361,
+      "turn": 14
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9846196436074813483,
+      "turn": 15
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17666240454705963625,
+      "turn": 21
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1490980918793140007,
+      "turn": 31
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8709381032785642832,
+      "turn": 32
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7523809826904720384,
+      "turn": 45
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14307515849220552148,
+      "turn": 46
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17859594476429297048,
+      "turn": 49
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m4-reserve-v2\\logs\\seed-10006-sheet-B-attax.jsonl",
+    "decisions_logged": 51,
+    "nodes_total": 497044,
+    "extra_ms_total": 1444.2,
+    "suggestions_with_stats": 51,
+    "cells_above_row20": false,
+    "hold_matches": 50,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "247ccf7",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-10006-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 10006,
+    "sheet": "B",
+    "turns": 51,
+    "placements": 100,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 45542
+}

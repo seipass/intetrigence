@@ -1,0 +1,270 @@
+{
+  "seed": 10015,
+  "sheet": "A",
+  "started_at": "unix:1794646804",
+  "profile": "official",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 129,
+  "totals": [
+    {
+      "sent_total": 104,
+      "received_total": 37,
+      "attack_total": 126,
+      "pieces_placed": 129,
+      "lines_cleared": 83
+    },
+    {
+      "sent_total": 59,
+      "received_total": 56,
+      "attack_total": 103,
+      "pieces_placed": 128,
+      "lines_cleared": 82
+    }
+  ],
+  "heights": [
+    {
+      "max": 15,
+      "mean": 6.4,
+      "final_height": 3
+    },
+    {
+      "max": 23,
+      "mean": 6.91,
+      "final_height": 23
+    }
+  ],
+  "think": [
+    {
+      "count": 129,
+      "median_ms": 96.764,
+      "p95_ms": 98.456,
+      "p99_ms": 98.701,
+      "max_ms": 99.037,
+      "mean_ms": 96.889,
+      "over_budget": 0
+    },
+    {
+      "count": 129,
+      "median_ms": 30.382,
+      "p95_ms": 36.791,
+      "p99_ms": 40.153,
+      "max_ms": 41.801,
+      "mean_ms": 29.799,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 129,
+      "accepted_first": 129,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 128,
+      "accepted_first": 128,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 129,
+      "spin_checked": 129,
+      "spin_matches": 129,
+      "spin_mismatches": 0,
+      "attack_checked": 129,
+      "attack_matches": 129,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 126,
+      "recomputed_total": 126,
+      "examples": []
+    },
+    {
+      "placements": 128,
+      "spin_checked": 128,
+      "spin_matches": 126,
+      "spin_mismatches": 2,
+      "attack_checked": 128,
+      "attack_matches": 127,
+      "attack_mismatches": 1,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 1,
+      "declared_total": 102,
+      "recomputed_total": 103,
+      "examples": [
+        {
+          "turn": 55,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 112,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 1
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 15965303784280092336,
+      "turn": 18
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1837514756557742549,
+      "turn": 28
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5121937667096596845,
+      "turn": 29
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14191711351241218247,
+      "turn": 30
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3745227482888529379,
+      "turn": 50
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10780972750202487851,
+      "turn": 58
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15567865414484617356,
+      "turn": 60
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5667263220180995162,
+      "turn": 61
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11171893435676289139,
+      "turn": 66
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2965030066995342407,
+      "turn": 71
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7059995856992685011,
+      "turn": 95
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6790585672161438406,
+      "turn": 97
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14088833930283619093,
+      "turn": 110
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12689637742830200613,
+      "turn": 111
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5656649224824041617,
+      "turn": 120
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14790388716045154069,
+      "turn": 121
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4559688037413863837,
+      "turn": 123
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10258693414438692867,
+      "turn": 124
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4432988413880548361,
+      "turn": 127
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m4-reserve-v2\\logs\\seed-10015-sheet-A-attax.jsonl",
+    "decisions_logged": 129,
+    "nodes_total": 1301553,
+    "extra_ms_total": 3745.1,
+    "suggestions_with_stats": 129,
+    "cells_above_row20": true,
+    "hold_matches": 128,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "247ccf7",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-10015-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 10015,
+    "sheet": "A",
+    "turns": 129,
+    "placements": 257,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 117340
+}

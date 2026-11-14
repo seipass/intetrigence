@@ -1,0 +1,187 @@
+{
+  "seed": 10020,
+  "sheet": "B",
+  "started_at": "unix:1794646804",
+  "profile": "official",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 21,
+  "totals": [
+    {
+      "sent_total": 15,
+      "received_total": 4,
+      "attack_total": 16,
+      "pieces_placed": 20,
+      "lines_cleared": 10
+    },
+    {
+      "sent_total": 6,
+      "received_total": 14,
+      "attack_total": 7,
+      "pieces_placed": 20,
+      "lines_cleared": 4
+    }
+  ],
+  "heights": [
+    {
+      "max": 10,
+      "mean": 4.1,
+      "final_height": 4
+    },
+    {
+      "max": 19,
+      "mean": 5.33,
+      "final_height": 19
+    }
+  ],
+  "think": [
+    {
+      "count": 20,
+      "median_ms": 97.886,
+      "p95_ms": 98.832,
+      "p99_ms": 99.007,
+      "max_ms": 99.007,
+      "mean_ms": 97.61,
+      "over_budget": 0
+    },
+    {
+      "count": 21,
+      "median_ms": 33.351,
+      "p95_ms": 45.29,
+      "p99_ms": 49.378,
+      "max_ms": 49.378,
+      "mean_ms": 33.017,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 20,
+      "accepted_first": 20,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 20,
+      "accepted_first": 20,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 20,
+      "spin_checked": 20,
+      "spin_matches": 20,
+      "spin_mismatches": 0,
+      "attack_checked": 20,
+      "attack_matches": 20,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 16,
+      "recomputed_total": 16,
+      "examples": []
+    },
+    {
+      "placements": 20,
+      "spin_checked": 20,
+      "spin_matches": 19,
+      "spin_mismatches": 1,
+      "attack_checked": 20,
+      "attack_matches": 20,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 7,
+      "recomputed_total": 7,
+      "examples": [
+        {
+          "turn": 2,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 10478932168961129806,
+      "turn": 15
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16635271062812413884,
+      "turn": 16
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3245617064007425772,
+      "turn": 17
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16288960231679446880,
+      "turn": 18
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m4-reserve-v2\\logs\\seed-10020-sheet-B-attax.jsonl",
+    "decisions_logged": 21,
+    "nodes_total": 200632,
+    "extra_ms_total": 668.6,
+    "suggestions_with_stats": 21,
+    "cells_above_row20": false,
+    "hold_matches": 20,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "247ccf7",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-10020-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 10020,
+    "sheet": "B",
+    "turns": 21,
+    "placements": 40,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 18148
+}

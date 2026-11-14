@@ -1,0 +1,188 @@
+{
+  "seed": 10009,
+  "sheet": "A",
+  "started_at": "unix:1794646804",
+  "profile": "official",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 64,
+  "totals": [
+    {
+      "sent_total": 40,
+      "received_total": 17,
+      "attack_total": 58,
+      "pieces_placed": 64,
+      "lines_cleared": 34
+    },
+    {
+      "sent_total": 35,
+      "received_total": 28,
+      "attack_total": 45,
+      "pieces_placed": 63,
+      "lines_cleared": 33
+    }
+  ],
+  "heights": [
+    {
+      "max": 14,
+      "mean": 5.34,
+      "final_height": 9
+    },
+    {
+      "max": 20,
+      "mean": 5.53,
+      "final_height": 20
+    }
+  ],
+  "think": [
+    {
+      "count": 64,
+      "median_ms": 96.632,
+      "p95_ms": 98.132,
+      "p99_ms": 98.572,
+      "max_ms": 98.572,
+      "mean_ms": 96.775,
+      "over_budget": 0
+    },
+    {
+      "count": 64,
+      "median_ms": 30.187,
+      "p95_ms": 38.369,
+      "p99_ms": 44.467,
+      "max_ms": 44.467,
+      "mean_ms": 30.278,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 64,
+      "accepted_first": 64,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 63,
+      "accepted_first": 63,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 64,
+      "spin_checked": 64,
+      "spin_matches": 64,
+      "spin_mismatches": 0,
+      "attack_checked": 64,
+      "attack_matches": 64,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 58,
+      "recomputed_total": 58,
+      "examples": []
+    },
+    {
+      "placements": 63,
+      "spin_checked": 63,
+      "spin_matches": 63,
+      "spin_mismatches": 0,
+      "attack_checked": 63,
+      "attack_matches": 63,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 45,
+      "recomputed_total": 45,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 16682847864542749426,
+      "turn": 25
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3107313481968164796,
+      "turn": 26
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2909725534926265583,
+      "turn": 40
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9863439955117845273,
+      "turn": 44
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2387140517620162534,
+      "turn": 61
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2412796187539930438,
+      "turn": 62
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "C:/Users/Hasilan/.hasilan-code/agent/web-harness/agent-worktrees/1cf19499-c382-48a1-89f9-aad965f1bf06/scripts/evidence/m4-reserve-v2\\logs\\seed-10009-sheet-A-attax.jsonl",
+    "decisions_logged": 64,
+    "nodes_total": 629305,
+    "extra_ms_total": 1887.4,
+    "suggestions_with_stats": 64,
+    "cells_above_row20": false,
+    "hold_matches": 63,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "247ccf7",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-10009-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 10009,
+    "sheet": "A",
+    "turns": 64,
+    "placements": 127,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 58437
+}

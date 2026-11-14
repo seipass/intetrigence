@@ -8,7 +8,11 @@ Prints a Markdown table (the M3 tuning run vs the M4 reserve run) so the M4
 report can show that the reserve metrics are consistent with tuning.
 """
 import json
+import os
 import sys
+
+LEFT = os.environ.get("LEFT", "M3 tuning")
+RIGHT = os.environ.get("RIGHT", "M4 reserve")
 
 
 def load(path):
@@ -63,7 +67,7 @@ def main():
         ("spin mismatches", "spin_mismatches", "{:d}"),
         ("same-spin attack mismatches", "same_spin_attack", "{:d}"),
     ]
-    print("| metric | M3 tuning | M4 reserve |")
+    print(f"| metric | {LEFT} | {RIGHT} |")
     print("|---|---|---|")
     for label, key, fmt in rows:
         if key == "wins":
