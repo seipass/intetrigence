@@ -5,6 +5,7 @@
 //! on our side is configurable: the M0 baseline stand-in (`crate::baseline`) or
 //! the real search (`crate::bot_agent`). The summary records which one ran.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -138,6 +139,13 @@ pub struct MatchConfig {
     pub notes: Vec<String>,
     /// Weight overrides applied to the search, recorded in the replay header.
     pub weights_note: Vec<String>,
+    /// Run each `(seed, sheet)` this many times (`--repeat`). The repeat index
+    /// is recorded in the audit and the game summary; used to measure the
+    /// anytime search's non-determinism.
+    pub repeat: u32,
+    /// Deterministic search (fixed schedule, no wall-clock deadline). The
+    /// official round uses this; the replay header and the summary record it.
+    pub deterministic: bool,
     /// Build commit recorded in every replay header. Captured once at the
     /// start of the match: the repository HEAD can move while a long match is
     /// running, and the recorded commit must be the binary's build, not the
@@ -164,6 +172,8 @@ impl MatchConfig {
             resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
             weights_note: Vec::new(),
+            repeat: 1,
+            deterministic: false,
             build_commit: None,
         }
     }
@@ -316,6 +326,11 @@ pub struct SearchGameSummary {
     pub turns: u32,
     pub fallback_turns: u32,
     #[serde(default)]
+    pub aborted_turns: u32,
+    /// Depth of the completed iteration on aborted turns (depth -> count).
+    #[serde(default)]
+    pub aborted_depth_histogram: BTreeMap<u32, u32>,
+    #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
     pub depth_p95: Option<f64>,
@@ -365,6 +380,8 @@ pub struct GameSummary {
     pub spin_mismatches: [u32; 2],
     pub attack_mismatches_same_spin: [u32; 2],
     pub think_over_budget: [u32; 2],
+    #[serde(default)]
+    pub think_over_100ms: [u32; 2],
     pub sent_total: [u32; 2],
     pub received_total: [u32; 2],
     pub attack_total: [u32; 2],
@@ -385,9 +402,22 @@ pub struct GameSummary {
     /// Lines cleared in the opener phase (first 14 placements) per slot.
     #[serde(default)]
     pub opener_lines: [u32; 2],
+    /// Total lines cleared per slot.
+    #[serde(default)]
+    pub lines_cleared: [u32; 2],
+    /// Placements with a non-none spin label per slot.
+    #[serde(default)]
+    pub spin_placements: [u32; 2],
     /// Garbage burst profile per slot.
     #[serde(default)]
     pub burst: [crate::replay::BurstProfile; 2],
+    /// Loss type when intetrigence lost: `collapse` (final height >= 14),
+    /// `pending` (net damage <= -20) or `race` (otherwise).
+    #[serde(default)]
+    pub loss_type: Option<String>,
+    /// Repeat index (`--repeat`; 0 for a single run).
+    #[serde(default)]
+    pub repeat: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -415,6 +445,8 @@ pub struct BotAggregate {
     pub attack_mismatches: u32,
     pub attack_mismatches_same_spin: u32,
     pub think_over_budget: u32,
+    #[serde(default)]
+    pub think_over_100ms: u32,
     pub attack_per_piece: f64,
     pub received_per_game: f64,
     pub visible_rows: u32,
@@ -429,6 +461,22 @@ pub struct BotAggregate {
     pub fallback_turns: u32,
     #[serde(default)]
     pub fallback_rate: f64,
+    #[serde(default)]
+    pub aborted_turns: u32,
+    #[serde(default)]
+    pub aborted_rate: f64,
+    /// Merged aborted-turn depth histogram (depth -> count).
+    #[serde(default)]
+    pub aborted_depth_histogram: BTreeMap<u32, u32>,
+    /// Median think time across games.
+    #[serde(default)]
+    pub think_median_ms: f64,
+    /// Maximum per-game p99 think time.
+    #[serde(default)]
+    pub think_p99_max: f64,
+    /// Maximum per-game think time.
+    #[serde(default)]
+    pub think_max: f64,
     #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
@@ -468,6 +516,19 @@ pub struct BotAggregate {
     /// Five-turn windows exceeding the stack capacity.
     #[serde(default)]
     pub burst_over_capacity: u32,
+    /// Attack per cleared line.
+    #[serde(default)]
+    pub attack_per_line: f64,
+    /// Share of placements with a non-none spin label.
+    #[serde(default)]
+    pub spin_rate: f64,
+    /// Intetrigence losses by type (slot 0 only).
+    #[serde(default)]
+    pub collapse_losses: u32,
+    #[serde(default)]
+    pub pending_losses: u32,
+    #[serde(default)]
+    pub race_losses: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -521,6 +582,19 @@ pub struct MatchSummary {
     /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
     #[serde(default)]
     pub resumed_games: u32,
+    /// Search schedule recorded for the match (depth/width/threads).
+    #[serde(default)]
+    pub depth: u32,
+    #[serde(default)]
+    pub width: u32,
+    #[serde(default)]
+    pub threads: u32,
+    /// Deterministic search mode (fixed schedule, no wall-clock deadline).
+    #[serde(default)]
+    pub deterministic: bool,
+    /// Load warning (e.g. over-100 ms moves in deterministic mode).
+    #[serde(default)]
+    pub load_note: Option<String>,
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
@@ -594,6 +668,15 @@ fn search_game_summary(turns: &[crate::audit::SearchTurn]) -> SearchGameSummary 
     SearchGameSummary {
         turns: turns.len() as u32,
         fallback_turns: turns.iter().filter(|turn| turn.fallback).count() as u32,
+        aborted_turns: turns.iter().filter(|turn| turn.aborted).count() as u32,
+        aborted_depth_histogram: turns
+            .iter()
+            .filter(|turn| turn.aborted)
+            .filter_map(|turn| turn.depth)
+            .fold(BTreeMap::new(), |mut histogram, depth| {
+                *histogram.entry(depth).or_insert(0) += 1;
+                histogram
+            }),
         depth_median: median(&depths),
         depth_p95: percentile(&depths, 95.0),
         depth_max: max_f64(&depths).map(|value| value as u32),
@@ -688,6 +771,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
             audit.scoring[1].attack_mismatches_same_spin,
         ],
         think_over_budget: [audit.think[0].over_budget, audit.think[1].over_budget],
+        think_over_100ms: [audit.think[0].over_100ms, audit.think[1].over_100ms],
         sent_total: [audit.totals[0].sent_total, audit.totals[1].sent_total],
         received_total: [
             audit.totals[0].received_total,
@@ -713,7 +797,27 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         ],
         final_height: [audit.heights[0].final_height, audit.heights[1].final_height],
         opener_lines: audit.opener_lines,
+        lines_cleared: [audit.totals[0].lines_cleared, audit.totals[1].lines_cleared],
+        spin_placements: audit.spin_placements,
         burst: audit.verify.burst.clone(),
+        repeat: audit.repeat,
+        loss_type: if audit.winner == Some(1) {
+            let final_height = audit.heights[0].final_height;
+            let net =
+                i64::from(audit.totals[0].sent_total) - i64::from(audit.totals[0].received_total);
+            Some(
+                if final_height >= 14 {
+                    "collapse"
+                } else if net <= -20 {
+                    "pending"
+                } else {
+                    "race"
+                }
+                .to_string(),
+            )
+        } else {
+            None
+        },
     }
 }
 
@@ -832,6 +936,10 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .iter()
                 .map(|audit| audit.think[slot].over_budget)
                 .sum(),
+            think_over_100ms: audits
+                .iter()
+                .map(|audit| audit.think[slot].over_100ms)
+                .sum(),
             attack_per_piece: ratio(
                 audits
                     .iter()
@@ -885,6 +993,40 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             search_turns: search.turns,
             fallback_turns: search.fallback_turns,
             fallback_rate: search.fallback_rate,
+            aborted_turns: games
+                .iter()
+                .map(|game| game.search[slot].aborted_turns)
+                .sum(),
+            aborted_rate: ratio(
+                games
+                    .iter()
+                    .map(|game| game.search[slot].aborted_turns)
+                    .sum(),
+                games.iter().map(|game| game.search[slot].turns).sum(),
+            ),
+            aborted_depth_histogram: games.iter().fold(BTreeMap::new(), |mut merged, game| {
+                for (depth, count) in &game.search[slot].aborted_depth_histogram {
+                    *merged.entry(*depth).or_insert(0) += count;
+                }
+                merged
+            }),
+            think_median_ms: if games.is_empty() {
+                0.0
+            } else {
+                games
+                    .iter()
+                    .map(|game| game.think_median_ms[slot])
+                    .sum::<f64>()
+                    / games.len() as f64
+            },
+            think_p99_max: games
+                .iter()
+                .map(|game| game.think_p99_ms[slot])
+                .fold(0.0f64, f64::max),
+            think_max: games
+                .iter()
+                .map(|game| game.think_max_ms[slot])
+                .fold(0.0f64, f64::max),
             depth_median: search.depth_median,
             depth_p95: search.depth_p95,
             depth_max: search.depth_max,
@@ -934,6 +1076,26 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .iter()
                 .map(|game| game.burst[slot].burst_over_capacity)
                 .sum(),
+            attack_per_line: ratio(
+                games.iter().map(|game| game.attack_total[slot]).sum(),
+                games.iter().map(|game| game.lines_cleared[slot]).sum(),
+            ),
+            spin_rate: ratio(
+                games.iter().map(|game| game.spin_placements[slot]).sum(),
+                games.iter().map(|game| game.pieces_placed[slot]).sum(),
+            ),
+            collapse_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("collapse"))
+                .count() as u32,
+            pending_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("pending"))
+                .count() as u32,
+            race_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("race"))
+                .count() as u32,
         }
     });
     MatchSummary {
@@ -990,6 +1152,11 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         verified,
         verify_failures: games.len() as u32 - verified,
         resumed_games: 0,
+        depth: 0,
+        width: 0,
+        threads: 0,
+        deterministic: false,
+        load_note: None,
         measurement_complete: false,
         attax_patch_sha256: None,
         attax,
@@ -1127,6 +1294,23 @@ impl MatchSummary {
 /// Recompute the opener-phase lines (first 14 placements per slot) from a
 /// replay. Used when a verified game is resumed: the audit may predate the
 /// `opener_lines` field.
+fn spin_placements_from_replay(path: &std::path::Path) -> [u32; 2] {
+    let mut spins = [0u32; 2];
+    if let Ok(records) = crate::replay::read_replay(path) {
+        for record in &records {
+            if let crate::replay::ReplayRecord::Turn(turn) = record {
+                for placement in &turn.placements {
+                    let slot = placement.slot as usize;
+                    if slot < 2 && placement.spin != "none" {
+                        spins[slot] += 1;
+                    }
+                }
+            }
+        }
+    }
+    spins
+}
+
 fn opener_lines_from_replay(path: &std::path::Path) -> [u32; 2] {
     let mut lines = [0u32; 2];
     let mut placements = [0u32; 2];
@@ -1232,6 +1416,14 @@ fn check_opponent_log(
 
 pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let build_commit = config.build_commit.clone().or_else(git_short_head);
+    let (search_depth, search_width, search_threads) = match &config.bot {
+        BotChoice::Search(search) => (
+            search.depth as u32,
+            search.width as u32,
+            search.threads as u32,
+        ),
+        BotChoice::Baseline => (0, 0, 0),
+    };
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
@@ -1243,188 +1435,217 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let mut audits = Vec::new();
     let mut resumed_games = 0u32;
     let mut measurement_incomplete = 0u32;
-    for &seed in &config.seeds {
-        for &sheet in &config.sheets {
-            let name = format!("seed-{seed}-sheet-{}", sheet.as_str());
-            let replay_path = replays.join(format!("{name}.jsonl"));
-            let audit_path = audits_dir.join(format!("{name}.json"));
-            let log_path = logs.join(format!("{name}-attax.jsonl"));
-            let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
+    for repeat in 0..config.repeat.max(1) {
+        for &seed in &config.seeds {
+            for &sheet in &config.sheets {
+                let name = if repeat == 0 {
+                    format!("seed-{seed}-sheet-{}", sheet.as_str())
+                } else {
+                    format!("seed-{seed}-sheet-{}-r{repeat}", sheet.as_str())
+                };
+                let replay_path = replays.join(format!("{name}.jsonl"));
+                let audit_path = audits_dir.join(format!("{name}.json"));
+                let log_path = logs.join(format!("{name}-attax.jsonl"));
+                let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
 
-            if config.resume && replay_path.exists() && audit_path.exists() {
-                if let Ok(verify) = verify_replay(&replay_path) {
-                    if verify.ok {
-                        if let Ok(text) = std::fs::read_to_string(&audit_path) {
-                            if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
-                                audit.verify = verify;
-                                audit.opener_lines = opener_lines_from_replay(&replay_path);
-                                println!("{name}: resumed (verified)");
-                                audits.push(audit);
-                                resumed_games += 1;
-                                continue;
+                if config.resume && replay_path.exists() && audit_path.exists() {
+                    if let Ok(verify) = verify_replay(&replay_path) {
+                        if verify.ok {
+                            if let Ok(text) = std::fs::read_to_string(&audit_path) {
+                                if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
+                                    audit.verify = verify;
+                                    audit.opener_lines = opener_lines_from_replay(&replay_path);
+                                    audit.spin_placements =
+                                        spin_placements_from_replay(&replay_path);
+                                    println!("{name}: resumed (verified)");
+                                    audits.push(audit);
+                                    resumed_games += 1;
+                                    continue;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // A fresh game must not append to a previous run's logs: the TBP
-            // transcript and the attax decision log are opened in append mode.
-            // Resumed games are handled above and keep their logs.
-            let transcript_path = logs.join(format!("{name}-opponent.jsonl"));
-            for path in [&log_path, &stderr_path, &transcript_path] {
-                let _ = std::fs::remove_file(path);
-            }
+                // A fresh game must not append to a previous run's logs: the TBP
+                // transcript and the attax decision log are opened in append mode.
+                // Resumed games are handled above and keep their logs.
+                let transcript_path = logs.join(format!("{name}-opponent.jsonl"));
+                for path in [&log_path, &stderr_path, &transcript_path] {
+                    let _ = std::fs::remove_file(path);
+                }
 
-            let mut bot: Box<dyn Agent> = match &config.bot {
-                BotChoice::Baseline => Box::new(BaselineBot::new()),
-                BotChoice::Search(search) => {
+                let mut bot: Box<dyn Agent> = match &config.bot {
+                    BotChoice::Baseline => Box::new(BaselineBot::new()),
+                    BotChoice::Search(search) => {
+                        let mut bot_config =
+                            crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
+                        bot_config.commit = build_commit.clone();
+                        bot_config.args.extend(config.weights_note.clone());
+                        Box::new(crate::bot_agent::BotAgent::new(bot_config))
+                    }
+                };
+                let mut opponent: Box<dyn Agent> = if config.self_play {
+                    let BotChoice::Search(search) = &config.bot else {
+                        return Err("--self-play requires --bot search".into());
+                    };
                     let mut bot_config =
                         crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
-                    bot_config.commit = build_commit.clone();
+                    bot_config.commit = git_short_head();
                     bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
-                }
-            };
-            let mut opponent: Box<dyn Agent> = if config.self_play {
-                let BotChoice::Search(search) = &config.bot else {
-                    return Err("--self-play requires --bot search".into());
-                };
-                let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
-                bot_config.commit = git_short_head();
-                bot_config.args.extend(config.weights_note.clone());
-                Box::new(crate::bot_agent::BotAgent::new(bot_config))
-            } else if let Some(tbp) = &config.tbp_opponent {
-                let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
-                host.cwd = tbp.cwd.clone();
-                host.env = tbp.env.clone();
-                host.timeout = tbp.timeout;
-                host.stderr_path = Some(stderr_path.clone());
-                let mut tbp_config = TbpAgentConfig::new(host);
-                tbp_config.commit = tbp.commit.clone();
-                tbp_config.name = Some(tbp.name.clone());
-                tbp_config.visible_rows = tbp.visible_rows;
-                tbp_config.supports_180 = tbp.supports_180;
-                tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
-                tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
-                tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
-                Box::new(TbpAgent::new(tbp_config))
-            } else {
-                match &config.attax {
-                    Some(attax) => {
-                        let mut host = HostConfig::new(
-                            attax.bun.clone(),
-                            vec![attax.entry_point().to_string_lossy().to_string()],
-                        );
-                        host.timeout = attax.timeout;
-                        host.stderr_path = Some(stderr_path.clone());
-                        host.env = attax.env.clone();
-                        let mut tbp_config = TbpAgentConfig::new(host);
-                        tbp_config.commit = attax.commit.clone();
-                        tbp_config.bun_version = attax.bun_version.clone();
-                        tbp_config.visible_rows = if attax.visible_rows == 0 {
-                            detect_attax_visible_rows(&attax.dir)
-                        } else {
-                            attax.visible_rows
-                        };
-                        tbp_config.supports_180 = attax.supports_180;
-                        tbp_config.decision_log = Some(log_path.clone());
-                        tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
-                        Box::new(TbpAgent::new(tbp_config))
+                } else if let Some(tbp) = &config.tbp_opponent {
+                    let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
+                    host.cwd = tbp.cwd.clone();
+                    host.env = tbp.env.clone();
+                    host.timeout = tbp.timeout;
+                    host.stderr_path = Some(stderr_path.clone());
+                    let mut tbp_config = TbpAgentConfig::new(host);
+                    tbp_config.commit = tbp.commit.clone();
+                    tbp_config.name = Some(tbp.name.clone());
+                    tbp_config.visible_rows = tbp.visible_rows;
+                    tbp_config.supports_180 = tbp.supports_180;
+                    tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
+                    tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
+                    tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
+                    Box::new(TbpAgent::new(tbp_config))
+                } else {
+                    match &config.attax {
+                        Some(attax) => {
+                            let mut host = HostConfig::new(
+                                attax.bun.clone(),
+                                vec![attax.entry_point().to_string_lossy().to_string()],
+                            );
+                            host.timeout = attax.timeout;
+                            host.stderr_path = Some(stderr_path.clone());
+                            host.env = attax.env.clone();
+                            let mut tbp_config = TbpAgentConfig::new(host);
+                            tbp_config.commit = attax.commit.clone();
+                            tbp_config.bun_version = attax.bun_version.clone();
+                            tbp_config.visible_rows = if attax.visible_rows == 0 {
+                                detect_attax_visible_rows(&attax.dir)
+                            } else {
+                                attax.visible_rows
+                            };
+                            tbp_config.supports_180 = attax.supports_180;
+                            tbp_config.decision_log = Some(log_path.clone());
+                            tbp_config.transcript =
+                                Some(logs.join(format!("{name}-opponent.jsonl")));
+                            Box::new(TbpAgent::new(tbp_config))
+                        }
+                        // No external bot: run the harness against itself offline.
+                        None => Box::new(BaselineBot::with_name("baseline-opponent")),
                     }
-                    // No external bot: run the harness against itself offline.
-                    None => Box::new(BaselineBot::with_name("baseline-opponent")),
+                };
+
+                let round_config = RoundConfig {
+                    seed,
+                    sheet,
+                    turn_cap: config.turn_cap,
+                    frames_per_turn: config.frames_per_turn,
+                    rules: config.rules.clone(),
+                    protocol: config.protocol.clone(),
+                    started_at: config.started_at.clone(),
+                    profile: config.profile,
+                    deterministic: config.deterministic,
+                    threads: search_threads,
+                };
+
+                let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
+                let report = run_round(&round_config, &mut agents)
+                    .map_err(|error| format!("{name}: {error}"))?;
+
+                write_replay(&replay_path, &report.records)
+                    .map_err(|error| format!("write {}: {error}", replay_path.display()))?;
+                let verify = verify_replay(&replay_path)
+                    .map_err(|error| format!("verify {}: {error}", replay_path.display()))?;
+
+                let mut audit = report.audit;
+                if config.self_play || config.attax.is_none() {
+                    audit.attax = None;
                 }
-            };
+                audit.replay = format!("replays/{name}.jsonl");
+                audit.verify = verify;
+                audit.queue_invariant_violations =
+                    report.agent_audits[1].queue_invariant_violations;
+                audit
+                    .write(&audit_path)
+                    .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
-            let round_config = RoundConfig {
-                seed,
-                sheet,
-                turn_cap: config.turn_cap,
-                frames_per_turn: config.frames_per_turn,
-                rules: config.rules.clone(),
-                protocol: config.protocol.clone(),
-                started_at: config.started_at.clone(),
-                profile: config.profile,
-            };
-
-            let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
-            let report = run_round(&round_config, &mut agents)
-                .map_err(|error| format!("{name}: {error}"))?;
-
-            write_replay(&replay_path, &report.records)
-                .map_err(|error| format!("write {}: {error}", replay_path.display()))?;
-            let verify = verify_replay(&replay_path)
-                .map_err(|error| format!("verify {}: {error}", replay_path.display()))?;
-
-            let mut audit = report.audit;
-            if config.self_play || config.attax.is_none() {
-                audit.attax = None;
-            }
-            audit.replay = format!("replays/{name}.jsonl");
-            audit.verify = verify;
-            audit.queue_invariant_violations = report.agent_audits[1].queue_invariant_violations;
-            audit
-                .write(&audit_path)
-                .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
-
-            let tbp_opponent = config.tbp_opponent.is_some();
-            let opponent_log = if tbp_opponent {
-                logs.join(format!("{name}-opponent.jsonl"))
-            } else {
-                log_path.clone()
-            };
-            // `exists()` is not proof of completeness: a 0-byte file, a
-            // truncated final line, or a log that stops mid-game all exist.
-            // Count the opponent's actual placements from the replay; do not
-            // derive the count from the winner (the seat that dies first
-            // decides whether the opponent gets the last turn; protocol v1.33
-            // §8.3.1.2).
-            let opponent_plays = report
-                .records
-                .iter()
-                .filter(|record| {
-                    matches!(
-                        record,
-                        crate::replay::ReplayRecord::Turn(turn)
-                            if turn.placements.iter().any(|placement| placement.slot == 1)
-                    )
-                })
-                .count() as u32;
-            let forfeit_by_opponent = audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
-            // A forfeit by the opponent logs the forfeit turn's suggestion
-            // but no play; every other game has one suggestion per play.
-            let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
-            let log_check = check_opponent_log(
-                &opponent_log,
-                expected_suggestions,
-                opponent_plays,
-                forfeit_by_opponent,
-                tbp_opponent,
-            );
-            if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
-                measurement_incomplete += 1;
-                eprintln!(
-                    "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
-                    replay_path.exists(),
-                    audit_path.exists(),
-                    log_check.as_ref().err().map(String::as_str).unwrap_or("ok")
+                let tbp_opponent = config.tbp_opponent.is_some();
+                let opponent_log = if tbp_opponent {
+                    logs.join(format!("{name}-opponent.jsonl"))
+                } else {
+                    log_path.clone()
+                };
+                // `exists()` is not proof of completeness: a 0-byte file, a
+                // truncated final line, or a log that stops mid-game all exist.
+                // Count the opponent's actual placements from the replay; do not
+                // derive the count from the winner (the seat that dies first
+                // decides whether the opponent gets the last turn; protocol v1.33
+                // §8.3.1.2).
+                let opponent_plays = report
+                    .records
+                    .iter()
+                    .filter(|record| {
+                        matches!(
+                            record,
+                            crate::replay::ReplayRecord::Turn(turn)
+                                if turn.placements.iter().any(|placement| placement.slot == 1)
+                        )
+                    })
+                    .count() as u32;
+                let forfeit_by_opponent =
+                    audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
+                // A forfeit by the opponent logs the forfeit turn's suggestion
+                // but no play; every other game has one suggestion per play.
+                let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
+                let log_check = check_opponent_log(
+                    &opponent_log,
+                    expected_suggestions,
+                    opponent_plays,
+                    forfeit_by_opponent,
+                    tbp_opponent,
                 );
+                if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
+                    measurement_incomplete += 1;
+                    eprintln!(
+                        "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
+                        replay_path.exists(),
+                        audit_path.exists(),
+                        log_check.as_ref().err().map(String::as_str).unwrap_or("ok")
+                    );
+                }
+                println!(
+                    "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
+                    audit.winner,
+                    audit.reason,
+                    audit.turns,
+                    audit.verify.ok,
+                    audit.verify.mismatches.len()
+                );
+                audits.push(audit);
             }
-            println!(
-                "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
-                audit.winner,
-                audit.reason,
-                audit.turns,
-                audit.verify.ok,
-                audit.verify.mismatches.len()
-            );
-            audits.push(audit);
         }
     }
 
-    let mut summary = summarize(&audits, config.notes.clone());
+    let mut notes = config.notes.clone();
+    notes.push(
+        "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
+            .into(),
+    );
+    let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
+    summary.deterministic = config.deterministic;
+    summary.depth = search_depth;
+    summary.width = search_width;
+    summary.threads = search_threads;
+    if config.deterministic && summary.bots[0].think_over_100ms > 0 {
+        summary.load_note = Some(format!(
+            "possible contamination: {} move(s) over 100 ms in deterministic mode (expected 0)",
+            summary.bots[0].think_over_100ms
+        ));
+    }
     summary.measurement_complete = measurement_incomplete == 0;
     summary.attax_patch_sha256 = config
         .attax
@@ -1579,6 +1800,11 @@ mod tests {
             no_contest: 0,
             stuck: 0,
             forfeits: 0,
+            depth: 0,
+            width: 0,
+            threads: 0,
+            deterministic: false,
+            load_note: None,
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,

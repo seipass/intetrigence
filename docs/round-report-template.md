@@ -36,11 +36,16 @@
 - win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
 - no-contest record: `<wins_topout>/<games - no_contest>` (TopOut games)
 - attack/piece: `<a>` vs `<b>`
+- attack/line: `<a>`, spin rate: `<a>%`
+- losses by type: collapse `<n>`, pending `<n>`, race `<n>`
+- aborted (hard deadline): `<n>/<n>` (`<a>%`)
+- search schedule: deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
 - think over 200 ms: `<n>` vs `<n>`
 - net damage/game: `<+a>` (negative games `<n>/<n>`); collapses `<n>/<n>`; opener lines/game `<a>`
-- burst (intetrigence received): max 1-turn `<n>`, max 5-turn `<n>`, over capacity `<n>`
+- burst (intetrigence received): max 1-turn `<n>`, max 5-turn `<n>`, over capacity `<n>` (overlapping 5-turn windows, not burst events)
+- environment: `<KEY>=<absolute path>` (e.g. `CLYS_TBP_LOG=...` for clys)
 - replay verified: **50/50**
 - audit: spin mismatches `<n>` / `<n>`, same-spin attack mismatches `<n>` / `<n>`
 - per sheet: A `<w>/25`, B `<w>/25`

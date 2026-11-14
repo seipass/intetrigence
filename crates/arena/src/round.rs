@@ -58,6 +58,9 @@ pub struct RoundSpec {
     pub seeds_source: String,
     pub seeds_commit: Option<String>,
     pub build_commit: Option<String>,
+    /// Deterministic search (fixed schedule). The A/B uses this; the official
+    /// round's mode is recorded in the report.
+    pub deterministic: bool,
     pub out_root: PathBuf,
     pub report_path: PathBuf,
     pub bot: BotChoice,
@@ -85,6 +88,9 @@ pub struct StageReport {
     pub commit: Option<String>,
     pub patch_note: Option<String>,
     pub patch_sha256: Option<String>,
+    /// Extra environment passed to the opponent process (absolute paths).
+    #[serde(default)]
+    pub env: Vec<(String, String)>,
     pub games: u32,
     pub wins: u32,
     pub losses: u32,
@@ -121,6 +127,8 @@ pub struct RoundReport {
     pub round: u32,
     pub started_at: String,
     pub build_commit: Option<String>,
+    #[serde(default)]
+    pub deterministic: bool,
     pub seeds: Vec<u64>,
     pub seeds_source: String,
     pub seeds_commit: Option<String>,
@@ -480,6 +488,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
                 patch_sha256: opponent.patch_sha256.clone(),
+                env: Vec::new(),
                 games: 0,
                 wins: 0,
                 losses: 0,
@@ -513,6 +522,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.resume = spec.resume;
             config.weights_note = spec.weights_note.clone();
             config.build_commit = spec.build_commit.clone();
+            config.deterministic = spec.deterministic;
             match &opponent.kind {
                 OpponentKind::Attax {
                     dir,
@@ -542,6 +552,11 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
                 patch_sha256: opponent.patch_sha256.clone(),
+                env: match &opponent.kind {
+                    OpponentKind::Tbp(config) => config.env.clone(),
+                    OpponentKind::Attax { env, .. } => env.clone(),
+                    OpponentKind::Missing => Vec::new(),
+                },
                 games: summary.games.len() as u32,
                 wins: summary.wins,
                 losses: summary.losses,
@@ -580,6 +595,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         round: spec.round,
         started_at: now_stamp(),
         build_commit: spec.build_commit.clone(),
+        deterministic: spec.deterministic,
         seeds: spec.seeds.clone(),
         seeds_source: spec.seeds_source.clone(),
         seeds_commit: spec.seeds_commit.clone(),
@@ -659,6 +675,9 @@ fn stage_section(
     }
     if let Some(sha) = &stage.patch_sha256 {
         writeln!(out, "- compatibility patch SHA-256: `{sha}`")?;
+    }
+    for (key, value) in &stage.env {
+        writeln!(out, "- environment: `{key}={value}`")?;
     }
     writeln!(
         out,
@@ -792,14 +811,25 @@ fn stage_section(
         )?;
         writeln!(
             out,
-            "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}**",
+            "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}** (overlapping 5-turn windows, not burst events)",
             bot.max_burst_1, bot.max_burst_5, bot.burst_over_capacity
+        )?;
+        writeln!(
+            out,
+            "- aborted (hard deadline): **{}/{} ({:.1}%)**, depths {:?}",
+            bot.aborted_turns,
+            bot.search_turns,
+            bot.aborted_rate * 100.0,
+            bot.aborted_depth_histogram
         )?;
     }
     writeln!(
         out,
-        "- think over 200 ms: {} vs {}",
-        summary.bots[0].think_over_budget, summary.bots[1].think_over_budget
+        "- think over 200 ms: {} vs {}; over 100 ms: {} vs {}",
+        summary.bots[0].think_over_budget,
+        summary.bots[1].think_over_budget,
+        summary.bots[0].think_over_100ms,
+        summary.bots[1].think_over_100ms
     )?;
     writeln!(
         out,

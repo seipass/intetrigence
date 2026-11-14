@@ -210,6 +210,7 @@ impl Agent for BaselineBot {
             depth: None,
             width: None,
             fallback: false,
+            aborted: false,
         })
     }
 

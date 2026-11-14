@@ -110,6 +110,9 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut threads = 8usize;
     let mut turn_cap = 1000u32;
     let mut max_stages: Option<usize> = None;
+    let mut deterministic = false;
+    let mut depth = 8usize;
+    let mut width = 96usize;
     let mut report_path: Option<PathBuf> = None;
     let mut dry_run = false;
     let mut check_only = false;
@@ -318,6 +321,22 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--turns: {error}"))?;
                 index += 2;
             }
+            "--deterministic" => {
+                deterministic = true;
+                index += 1;
+            }
+            "--depth" => {
+                depth = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--depth: {error}"))?;
+                index += 2;
+            }
+            "--width" => {
+                width = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--width: {error}"))?;
+                index += 2;
+            }
             "--max-stages" => {
                 max_stages = Some(
                     value(1)?
@@ -494,12 +513,16 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         seeds_source,
         seeds_commit,
         build_commit: build_commit.clone(),
+        deterministic,
         out_root,
         report_path: report_path.unwrap_or_else(|| default_report_path(round)),
         bot: {
             let mut search = SearchConfig {
                 budget: Duration::from_millis(ms),
                 threads,
+                depth,
+                width,
+                max_width: width,
                 ..SearchConfig::default()
             };
             apply_weight_overrides(&mut search.weights, &weight_overrides)?;

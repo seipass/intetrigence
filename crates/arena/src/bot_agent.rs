@@ -230,6 +230,7 @@ impl Agent for BotAgent {
         let mut depth = None;
         let mut width = None;
         let mut fallback = true;
+        let mut aborted = false;
         match self.searcher.search(&root) {
             Some(result) => {
                 self.searches += 1;
@@ -240,7 +241,8 @@ impl Agent for BotAgent {
                 extra_ms = Some(elapsed_ms);
                 depth = Some(result.depth as u32);
                 width = Some(result.width as u32);
-                fallback = result.depth <= 1;
+                fallback = result.fallback;
+                aborted = result.aborted;
                 for candidate in &result.candidates {
                     let converted = Self::candidate(view, &candidate.first.placement);
                     candidates.push(converted);
@@ -268,6 +270,7 @@ impl Agent for BotAgent {
             depth,
             width,
             fallback,
+            aborted,
         })
     }
 

@@ -27,6 +27,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Only one measurement may use the machine at a time.
+source "$ROOT/scripts/measurement-lock.sh"
+acquire_measurement "round-$ROUND"
 ROUND="${ROUND:?set ROUND (e.g. ROUND=1)}"
 SEEDS_FILE="${SEEDS_FILE:-$ROOT/docs/seeds-round-$ROUND.md}"
 OUT="${OUT:-$ROOT/scripts/evidence}"
@@ -45,12 +48,14 @@ MS="${MS:-100}"
 THREADS="${THREADS:-8}"
 TURNS="${TURNS:-1000}"
 MAX_STAGES="${MAX_STAGES:-3}"
+mkdir -p "$OUT"
 
 ARGS=(run --round "$ROUND" --out "$OUT"
   --attax-dir "$ATTAX_DIR" --attax-commit "$ATTAX_COMMIT"
   --attax-patch-note "$ATTAX_PATCH_NOTE" --attax-patch-sha256 "$ATTAX_PATCH_SHA256"
   --attax-visible-rows "$ATTAX_VISIBLE_ROWS"
   --gate-attax "$GATE_ATTAX" --gate-cc2 "$GATE_CC2" --gate-clys "$GATE_CLYS"
+  --deterministic --depth "${DEPTH:-6}" --width "${WIDTH:-96}"
   --ms "$MS" --threads "$THREADS" --turns "$TURNS" --max-stages "$MAX_STAGES")
 
 if [ -n "${SEEDS_OVERRIDE:-}" ]; then
@@ -68,7 +73,7 @@ if [ -n "${CC2_PROGRAM:-}" ]; then
   ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}" --cc2-supports-180 "$CC2_SUPPORTS_180")
 fi
 if [ -n "${CLYS_PROGRAM:-}" ]; then
-  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180")
+  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180" --clys-env "CLYS_TBP_LOG=$(cd "$OUT" && pwd)/round-$ROUND-clys-adapter.jsonl")
 fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
   ARGS+=(--dry-run)

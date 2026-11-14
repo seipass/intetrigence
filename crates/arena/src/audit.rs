@@ -32,6 +32,9 @@ pub struct ThinkStats {
     pub mean_ms: f64,
     /// Placements whose wall-clock think time exceeded [`PPS_BUDGET_MS`].
     pub over_budget: u32,
+    /// Placements whose wall-clock think time exceeded 100 ms (the bot budget).
+    #[serde(default)]
+    pub over_100ms: u32,
 }
 
 impl ThinkStats {
@@ -56,6 +59,7 @@ impl ThinkStats {
             p99_ms: round3(sorted[rank99 - 1]),
             max_ms: round3(sorted[count - 1]),
             mean_ms: round3(sorted.iter().sum::<f64>() / count as f64),
+            over_100ms: samples.iter().filter(|&&sample| sample > 100.0).count() as u32,
             over_budget: samples
                 .iter()
                 .filter(|&&sample| sample > PPS_BUDGET_MS)
@@ -252,6 +256,9 @@ pub struct SearchTurn {
     pub nodes: Option<u64>,
     #[serde(default)]
     pub fallback: bool,
+    /// The search hit its hard deadline (the bot's `aborted` flag).
+    #[serde(default)]
+    pub aborted: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -304,6 +311,12 @@ pub struct GameAudit {
     /// Lines cleared in the opener phase (the first 14 placements per slot).
     #[serde(default)]
     pub opener_lines: [u32; 2],
+    /// Placements with a non-none spin label per slot.
+    #[serde(default)]
+    pub spin_placements: [u32; 2],
+    /// Repeat index when the same seed is run multiple times (`--repeat`).
+    #[serde(default)]
+    pub repeat: u32,
 }
 
 impl GameAudit {

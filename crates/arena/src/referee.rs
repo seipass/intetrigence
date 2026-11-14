@@ -39,6 +39,10 @@ pub struct RoundConfig {
     pub started_at: String,
     /// Match profile (protocol v1.11 §1.3). `Official` is the empty board.
     pub profile: Profile,
+    /// Deterministic search (fixed schedule, no wall-clock deadline).
+    pub deterministic: bool,
+    /// Worker threads requested for the search (recorded in the header).
+    pub threads: u32,
 }
 
 impl RoundConfig {
@@ -50,6 +54,8 @@ impl RoundConfig {
             frames_per_turn: 12,
             rules: "docs/s2-spec.md@v1.3.11".into(),
             protocol: "docs/s2-referee-protocol.md@v1.9".into(),
+            deterministic: false,
+            threads: 8,
             started_at: String::new(),
             profile: Profile::Official,
         }
@@ -227,6 +233,7 @@ pub fn run_round(
                 width: suggestion.width,
                 nodes: suggestion.nodes,
                 fallback: suggestion.fallback,
+                aborted: suggestion.aborted,
             });
 
             let adopted =
@@ -450,13 +457,19 @@ pub fn run_round(
 
     let mut opener_lines = [0u32; 2];
     let mut opener_placements = [0u32; 2];
+    let mut spin_placements = [0u32; 2];
     for record in &records {
         if let ReplayRecord::Turn(turn) = record {
             for placement in &turn.placements {
                 let slot = placement.slot as usize;
-                if slot < 2 && opener_placements[slot] < 14 {
-                    opener_lines[slot] += u32::from(placement.lines);
-                    opener_placements[slot] += 1;
+                if slot < 2 {
+                    if placement.spin != "none" {
+                        spin_placements[slot] += 1;
+                    }
+                    if opener_placements[slot] < 14 {
+                        opener_lines[slot] += u32::from(placement.lines);
+                        opener_placements[slot] += 1;
+                    }
                 }
             }
         }
@@ -515,6 +528,8 @@ pub fn run_round(
         bot_nodes_total: agent_audits[0].nodes_total,
         search,
         opener_lines,
+        spin_placements,
+        repeat: 0,
     };
 
     Ok(RoundReport {
@@ -550,6 +565,8 @@ fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> 
         preview: 5,
         profile: config.profile.as_str(),
         start_garbage: start_garbage.to_vec(),
+        deterministic: config.deterministic,
+        threads: config.threads,
     }
 }
 
@@ -649,13 +666,19 @@ fn forfeit_report(
     };
     let mut opener_lines = [0u32; 2];
     let mut opener_placements = [0u32; 2];
+    let mut spin_placements = [0u32; 2];
     for record in &records {
         if let ReplayRecord::Turn(turn) = record {
             for placement in &turn.placements {
                 let slot = placement.slot as usize;
-                if slot < 2 && opener_placements[slot] < 14 {
-                    opener_lines[slot] += u32::from(placement.lines);
-                    opener_placements[slot] += 1;
+                if slot < 2 {
+                    if placement.spin != "none" {
+                        spin_placements[slot] += 1;
+                    }
+                    if opener_placements[slot] < 14 {
+                        opener_lines[slot] += u32::from(placement.lines);
+                        opener_placements[slot] += 1;
+                    }
                 }
             }
         }
@@ -690,6 +713,8 @@ fn forfeit_report(
         bot_nodes_total: 0,
         search: [Vec::new(), Vec::new()],
         opener_lines: [0, 0],
+        spin_placements: [0, 0],
+        repeat: 0,
     };
     for agent in agents.iter_mut() {
         let _ = agent.end_round();
