@@ -350,12 +350,18 @@ fn gate_check(
     turncap_wins: u32,
     topout_losses: u32,
     forfeit_other: u32,
+    measurement_complete: bool,
     verified: u32,
     games: u32,
     gate: u32,
 ) -> bool {
     // A `forfeit-other` win is an invalid game (protocol v1.13 §7.1.3-4).
     if forfeit_other > 0 {
+        return false;
+    }
+    // Every game needs replay + verify + audit + opponent decision log
+    // (protocol v1.22 §8.3.1).
+    if !measurement_complete {
         return false;
     }
     // Every replay must verify.
@@ -379,6 +385,7 @@ fn stage_gate(index: usize, summary: &MatchSummary, gate: u32) -> bool {
         summary.wins_turncap,
         summary.losses_topout,
         summary.wins_forfeit_other,
+        summary.measurement_complete,
         summary.verified,
         summary.games.len() as u32,
         gate,
@@ -394,6 +401,9 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
             "invalid: {} forfeit-other win(s) (protocol v1.13 §7.1.3-4)",
             summary.wins_forfeit_other
         );
+    }
+    if !summary.measurement_complete {
+        return "measurement incomplete (missing replay, audit or opponent decision log)".into();
     }
     if summary.verify_failures > 0 {
         return format!("{} replay verification failure(s)", summary.verify_failures);
@@ -607,7 +617,8 @@ fn stage_section(
         return Ok(());
     };
     let games = summary.games.len() as u32;
-    let (low, high) = wilson_interval(summary.wins, games, 1.959_964);
+    let gate_wins = summary.wins_topout + summary.wins_turncap;
+    let (low, high) = wilson_interval(gate_wins, games, 1.959_964);
     writeln!(
         out,
         "- games: **{}** ({} seed(s) x sheets A/B)",
@@ -626,11 +637,19 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- result: **{} W / {} L / {} D** — {:.1}% (Wilson 95% CI {:.1}..{:.1}%)",
-        summary.wins,
-        summary.losses,
-        summary.draws,
-        summary.win_rate * 100.0,
+        "- raw games: {} W / {} L / {} D (forfeits: {}; this is **not** a win rate)",
+        summary.wins, summary.losses, summary.draws, summary.forfeits
+    )?;
+    writeln!(
+        out,
+        "- **gate record: {} TopOut+TurnCap wins / {} games** — {:.1}% (Wilson 95% CI {:.1}..{:.1}%)",
+        gate_wins,
+        games,
+        if games == 0 {
+            0.0
+        } else {
+            gate_wins as f64 / games as f64 * 100.0
+        },
         low * 100.0,
         high * 100.0
     )?;
@@ -685,6 +704,25 @@ fn stage_section(
         out,
         "- think over 200 ms: {} vs {}",
         summary.bots[0].think_over_budget, summary.bots[1].think_over_budget
+    )?;
+    writeln!(
+        out,
+        "- measurement complete: {} (replay + verify + audit + opponent decision log)",
+        if summary.measurement_complete {
+            "**yes**"
+        } else {
+            "**NO**"
+        }
+    )?;
+    writeln!(
+        out,
+        "- surge releases: {} vs {}; max B2B: {} vs {}; turns at B2B>=4: {} vs {}",
+        summary.surge_released[0],
+        summary.surge_released[1],
+        summary.max_b2b_streak[0],
+        summary.max_b2b_streak[1],
+        summary.turns_with_b2b_ge_4[0],
+        summary.turns_with_b2b_ge_4[1]
     )?;
     writeln!(
         out,
@@ -960,15 +998,16 @@ mod tests {
     #[test]
     fn stage_gate_counts_only_topout_and_turncap_wins() {
         // Stage 1: >= 45 TopOut+TurnCap wins and <= 5 TopOut losses.
-        assert!(gate_check(0, 40, 5, 5, 0, 50, 50, 45));
-        assert!(!gate_check(0, 39, 5, 5, 0, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 6, 0, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 5, 1, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 5, 0, 49, 50, 45));
+        assert!(gate_check(0, 40, 5, 5, 0, true, 50, 50, 45));
+        assert!(!gate_check(0, 39, 5, 5, 0, true, 50, 50, 45));
+        assert!(!gate_check(0, 40, 5, 6, 0, true, 50, 50, 45));
+        assert!(!gate_check(0, 40, 5, 5, 1, true, 50, 50, 45));
+        assert!(!gate_check(0, 40, 5, 5, 0, true, 49, 50, 45));
+        assert!(!gate_check(0, 40, 5, 5, 0, false, 50, 50, 45));
         // Forfeit-vision wins are not part of the gate.
-        assert!(!gate_check(0, 44, 0, 0, 0, 50, 50, 45));
+        assert!(!gate_check(0, 44, 0, 0, 0, true, 50, 50, 45));
         // Stage 2/3: >= 48 TopOut+TurnCap wins.
-        assert!(gate_check(1, 46, 2, 2, 0, 50, 50, 48));
-        assert!(!gate_check(1, 45, 2, 3, 0, 50, 50, 48));
+        assert!(gate_check(1, 46, 2, 2, 0, true, 50, 50, 48));
+        assert!(!gate_check(1, 45, 2, 3, 0, true, 50, 50, 48));
     }
 }

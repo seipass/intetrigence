@@ -205,6 +205,12 @@ pub struct GameSummary {
     /// `vision` | `other` | `unknown` for Forfeit results.
     pub forfeit_cause: Option<String>,
     pub turns: u32,
+    #[serde(default)]
+    pub surge_released: [u32; 2],
+    #[serde(default)]
+    pub max_b2b_streak: [u32; 2],
+    #[serde(default)]
+    pub turns_with_b2b_ge_4: [u32; 2],
     pub verified: bool,
     pub verify_mismatches: usize,
     pub think_median_ms: [f64; 2],
@@ -284,6 +290,12 @@ pub struct MatchSummary {
     pub losses_topout: u32,
     pub losses_forfeit: u32,
     pub turncap: u32,
+    #[serde(default)]
+    pub surge_released: [u32; 2],
+    #[serde(default)]
+    pub max_b2b_streak: [u32; 2],
+    #[serde(default)]
+    pub turns_with_b2b_ge_4: [u32; 2],
     pub win_rate: f64,
     pub wilson_low: f64,
     pub wilson_high: f64,
@@ -292,6 +304,9 @@ pub struct MatchSummary {
     /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
     #[serde(default)]
     pub resumed_games: u32,
+    /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
+    #[serde(default)]
+    pub measurement_complete: bool,
     pub attax: Option<AttaxSummary>,
     pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
@@ -331,6 +346,9 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         reason: audit.reason.clone(),
         forfeit_cause: audit.forfeit_cause.map(|cause| cause.as_str().to_string()),
         turns: audit.turns,
+        surge_released: audit.surge_released,
+        max_b2b_streak: audit.max_b2b_streak,
+        turns_with_b2b_ge_4: audit.turns_with_b2b_ge_4,
         verified: audit.verify.ok,
         verify_mismatches: audit.verify.mismatches.len(),
         think_median_ms: [audit.think[0].median_ms, audit.think[1].median_ms],
@@ -535,12 +553,33 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         losses_topout,
         losses_forfeit,
         turncap,
+        surge_released: [
+            games.iter().map(|game| game.surge_released[0]).sum(),
+            games.iter().map(|game| game.surge_released[1]).sum(),
+        ],
+        max_b2b_streak: [
+            games
+                .iter()
+                .map(|game| game.max_b2b_streak[0])
+                .max()
+                .unwrap_or(0),
+            games
+                .iter()
+                .map(|game| game.max_b2b_streak[1])
+                .max()
+                .unwrap_or(0),
+        ],
+        turns_with_b2b_ge_4: [
+            games.iter().map(|game| game.turns_with_b2b_ge_4[0]).sum(),
+            games.iter().map(|game| game.turns_with_b2b_ge_4[1]).sum(),
+        ],
         win_rate: rate(wins, games.len() as u32),
         wilson_low: (wilson_low * 10000.0).round() / 10000.0,
         wilson_high: (wilson_high * 10000.0).round() / 10000.0,
         verified,
         verify_failures: games.len() as u32 - verified,
         resumed_games: 0,
+        measurement_complete: false,
         attax,
         bots,
         notes,
@@ -671,6 +710,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
 
     let mut audits = Vec::new();
     let mut resumed_games = 0u32;
+    let mut measurement_incomplete = 0u32;
     for &seed in &config.seeds {
         for &sheet in &config.sheets {
             let name = format!("seed-{seed}-sheet-{}", sheet.as_str());
@@ -723,6 +763,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 tbp_config.visible_rows = tbp.visible_rows;
                 tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
                 tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
+                tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                 Box::new(TbpAgent::new(tbp_config))
             } else {
                 match &config.attax {
@@ -737,6 +778,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();
                         tbp_config.decision_log = Some(log_path.clone());
+                        tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                         Box::new(TbpAgent::new(tbp_config))
                     }
                     // No external bot: run the harness against itself offline.
@@ -775,6 +817,20 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 .write(&audit_path)
                 .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
+            let opponent_log = if config.tbp_opponent.is_some() {
+                logs.join(format!("{name}-opponent.jsonl"))
+            } else {
+                log_path.clone()
+            };
+            if !replay_path.exists() || !audit_path.exists() || !opponent_log.exists() {
+                measurement_incomplete += 1;
+                eprintln!(
+                    "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
+                    replay_path.exists(),
+                    audit_path.exists(),
+                    opponent_log.exists()
+                );
+            }
             println!(
                 "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
                 audit.winner,
@@ -789,6 +845,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
 
     let mut summary = summarize(&audits, config.notes.clone());
     summary.resumed_games = resumed_games;
+    summary.measurement_complete = measurement_incomplete == 0;
     if resumed_games > 0 {
         println!("resume: {resumed_games} verified game(s) reused");
     }
@@ -872,12 +929,16 @@ mod tests {
             losses_topout: 0,
             losses_forfeit: 0,
             turncap: 0,
+            surge_released: [0, 0],
+            max_b2b_streak: [0, 0],
+            turns_with_b2b_ge_4: [0, 0],
             win_rate: 0.0,
             wilson_low: 0.0,
             wilson_high: 1.0,
             verified: 0,
             verify_failures: 0,
             resumed_games: 0,
+            measurement_complete: true,
             attax: None,
             bots: [
                 BotAggregate {

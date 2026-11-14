@@ -163,6 +163,7 @@ pub fn run_round(
     let mut scoring: [ScoringAudit; 2] = [ScoringAudit::default(), ScoringAudit::default()];
     let mut reachability_rejections = 0u32;
     let mut heights: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
+    let mut b2b_turns = [0u32; 2];
 
     let mut end: Option<End> = None;
     let mut turns_played = 0u32;
@@ -246,6 +247,9 @@ pub fn run_round(
                 }
             };
 
+            if applied.b2b_after >= 4 {
+                b2b_turns[slot] += 1;
+            }
             scoring[slot].record(
                 t,
                 slot as u8,
@@ -434,6 +438,9 @@ pub fn run_round(
         detail: outcome.detail.clone(),
         forfeit_cause,
         turns: turns_played,
+        surge_released: [per_player[0].surge_released, per_player[1].surge_released],
+        max_b2b_streak: [per_player[0].max_b2b, per_player[1].max_b2b],
+        turns_with_b2b_ge_4: b2b_turns,
         heights: [
             crate::audit::HeightStats::from_samples(&heights[0]),
             crate::audit::HeightStats::from_samples(&heights[1]),
@@ -612,6 +619,9 @@ fn forfeit_report(
         detail: Some(detail),
         forfeit_cause: Some(ForfeitCause::Unknown),
         turns: 0,
+        surge_released: [0, 0],
+        max_b2b_streak: [0, 0],
+        turns_with_b2b_ge_4: [0, 0],
         totals: [crate::audit::PlayerTotals::default(); 2],
         heights: [crate::audit::HeightStats::default(); 2],
         think: [ThinkStats::default(), ThinkStats::default()],
@@ -676,6 +686,10 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
     }
 }
 
+fn round3(value: f64) -> f64 {
+    (value * 1000.0).round() / 1000.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,8 +724,4 @@ mod tests {
         engine.players[0].game = game;
         assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Vision);
     }
-}
-
-fn round3(value: f64) -> f64 {
-    (value * 1000.0).round() / 1000.0
 }

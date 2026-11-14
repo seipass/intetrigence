@@ -253,6 +253,15 @@ pub struct GameAudit {
     /// Forfeit cause (protocol v1.8 §7.1); `None` for non-forfeit results.
     pub forfeit_cause: Option<crate::replay::ForfeitCause>,
     pub turns: u32,
+    /// Surge releases per player (S2 B2B charging payoff).
+    #[serde(default)]
+    pub surge_released: [u32; 2],
+    /// Maximum B2B streak reached per player.
+    #[serde(default)]
+    pub max_b2b_streak: [u32; 2],
+    /// Turns at or above the surge threshold (B2B >= 4) per player.
+    #[serde(default)]
+    pub turns_with_b2b_ge_4: [u32; 2],
     pub totals: [PlayerTotals; 2],
     /// Per-turn board height samples (diagnostic profiles).
     pub heights: [HeightStats; 2],

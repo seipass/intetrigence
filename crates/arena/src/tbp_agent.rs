@@ -5,6 +5,7 @@
 //! refills to a six-entry queue, `start` resend after garbage, hold inference,
 //! think-time recording and the `ATTAX_TBP_LOG` cross-check.
 
+use std::io::Write as _;
 use std::path::PathBuf;
 
 use intetrigence_core::PieceKind;
@@ -37,6 +38,9 @@ pub struct TbpAgentConfig {
     /// worker has expanded the root). Zero disables retries, which is required
     /// for bots whose empty suggestion is a real forfeit (attax).
     pub retry_empty_suggest_ms: u64,
+    /// JSONL transcript of every host message and suggestion (measurement
+    /// completeness, protocol v1.21 §8.3.1).
+    pub transcript: Option<PathBuf>,
 }
 
 impl TbpAgentConfig {
@@ -50,6 +54,7 @@ impl TbpAgentConfig {
             visible_rows: 20,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
+            transcript: None,
         }
     }
 }
@@ -71,10 +76,12 @@ pub struct TbpAgent {
     decisions_logged: u64,
     cells_above_row20: bool,
     queue_invariant_violations: u64,
+    transcript: Option<PathBuf>,
 }
 
 impl TbpAgent {
     pub fn new(config: TbpAgentConfig) -> Self {
+        let transcript = config.transcript.clone();
         let descriptor = BotDescriptor {
             name: config.name.clone().unwrap_or_else(|| "tbp-bot".into()),
             version: None,
@@ -103,7 +110,12 @@ impl TbpAgent {
             decisions_logged: 0,
             cells_above_row20: false,
             queue_invariant_violations: 0,
+            transcript,
         }
+    }
+
+    fn transcript_log(&self, value: serde_json::Value) {
+        transcript_log(self.transcript.as_deref(), value);
     }
 
     pub fn queue_invariant_violations(&self) -> u64 {
@@ -147,6 +159,22 @@ pub fn refill_pieces(queue: &[PieceKind], current_len: usize) -> Vec<Piece> {
         .copied()
         .map(Piece::from_core)
         .collect()
+}
+
+fn transcript_log(path: Option<&std::path::Path>, value: serde_json::Value) {
+    let Some(path) = path else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(file, "{value}");
+    }
 }
 
 fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<char>>> {
@@ -193,6 +221,7 @@ impl Agent for TbpAgent {
             context.initial.combo,
             context.initial.b2b_streak,
         );
+        self.transcript_log(serde_json::json!({"type": "start", "payload": &payload}));
         host.start(&payload, "initial", board_hash(&context.initial.board), 0);
         self.mirror = Mirror::from_start(&payload);
         self.host = Some(host);
@@ -221,6 +250,10 @@ impl Agent for TbpAgent {
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
         };
+        transcript_log(
+            self.transcript.as_deref(),
+            serde_json::json!({"type": "suggestion", "payload": &payload}),
+        );
         let think_ms = delay as f64 + total_think;
         let (nodes, extra_ms) = match &payload.move_info {
             Some(info) => {
@@ -261,6 +294,10 @@ impl Agent for TbpAgent {
             location: location_of_core(commit.piece, commit.rotation, commit.x, commit.y),
             spin: SpinLabel::from_core(commit.spin),
         };
+        transcript_log(
+            self.transcript.as_deref(),
+            serde_json::json!({"type": "play", "move": &mv}),
+        );
         host.play(mv)
             .map_err(|error| AgentError::Io(error.to_string()))?;
         let inferred_hold = self.mirror.apply_play(&mv);
@@ -283,6 +320,10 @@ impl Agent for TbpAgent {
                 commit.combo,
                 commit.b2b_streak,
             );
+            transcript_log(
+                self.transcript.as_deref(),
+                serde_json::json!({"type": "start", "reason": "garbage", "payload": &payload}),
+            );
             host.start(&payload, "garbage", commit.board_hash, commit.turn);
             self.mirror = Mirror::from_start(&payload);
         } else {
@@ -290,6 +331,10 @@ impl Agent for TbpAgent {
             // A hold with an empty slot makes the adapter consume two entries,
             // so this sends two `new_piece` messages in that case.
             for piece in refill_pieces(&commit.queue, self.mirror.queue.len()) {
+                transcript_log(
+                    self.transcript.as_deref(),
+                    serde_json::json!({"type": "new_piece", "piece": piece}),
+                );
                 host.new_piece(piece)
                     .map_err(|error| AgentError::Io(error.to_string()))?;
                 self.mirror.push(piece);
@@ -307,6 +352,7 @@ impl Agent for TbpAgent {
     }
 
     fn end_round(&mut self) -> Result<(), AgentError> {
+        self.transcript_log(serde_json::json!({"type": "quit"}));
         if let Some(mut host) = self.host.take() {
             self.start_resends = host
                 .start_resends
