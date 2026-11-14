@@ -71,6 +71,8 @@ pub struct MatchConfig {
     pub bot: BotChoice,
     /// Match profile (protocol v1.11 §1.3).
     pub profile: Profile,
+    /// Run both slots with the in-process search (self-play diagnostic).
+    pub self_play: bool,
     /// Notes written into the summary. Set per match so the M0 plumbing run and
     /// the M2 real-bot run cannot inherit each other's wording.
     pub notes: Vec<String>,
@@ -90,6 +92,7 @@ impl MatchConfig {
             protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
             profile: Profile::Official,
+            self_play: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
         }
     }
@@ -587,22 +590,31 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
                 }
             };
-            let mut opponent: Box<dyn Agent> = match &config.attax {
-                Some(attax) => {
-                    let mut host = HostConfig::new(
-                        attax.bun.clone(),
-                        vec![attax.entry_point().to_string_lossy().to_string()],
-                    );
-                    host.timeout = attax.timeout;
-                    host.stderr_path = Some(stderr_path.clone());
-                    let mut tbp_config = TbpAgentConfig::new(host);
-                    tbp_config.commit = attax.commit.clone();
-                    tbp_config.bun_version = attax.bun_version.clone();
-                    tbp_config.decision_log = Some(log_path.clone());
-                    Box::new(TbpAgent::new(tbp_config))
+            let mut opponent: Box<dyn Agent> = if config.self_play {
+                let BotChoice::Search(search) = &config.bot else {
+                    return Err("--self-play requires --bot search".into());
+                };
+                let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
+                bot_config.commit = git_short_head();
+                Box::new(crate::bot_agent::BotAgent::new(bot_config))
+            } else {
+                match &config.attax {
+                    Some(attax) => {
+                        let mut host = HostConfig::new(
+                            attax.bun.clone(),
+                            vec![attax.entry_point().to_string_lossy().to_string()],
+                        );
+                        host.timeout = attax.timeout;
+                        host.stderr_path = Some(stderr_path.clone());
+                        let mut tbp_config = TbpAgentConfig::new(host);
+                        tbp_config.commit = attax.commit.clone();
+                        tbp_config.bun_version = attax.bun_version.clone();
+                        tbp_config.decision_log = Some(log_path.clone());
+                        Box::new(TbpAgent::new(tbp_config))
+                    }
+                    // No external bot: run the harness against itself offline.
+                    None => Box::new(BaselineBot::with_name("baseline-opponent")),
                 }
-                // No external bot: run the harness against itself offline.
-                None => Box::new(BaselineBot::with_name("baseline-opponent")),
             };
 
             let round_config = RoundConfig {
@@ -626,6 +638,9 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 .map_err(|error| format!("verify {}: {error}", replay_path.display()))?;
 
             let mut audit = report.audit;
+            if config.self_play || config.attax.is_none() {
+                audit.attax = None;
+            }
             audit.replay = format!("replays/{name}.jsonl");
             audit.verify = verify;
             audit.queue_invariant_violations = report.agent_audits[1].queue_invariant_violations;

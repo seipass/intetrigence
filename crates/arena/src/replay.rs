@@ -21,7 +21,7 @@ use intetrigence_core::{PieceKind, Rotation, SpinType};
 use serde::{Deserialize, Serialize};
 
 use crate::agent::BotDescriptor;
-use crate::engine::{Engine, PlacementTarget, Sheet, board_hash};
+use crate::engine::{Engine, PlacementTarget, Profile, Sheet, board_hash};
 
 pub const SCHEMA: &str = "intetrigence/s2-replay/1";
 
@@ -250,6 +250,19 @@ pub fn write_replay(path: &Path, records: &[ReplayRecord]) -> std::io::Result<()
     file.flush()
 }
 
+/// Rebuilds the initial engine for a replay header (profile start garbage
+/// included). Periodic harness injections are in the record stream; apply the
+/// `garbage` records with `from == 2` at the same turns.
+pub fn engine_from_header(header: &Header) -> Engine {
+    let sheet = Sheet::parse(&header.sheet).unwrap_or(Sheet::A);
+    Engine::with_start_garbage(
+        header.seed,
+        sheet,
+        header.frames_per_turn,
+        &header.start_garbage,
+    )
+}
+
 pub fn read_replay(path: &Path) -> Result<Vec<ReplayRecord>, VerifyError> {
     let file = std::fs::File::open(path).map_err(|error| VerifyError::Io(error.to_string()))?;
     let mut records = Vec::new();
@@ -305,7 +318,7 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             ));
         }
     };
-    let sheet = Sheet::parse(&header.sheet)
+    Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
     let visible_rows = [
         header
@@ -319,12 +332,8 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             .map(|bot| bot.visible_rows)
             .unwrap_or(0),
     ];
-    let mut engine = Engine::with_start_garbage(
-        header.seed,
-        sheet,
-        header.frames_per_turn,
-        &header.start_garbage,
-    );
+    let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
+    let mut engine = engine_from_header(&header);
     let mut report = VerifyReport {
         seed: header.seed,
         sheet: header.sheet.clone(),
@@ -334,6 +343,37 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     let mut index = 1;
     while index < records.len() {
         match &records[index] {
+            ReplayRecord::Garbage(garbage) if garbage.from == 2 => {
+                // Harness injection (garbage-pressure profile). It is recorded
+                // before the turn it applies to, so the verifier applies it at
+                // the same point.
+                if profile.injection_amount(garbage.t) != Some(garbage.amount) {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: profile {:?} does not inject {} rows",
+                        garbage.t, header.profile, garbage.amount
+                    ));
+                }
+                if garbage.to > 1 {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: bad target slot {}",
+                        garbage.t, garbage.to
+                    ));
+                }
+                if garbage.arrival_frame != u64::from(garbage.t) * header.frames_per_turn {
+                    report.mismatches.push(format!(
+                        "t{} harness garbage: arrival_frame {} != {}",
+                        garbage.t,
+                        garbage.arrival_frame,
+                        u64::from(garbage.t) * header.frames_per_turn
+                    ));
+                }
+                if garbage.to <= 1 {
+                    engine.players[garbage.to as usize]
+                        .garbage
+                        .receive(garbage.amount, garbage.arrival_frame);
+                }
+                index += 1;
+            }
             ReplayRecord::Turn(turn) => {
                 engine.turn = turn.t;
                 engine.begin_turn();

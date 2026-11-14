@@ -209,6 +209,35 @@ pub struct PlayerTotals {
     pub received_total: u32,
     pub attack_total: u32,
     pub pieces_placed: u32,
+    pub lines_cleared: u32,
+}
+
+/// Board-height samples for one player (one sample per turn, taken at the start
+/// of the turn). Used by the diagnostic profiles to report the stack profile.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+pub struct HeightStats {
+    pub max: u32,
+    pub mean: f64,
+    pub final_height: u32,
+}
+
+impl HeightStats {
+    pub fn from_samples(samples: &[u32]) -> Self {
+        if samples.is_empty() {
+            return Self::default();
+        }
+        let max = *samples.iter().max().unwrap_or(&0);
+        let mean = (samples.iter().map(|&value| f64::from(value)).sum::<f64>()
+            / samples.len() as f64
+            * 100.0)
+            .round()
+            / 100.0;
+        Self {
+            max,
+            mean,
+            final_height: *samples.last().unwrap_or(&0),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -225,6 +254,8 @@ pub struct GameAudit {
     pub forfeit_cause: Option<crate::replay::ForfeitCause>,
     pub turns: u32,
     pub totals: [PlayerTotals; 2],
+    /// Per-turn board height samples (diagnostic profiles).
+    pub heights: [HeightStats; 2],
     pub think: [ThinkStats; 2],
     pub first_choice: [FirstChoiceAudit; 2],
     pub scoring: [ScoringAudit; 2],

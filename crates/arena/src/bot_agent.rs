@@ -38,6 +38,7 @@ pub struct BotAgentConfig {
 impl BotAgentConfig {
     pub fn new(search: SearchConfig) -> Self {
         let budget_ms = search.budget.as_millis();
+        let threads = search.threads;
         Self {
             search,
             name: "intetrigence".into(),
@@ -47,7 +48,7 @@ impl BotAgentConfig {
                 "--ms".into(),
                 budget_ms.to_string(),
                 "--threads".into(),
-                "8".into(),
+                threads.to_string(),
             ],
         }
     }
