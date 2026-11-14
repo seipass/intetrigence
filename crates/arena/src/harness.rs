@@ -59,6 +59,8 @@ pub struct TbpOpponentConfig {
     pub visible_rows: u32,
     /// Delay before each `suggest` (budget for continuously-searching bots).
     pub suggest_delay_ms: u64,
+    /// Retry an empty `suggest` for this long (CC2 race).
+    pub retry_empty_suggest_ms: u64,
     pub timeout: Duration,
 }
 
@@ -73,6 +75,7 @@ impl TbpOpponentConfig {
             commit: None,
             visible_rows: 40,
             suggest_delay_ms: 0,
+            retry_empty_suggest_ms: 0,
             timeout: Duration::from_secs(30),
         }
     }
@@ -680,6 +683,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 tbp_config.name = Some(tbp.name.clone());
                 tbp_config.visible_rows = tbp.visible_rows;
                 tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
+                tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
                 Box::new(TbpAgent::new(tbp_config))
             } else {
                 match &config.attax {

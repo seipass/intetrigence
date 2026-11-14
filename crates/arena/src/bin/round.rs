@@ -74,11 +74,15 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut cc2_commit: Option<String> = None;
     let mut cc2_visible_rows = 40u32;
     let mut cc2_suggest_delay_ms = 100u64;
+    let mut cc2_retry_empty_ms = 2000u64;
+    let mut cc2_cwd: Option<PathBuf> = None;
     let mut clys_program: Option<String> = None;
     let mut clys_args: Vec<String> = Vec::new();
     let mut clys_commit: Option<String> = None;
     let mut clys_visible_rows = 40u32;
     let mut clys_suggest_delay_ms = 0u64;
+    let mut clys_retry_empty_ms = 0u64;
+    let mut clys_cwd: Option<PathBuf> = None;
     let mut gates = [50u32, 48, 48];
     let mut ms = 100u64;
     let mut threads = 8usize;
@@ -159,6 +163,16 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--cc2-suggest-delay-ms: {error}"))?;
                 index += 2;
             }
+            "--cc2-retry-empty-ms" => {
+                cc2_retry_empty_ms = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--cc2-retry-empty-ms: {error}"))?;
+                index += 2;
+            }
+            "--cc2-cwd" => {
+                cc2_cwd = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
             "--clys-program" => {
                 clys_program = Some(value(1)?);
                 index += 2;
@@ -181,6 +195,16 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 clys_suggest_delay_ms = value(1)?
                     .parse()
                     .map_err(|error| format!("--clys-suggest-delay-ms: {error}"))?;
+                index += 2;
+            }
+            "--clys-retry-empty-ms" => {
+                clys_retry_empty_ms = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--clys-retry-empty-ms: {error}"))?;
+                index += 2;
+            }
+            "--clys-cwd" => {
+                clys_cwd = Some(PathBuf::from(value(1)?));
                 index += 2;
             }
             "--gate-attax" => {
@@ -308,6 +332,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.commit = cc2_commit.clone();
             config.visible_rows = cc2_visible_rows;
             config.suggest_delay_ms = cc2_suggest_delay_ms;
+            config.retry_empty_suggest_ms = cc2_retry_empty_ms;
+            config.cwd = cc2_cwd;
             OpponentSpec {
                 key: "cc2".into(),
                 display: "Cold Clear 2".into(),
@@ -328,6 +354,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.commit = clys_commit.clone();
             config.visible_rows = clys_visible_rows;
             config.suggest_delay_ms = clys_suggest_delay_ms;
+            config.retry_empty_suggest_ms = clys_retry_empty_ms;
+            config.cwd = clys_cwd;
             OpponentSpec {
                 key: "clys".into(),
                 display: "clys".into(),

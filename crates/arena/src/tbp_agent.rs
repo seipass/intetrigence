@@ -33,6 +33,10 @@ pub struct TbpAgentConfig {
     /// Delay before each `suggest`, giving a continuously-searching bot a
     /// budget (CC2/clys have no think-time option). Included in `think_ms`.
     pub suggest_delay_ms: u64,
+    /// Retry an empty `suggest` for this long (CC2 can answer before its
+    /// worker has expanded the root). Zero disables retries, which is required
+    /// for bots whose empty suggestion is a real forfeit (attax).
+    pub retry_empty_suggest_ms: u64,
 }
 
 impl TbpAgentConfig {
@@ -45,6 +49,7 @@ impl TbpAgentConfig {
             name: None,
             visible_rows: 20,
             suggest_delay_ms: 0,
+            retry_empty_suggest_ms: 0,
         }
     }
 }
@@ -191,14 +196,24 @@ impl Agent for TbpAgent {
         if delay > 0 {
             std::thread::sleep(std::time::Duration::from_millis(delay));
         }
-        let host = self
-            .host
-            .as_mut()
-            .ok_or_else(|| AgentError::Protocol("suggest before begin_round".into()))?;
-        let payload = host
-            .suggest()
-            .map_err(|error| AgentError::Io(error.to_string()))?;
-        let think_ms = delay as f64 + host.think_ms.last().copied().unwrap_or(0.0);
+        let retry_ms = self.config.retry_empty_suggest_ms;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(retry_ms);
+        let mut total_think = 0.0;
+        let payload = loop {
+            let host = self
+                .host
+                .as_mut()
+                .ok_or_else(|| AgentError::Protocol("suggest before begin_round".into()))?;
+            let payload = host
+                .suggest()
+                .map_err(|error| AgentError::Io(error.to_string()))?;
+            total_think += host.think_ms.last().copied().unwrap_or(0.0);
+            if !payload.moves.is_empty() || retry_ms == 0 || std::time::Instant::now() >= deadline {
+                break payload;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let think_ms = delay as f64 + total_think;
         let (nodes, extra_ms) = match &payload.move_info {
             Some(info) => {
                 self.suggestions_with_stats += 1;
