@@ -825,6 +825,43 @@ verify(replay) -> Result<(), Mismatch>:
 - 欠損は**再開で補える**(§1.4)。同一ビルド・同一 seeds なら、欠損ゲームだけを再実行して揃えられる。
 - 相手の decision log は**採点オーディットと first-choice 採用率の根拠**になる。無いと「相手が何を主張したか」を検証できない。
 
+#### 8.3.1.1 相手ごとの decision log の実体
+
+| 相手 | ファイル | 内容 |
+|---|---|---|
+| **attax** | `logs/<game>-attax.jsonl`(`ATTAX_TBP_LOG`) | `suggestion` の第 1 候補・申告 spin・申告攻撃 |
+| **CC2 / clys** | `logs/<game>-opponent.jsonl`(TBP transcript) | `start` / `suggest` / `suggestion` / `play` / `new_piece` の全メッセージ。`suggestion` は**全候補**・申告 spin・申告攻撃 |
+
+- CC2 / clys は**ネイティブの decision log を持たない**。したがって **TBP transcript を decision log とみなす**。
+- `arena match --tbp-*` は transcript を**常に書く**。
+- **`suggestion` に全候補が含まれること**が必須。第 1 候補だけでは **first-choice 採用率と採点オーディットができない**。
+- レポートに**環境変数名とパス**を記録する(`ATTAX_TBP_LOG` など)。パスが再現できないログは証拠にならない。
+
+#### 8.3.1.2 `measurement_complete` は「ファイルの存在」では判定できない(2026-11-16 追加)
+
+**`Path::exists()` は完全性の証明ではない。** 次のどれも `exists() == true` になる:
+
+| 状態 | `exists()` | 実際 |
+|---|---|---|
+| 0 バイトのファイル(アダプタが起動直後に落ちた) | **true** | **証拠なし** |
+| `start` だけ書かれて中断(ゲーム途中で kill) | **true** | **suggestion が無い** |
+| 最終行が途中で切れている(バッファ未フラッシュ) | **true** | **JSON として壊れている** |
+
+**したがって `measurement_complete` は内容で判定する**:
+
+| 検査 | 条件 |
+|---|---|
+| 空でない | サイズ > 0 |
+| 完全な行のみ | 最終行が**完全な JSON** として parse できる |
+| `start` が 1 回 | メッセージ種別の数 |
+| **`suggestion` の件数 == replay の turn 数** | 両者とも |
+| 各 `suggestion` に候補が 1 つ以上 | 空の候補列を許さない |
+| `suggest` / `suggestion` の対応 | 各 `suggest` に 1 つの `suggestion` |
+
+**負のテストが必須**: アダプタを**ゲーム途中で kill** し、`measurement_complete == false` になることを確認する。**正常系だけの確認では、この検査が効いているか分からない**(§10.2 の失敗 7)。
+
+> **「10 ゲームのスモークで `measurement_complete = true` を確認した」は、正常系の確認にすぎない。** 壊れた入力で `false` になることを確かめていない。
+
 ### 8.4 監査記録(毎ゲーム)
 
 | 項目 | 用途 |
@@ -994,6 +1031,7 @@ verify(replay) -> Result<(), Mismatch>:
 |---|---|---|
 | 5 | `docs/s2-attack-examples.json` に 19 件目を追加 → core のテストが `cases.len() == 18` をハードコードしていて CI が壊れた | **fixture を使っているテスト**(`grep -rn "s2-attack-examples" crates/`) |
 | 6 | `referee.rs` から「TurnCap の攻撃量順位付け」を削除 → **protocol §6.3 に同じ規則が残っていた**(実装と文書が食い違ったまま) | **その規則を記述している文書**(`grep -rn "順位付け\|受信ゴミ行数" docs/`) |
+| 7 | `measurement_complete` を `Path::exists()` で判定 → **0 バイト・途中で切れたファイルでも true** | **「その条件が偽になる入力」を 1 つ挙げたか**(負のテスト) |
 
 **手順**:
 
@@ -1073,3 +1111,4 @@ verify(replay) -> Result<(), Mismatch>:
 | v1.29 | 2026-11-16 | **段階順を変更**(goal `721820d42d69bc91`): **CC2 → clys → attax**。段階 1・2 は完全試合(`wins_topout == 50`)、段階 3 のみ `wins_topout >= 48` かつ `turncap == 0`(no contest は 2 件まで)。5 項目合計の検算を全段階で必須化。§1・§1.4・§6.2・§7.1.3・§8.5 を追随。 |
 | v1.30 | 2026-11-16 | §7.3.2 を新設。**attax の 180° 非対応は forfeit の原因ではない**ことを実測で確認(`supports_180=false` で再分類しても 2 件とも `forfeit-other` のまま。attax は 12 候補を返して全滅、レフェリー側には可視配置あり)。原因は board desync。 |
 | v1.31 | 2026-11-16 | **§8.4.1 を新設**。`think_ms` は探索の証明ではない。anytime ループが期限超過で反復を捨てて `None` を返し、**全設定で 1-ply greedy にフォールバック**していた事故を記録。レポートに「完了した探索の深さ・幅・ノード数」と「1-ply フォールバック率」を必須化。 |
+| v1.32 | 2026-11-16 | **§8.3.1.1 / §8.3.1.2 を新設**。相手ごとの decision log の実体(attax = `ATTAX_TBP_LOG`、CC2/clys = TBP transcript を decision log とみなす)を明記。**`measurement_complete` を `Path::exists()` で判定してはいけない**ことを明記(0 バイト・truncation・`suggestion` 欠落はすべて `exists() == true`)。内容による 6 検査と**負のテスト**(ゲーム途中で kill → `false`)を必須化。§10.2 に失敗 7 を追加。 |
