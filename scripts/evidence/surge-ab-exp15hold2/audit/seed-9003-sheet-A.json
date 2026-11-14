@@ -1,0 +1,161 @@
+{
+  "seed": 9003,
+  "sheet": "A",
+  "started_at": "unix:1794674416",
+  "profile": "garbage-pressure:8:4",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 64,
+  "surge_released": [
+    0,
+    0
+  ],
+  "max_b2b_streak": [
+    3,
+    3
+  ],
+  "turns_with_b2b_ge_4": [
+    0,
+    0
+  ],
+  "totals": [
+    {
+      "sent_total": 40,
+      "received_total": 31,
+      "attack_total": 56,
+      "pieces_placed": 64,
+      "lines_cleared": 42
+    },
+    {
+      "sent_total": 19,
+      "received_total": 38,
+      "attack_total": 48,
+      "pieces_placed": 64,
+      "lines_cleared": 41
+    }
+  ],
+  "heights": [
+    {
+      "max": 22,
+      "mean": 10.92,
+      "final_height": 15
+    },
+    {
+      "max": 21,
+      "mean": 8.44,
+      "final_height": 21
+    }
+  ],
+  "think": [
+    {
+      "count": 64,
+      "median_ms": 97.059,
+      "p95_ms": 98.672,
+      "p99_ms": 100.981,
+      "max_ms": 100.981,
+      "mean_ms": 97.225,
+      "over_budget": 0
+    },
+    {
+      "count": 64,
+      "median_ms": 96.703,
+      "p95_ms": 99.07,
+      "p99_ms": 102.172,
+      "max_ms": 102.172,
+      "mean_ms": 97.115,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 64,
+      "accepted_first": 64,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 64,
+      "accepted_first": 64,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 64,
+      "spin_checked": 64,
+      "spin_matches": 64,
+      "spin_mismatches": 0,
+      "attack_checked": 64,
+      "attack_matches": 64,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 56,
+      "recomputed_total": 56,
+      "examples": []
+    },
+    {
+      "placements": 64,
+      "spin_checked": 64,
+      "spin_matches": 64,
+      "spin_mismatches": 0,
+      "attack_checked": 64,
+      "attack_matches": 64,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 48,
+      "recomputed_total": 48,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "65ddc95",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "4",
+        "--weights surge_exponent=1.5",
+        "--weights surge_hold_penalty=-60"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "65ddc95",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "4",
+        "--weights surge_exponent=1.5",
+        "--weights surge_hold_penalty=-60"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9003-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9003,
+    "sheet": "A",
+    "turns": 64,
+    "placements": 128,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 41421
+}
