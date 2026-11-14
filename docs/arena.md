@@ -274,6 +274,23 @@ scripts/m0-match.sh
 
 ---
 
+## 4.1 M2 チューニングゲート(2026-11-14)
+
+本物の `intetrigence_bot::Searcher`(`--ms 100`、8 スレッド)を接続し、tuning seeds
+**9001–9010 × A/B = 20 ゲーム**を attax `7b38f51` と実施した。詳細は
+[`docs/m2-tuning-report.md`](m2-tuning-report.md)、証拠は `scripts/evidence/m2-tuning/`。
+
+- **18 勝 2 敗 0 分**(勝率 90.0%、Wilson 95% CI 69.9%–97.2%)、replay 検証 **20/20**
+- ただし **18 勝はすべて attax の forfeit**(20 行視野で可視領域に置けず `moves` が空)。
+  intetrigence の forfeit は **0**。40 行のトップアウトまで到達した 2 ゲームは **0 勝 2 敗**
+  (9006-A downstack、9010-A buried。いずれも sheet A)
+- think median / p95: intetrigence **97.1 / 98.7 ms**、attax **29.1 / 35.9 ms**、200 ms 超 0
+- attack/piece: intetrigence **0.986**、attax **0.866**。受信ゴミ/ゲーム: **75.7 / 110.0**
+- 採点オーディット: intetrigence spin 0 / attack 0、attax spin 88(All-Mini+ 非 T)/ same-spin attack 0
+- **解釈**: 生の勝率は M2 ゲート(5 割)を超えるが、その大半は attax の 20 行視野による forfeit。
+  フル 40 行視野の相手に対する強さはまだ測れていない。M3 は防御・downstack と
+  (可能なら)フル視野の相手での評価が課題。
+
 ## 5. 既知の制約・残件
 
 1. **intetrigence 側は暫定ベースライン**。本物の bot(`crates/bot`)ができたら
