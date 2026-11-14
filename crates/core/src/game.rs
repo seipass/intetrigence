@@ -450,11 +450,15 @@ impl Game {
         self.spawn(kind, false)
     }
 
-    /// Inserts garbage rows at the bottom and pushes the stack (and the active
-    /// piece) up by the same amount.
-    /// Rows pushed past row 39 are discarded (`docs/s2-spec.md` §11-U6). If the
-    /// active piece is pushed out of the board, the game tops out and `Ok(())`
-    /// is returned with `is_over() == true`.
+    /// Inserts garbage rows at the bottom and pushes the stack up.
+    ///
+    /// This is a **post-lock** operation (`docs/s2-referee-protocol.md` §5.4):
+    /// the active piece is the just-spawned next piece. TBP `start` does not
+    /// carry the active position, so the next piece is respawned at its
+    /// standard spawn position above the new stack rather than translated
+    /// upward. If that spawn is blocked, the game tops out.
+    ///
+    /// Rows pushed past row 39 are discarded (`docs/s2-spec.md` §11-U6).
     pub fn insert_garbage(&mut self, holes: &[u8]) -> Result<(), GarbageError> {
         let count = holes.len();
         self.board.insert_garbage(holes)?;
@@ -463,13 +467,19 @@ impl Game {
         }
 
         self.stats.garbage_lines_received += count as u32;
-        if let Some(mut piece) = self.active {
-            piece.y += count as i32;
+        if let Some(piece) = self.active {
+            let (x, y) = piece.kind.spawn_position();
+            let spawn = ActivePiece {
+                kind: piece.kind,
+                rotation: Rotation::Zero,
+                x,
+                y,
+            };
             if self
                 .board
-                .can_place(piece.kind, piece.rotation, piece.x, piece.y)
+                .can_place(spawn.kind, spawn.rotation, spawn.x, spawn.y)
             {
-                self.active = Some(piece);
+                self.active = Some(spawn);
             } else {
                 self.active = None;
                 self.topped_out = true;

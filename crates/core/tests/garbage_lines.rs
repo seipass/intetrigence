@@ -187,29 +187,48 @@ fn clearing_a_garbage_row_reports_the_bonus() {
 }
 
 #[test]
-fn game_garbage_insertion_pushes_the_active_piece_up() {
+fn game_garbage_insertion_respawns_the_active_piece_at_spawn() {
     let mut game = Game::new(0);
     let before = game.active().unwrap();
 
     game.insert_garbage(&[0, 1]).unwrap();
 
     let after = game.active().unwrap();
-    assert_eq!(after.x, before.x);
-    assert_eq!(after.y, before.y + 2);
-    assert_eq!(after.rotation, before.rotation);
+    assert_eq!(after.kind, before.kind);
+    assert_eq!((after.x, after.y), after.kind.spawn_position());
+    assert_eq!(after.rotation, Rotation::Zero);
     assert_eq!(game.stats().garbage_lines_received, 2);
     assert_eq!(game.check_invariants(), Ok(()));
 }
 
 #[test]
-fn game_garbage_insertion_tops_out_when_the_piece_is_pushed_out() {
+fn game_garbage_insertion_after_lock_keeps_next_piece_at_spawn() {
+    let mut game = Game::new(0);
+    game.hard_drop().unwrap();
+    let next = game.active().unwrap();
+
+    game.insert_garbage(&[0, 1, 2]).unwrap();
+
+    let after = game.active().unwrap();
+    assert_eq!(after.kind, next.kind);
+    assert_eq!((after.x, after.y), after.kind.spawn_position());
+    assert_eq!(after.rotation, Rotation::Zero);
+    assert_eq!(game.check_invariants(), Ok(()));
+}
+
+#[test]
+fn game_garbage_insertion_tops_out_when_the_spawn_is_blocked() {
+    // The block at (3, 20) is below the T spawn; after one garbage row it
+    // shifts to (3, 21), which is a T spawn cell.
+    let mut board = Board::new();
+    board.set_cell(3, 20, Cell::Block);
     let active = ActivePiece {
-        kind: PieceKind::O,
+        kind: PieceKind::T,
         rotation: Rotation::Zero,
-        x: 4,
-        y: 38,
+        x: 3,
+        y: 20,
     };
-    let mut game = Game::from_position(0, Board::new(), active).unwrap();
+    let mut game = Game::from_position(0, board, active).unwrap();
 
     game.insert_garbage(&[0]).unwrap();
 
