@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::agent::Agent;
 use crate::audit::{GameAudit, wilson_interval};
 use crate::baseline::BaselineBot;
-use crate::engine::Sheet;
+use crate::engine::{Profile, Sheet};
 use crate::referee::{RoundConfig, run_round};
 use crate::replay::{VerifyReport, verify_replay, write_replay};
 use crate::tbp_agent::{TbpAgent, TbpAgentConfig};
@@ -69,6 +69,8 @@ pub struct MatchConfig {
     /// Slot 0 bot.
     /// Slot 0 bot.
     pub bot: BotChoice,
+    /// Match profile (protocol v1.11 §1.3).
+    pub profile: Profile,
     /// Notes written into the summary. Set per match so the M0 plumbing run and
     /// the M2 real-bot run cannot inherit each other's wording.
     pub notes: Vec<String>,
@@ -87,6 +89,7 @@ impl MatchConfig {
             rules: version_string("docs/s2-spec.md", "v1.3.11"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
+            profile: Profile::Official,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
         }
     }
@@ -208,6 +211,9 @@ pub struct BotAggregate {
 pub struct MatchSummary {
     pub schema: String,
     pub started_at: String,
+    /// Match profile (protocol v1.11 §1.3); only `official` is usable for
+    /// final claims.
+    pub profile: String,
     pub games: Vec<GameSummary>,
     pub wins: u32,
     pub losses: u32,
@@ -413,6 +419,10 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
+        profile: audits
+            .first()
+            .map(|audit| audit.profile.clone())
+            .unwrap_or_else(|| "official".into()),
         started_at: audits
             .first()
             .map(|audit| audit.started_at.clone())
@@ -603,6 +613,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 rules: config.rules.clone(),
                 protocol: config.protocol.clone(),
                 started_at: config.started_at.clone(),
+                profile: config.profile,
             };
 
             let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
@@ -701,6 +712,7 @@ mod tests {
         let summary = MatchSummary {
             schema: "x".into(),
             started_at: "unix:0".into(),
+            profile: "official".into(),
             games: vec![],
             wins: 0,
             losses: 0,

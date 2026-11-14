@@ -1,0 +1,188 @@
+{
+  "seed": 9005,
+  "sheet": "A",
+  "started_at": "unix:1794635828",
+  "profile": "defense-stress:16",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 72,
+  "totals": [
+    {
+      "sent_total": 49,
+      "received_total": 25,
+      "attack_total": 70,
+      "pieces_placed": 72
+    },
+    {
+      "sent_total": 30,
+      "received_total": 38,
+      "attack_total": 53,
+      "pieces_placed": 71
+    }
+  ],
+  "think": [
+    {
+      "count": 72,
+      "median_ms": 96.8,
+      "p95_ms": 98.367,
+      "p99_ms": 99.311,
+      "max_ms": 99.311,
+      "mean_ms": 96.918,
+      "over_budget": 0
+    },
+    {
+      "count": 72,
+      "median_ms": 30.314,
+      "p95_ms": 38.68,
+      "p99_ms": 45.034,
+      "max_ms": 45.034,
+      "mean_ms": 30.724,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 72,
+      "accepted_first": 72,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 71,
+      "accepted_first": 71,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 72,
+      "spin_checked": 72,
+      "spin_matches": 72,
+      "spin_mismatches": 0,
+      "attack_checked": 72,
+      "attack_matches": 72,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 70,
+      "recomputed_total": 70,
+      "examples": []
+    },
+    {
+      "placements": 71,
+      "spin_checked": 71,
+      "spin_matches": 70,
+      "spin_mismatches": 1,
+      "attack_checked": 71,
+      "attack_matches": 71,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 53,
+      "recomputed_total": 53,
+      "examples": [
+        {
+          "turn": 58,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 7051646470254011094,
+      "turn": 34
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13388776019556630631,
+      "turn": 44
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4170778596681915627,
+      "turn": 50
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7475645813144992316,
+      "turn": 67
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4070233457781658212,
+      "turn": 68
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6004717866815141556,
+      "turn": 69
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3717030848465905336,
+      "turn": 70
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "scripts/evidence/m3-defense-16\\logs\\seed-9005-sheet-A-attax.jsonl",
+    "decisions_logged": 72,
+    "nodes_total": 729788,
+    "extra_ms_total": 2156.1,
+    "suggestions_with_stats": 72,
+    "cells_above_row20": true,
+    "hold_matches": 71,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "c1535af",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-9005-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9005,
+    "sheet": "A",
+    "turns": 72,
+    "placements": 143,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 67469
+}

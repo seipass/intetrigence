@@ -1,0 +1,668 @@
+{
+  "seed": 9010,
+  "sheet": "B",
+  "started_at": "unix:1794635828",
+  "profile": "defense-stress:16",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 662,
+  "totals": [
+    {
+      "sent_total": 448,
+      "received_total": 175,
+      "attack_total": 656,
+      "pieces_placed": 661
+    },
+    {
+      "sent_total": 368,
+      "received_total": 253,
+      "attack_total": 578,
+      "pieces_placed": 661
+    }
+  ],
+  "think": [
+    {
+      "count": 661,
+      "median_ms": 96.88,
+      "p95_ms": 98.346,
+      "p99_ms": 98.976,
+      "max_ms": 99.286,
+      "mean_ms": 96.928,
+      "over_budget": 0
+    },
+    {
+      "count": 662,
+      "median_ms": 29.937,
+      "p95_ms": 36.333,
+      "p99_ms": 41.105,
+      "max_ms": 47.764,
+      "mean_ms": 29.984,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 661,
+      "accepted_first": 661,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 661,
+      "accepted_first": 661,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 661,
+      "spin_checked": 661,
+      "spin_matches": 661,
+      "spin_mismatches": 0,
+      "attack_checked": 661,
+      "attack_matches": 661,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 656,
+      "recomputed_total": 656,
+      "examples": []
+    },
+    {
+      "placements": 661,
+      "spin_checked": 661,
+      "spin_matches": 650,
+      "spin_mismatches": 11,
+      "attack_checked": 661,
+      "attack_matches": 659,
+      "attack_mismatches": 2,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 2,
+      "declared_total": 575,
+      "recomputed_total": 578,
+      "examples": [
+        {
+          "turn": 36,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 40,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 1,
+          "recomputed_attack": 2
+        },
+        {
+          "turn": 44,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 1,
+          "recomputed_attack": 3
+        },
+        {
+          "turn": 56,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 64,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 103,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 371,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 457,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 459,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 476,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 640,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 5303601111163605415,
+      "turn": 19
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1305938048078046587,
+      "turn": 20
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8042321720385345100,
+      "turn": 22
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3134434497207888684,
+      "turn": 39
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8619959505245790695,
+      "turn": 41
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8631829725572219286,
+      "turn": 42
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7642521954832319878,
+      "turn": 43
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9737661811547942512,
+      "turn": 55
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13809835046798982193,
+      "turn": 68
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13005361214316142837,
+      "turn": 71
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3912252135962072061,
+      "turn": 80
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4515491711473237695,
+      "turn": 81
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9704845822478030681,
+      "turn": 84
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8653710539675955490,
+      "turn": 100
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4073968529578806193,
+      "turn": 107
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14193679852265567599,
+      "turn": 112
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8057095530639352631,
+      "turn": 126
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7666076420678843037,
+      "turn": 127
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2436738432861049411,
+      "turn": 128
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12773612409174676138,
+      "turn": 138
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15007459996011461152,
+      "turn": 139
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16798660668436513561,
+      "turn": 154
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14559936819673724460,
+      "turn": 162
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4369371907080167819,
+      "turn": 174
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3312593759410882277,
+      "turn": 176
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12743058330018788689,
+      "turn": 194
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2401054595932290821,
+      "turn": 196
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14143873317201872985,
+      "turn": 201
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15456493028465815791,
+      "turn": 211
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13142660369475856449,
+      "turn": 217
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7451810891906989067,
+      "turn": 233
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 18443956496372805148,
+      "turn": 252
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11986394863694952139,
+      "turn": 253
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6175301853812392521,
+      "turn": 254
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8096422741630628599,
+      "turn": 270
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17724599224412146751,
+      "turn": 280
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7606155789278054049,
+      "turn": 281
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12594006403602140751,
+      "turn": 295
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17141923519793240420,
+      "turn": 303
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14838875543842929946,
+      "turn": 316
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7004177590026937784,
+      "turn": 317
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9056208001142299040,
+      "turn": 326
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11138424661702956464,
+      "turn": 343
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14791655196634179226,
+      "turn": 344
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 938337518508130794,
+      "turn": 348
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12669215787328747764,
+      "turn": 349
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2286340804048821511,
+      "turn": 356
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14073064568560261599,
+      "turn": 386
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14839659723142834842,
+      "turn": 397
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14213084528995584933,
+      "turn": 399
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1093373976831604095,
+      "turn": 407
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6185406673281625345,
+      "turn": 426
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5009735100219997527,
+      "turn": 429
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16694491660810695347,
+      "turn": 433
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16325736885202398745,
+      "turn": 445
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3500696418551024065,
+      "turn": 446
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1316437454833645593,
+      "turn": 447
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4784985431245343365,
+      "turn": 457
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8656395683780537853,
+      "turn": 466
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2594892080131192608,
+      "turn": 472
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2702298120021820078,
+      "turn": 473
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2993808437308880610,
+      "turn": 489
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16258835356469114550,
+      "turn": 490
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2477126178444546840,
+      "turn": 492
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5650848504295719336,
+      "turn": 493
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3207946874278333232,
+      "turn": 510
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11801773321968358276,
+      "turn": 511
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12709676611841389349,
+      "turn": 515
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10071125738580188663,
+      "turn": 516
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14963335791800190377,
+      "turn": 544
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14749115498084550486,
+      "turn": 546
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10303504584636751044,
+      "turn": 557
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11400317604757356174,
+      "turn": 569
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3660409913208850749,
+      "turn": 574
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 670606208965417070,
+      "turn": 587
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4432146953102474737,
+      "turn": 595
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14818671671492607988,
+      "turn": 602
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10361581633781655759,
+      "turn": 609
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14644898376087365377,
+      "turn": 610
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 652971908677447647,
+      "turn": 622
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 18191027976660561651,
+      "turn": 623
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10644042724986637943,
+      "turn": 624
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6667103226268788887,
+      "turn": 634
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16632975125631753903,
+      "turn": 637
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13752447492669605658,
+      "turn": 646
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14557894991656428884,
+      "turn": 649
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6347215353814740639,
+      "turn": 660
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "scripts/evidence/m3-defense-16\\logs\\seed-9010-sheet-B-attax.jsonl",
+    "decisions_logged": 662,
+    "nodes_total": 6667301,
+    "extra_ms_total": 19366.3,
+    "suggestions_with_stats": 662,
+    "cells_above_row20": false,
+    "hold_matches": 661,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "c1535af",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-9010-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9010,
+    "sheet": "B",
+    "turns": 662,
+    "placements": 1322,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 602819
+}

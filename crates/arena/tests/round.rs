@@ -3,7 +3,7 @@
 
 use intetrigence_arena::agent::Agent;
 use intetrigence_arena::baseline::BaselineBot;
-use intetrigence_arena::engine::Sheet;
+use intetrigence_arena::engine::{Profile, Sheet};
 use intetrigence_arena::referee::{RoundConfig, run_round};
 use intetrigence_arena::replay::{ReplayRecord, verify_replay, write_replay};
 
@@ -16,6 +16,7 @@ fn config(seed: u64, sheet: Sheet, turn_cap: u32) -> RoundConfig {
         rules: "docs/s2-spec.md@v1.3.11".into(),
         protocol: "docs/s2-referee-protocol.md@v1.9".into(),
         started_at: "test".into(),
+        profile: Profile::Official,
     }
 }
 

@@ -22,7 +22,7 @@ use crate::agent::{Agent, AgentAudit, Commit, RoundContext};
 use crate::audit::{
     FirstChoiceAudit, GameAudit, ScoringAudit, StartResendAudit, ThinkStats, attax_audit,
 };
-use crate::engine::{Engine, Sheet, board_hash};
+use crate::engine::{Engine, Profile, Sheet, board_hash};
 use crate::replay::{
     BotRecord, ForfeitCause, GarbageRecord, HashRecord, Header, PlacementRecord, PlayerRecord,
     ReplayRecord, ResultRecord, SCHEMA, TurnRecord, piece_name, spin_name,
@@ -37,6 +37,8 @@ pub struct RoundConfig {
     pub rules: String,
     pub protocol: String,
     pub started_at: String,
+    /// Match profile (protocol v1.11 §1.3). `Official` is the empty board.
+    pub profile: Profile,
 }
 
 impl RoundConfig {
@@ -49,6 +51,7 @@ impl RoundConfig {
             rules: "docs/s2-spec.md@v1.3.11".into(),
             protocol: "docs/s2-referee-protocol.md@v1.9".into(),
             started_at: String::new(),
+            profile: Profile::Official,
         }
     }
 }
@@ -127,7 +130,13 @@ pub fn run_round(
     config: &RoundConfig,
     agents: &mut [&mut dyn Agent; 2],
 ) -> Result<RoundReport, RoundError> {
-    let mut engine = Engine::new(config.seed, config.sheet, config.frames_per_turn);
+    let start_garbage = config.profile.start_garbage(config.seed);
+    let mut engine = Engine::with_start_garbage(
+        config.seed,
+        config.sheet,
+        config.frames_per_turn,
+        &start_garbage,
+    );
     engine.begin_turn();
 
     for slot in 0..2 {
@@ -147,7 +156,7 @@ pub fn run_round(
         BotRecord::from(&agents[0].descriptor()),
         BotRecord::from(&agents[1].descriptor()),
     ];
-    let mut records = vec![ReplayRecord::Header(header(config, &bots))];
+    let mut records = vec![ReplayRecord::Header(header(config, &bots, &start_garbage))];
 
     let mut think: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
     let mut indices: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
@@ -398,6 +407,7 @@ pub fn run_round(
         seed: config.seed,
         sheet: config.sheet.as_str().to_string(),
         started_at: config.started_at.clone(),
+        profile: config.profile.as_str(),
         winner: winner.map(|slot| slot as u8),
         reason: outcome.reason.clone(),
         detail: outcome.detail.clone(),
@@ -445,7 +455,7 @@ pub fn run_round(
     })
 }
 
-fn header(config: &RoundConfig, bots: &[BotRecord; 2]) -> Header {
+fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> Header {
     let mut slots = BTreeMap::new();
     slots.insert("0".to_string(), "intetrigence".to_string());
     slots.insert("1".to_string(), "attax".to_string());
@@ -468,6 +478,8 @@ fn header(config: &RoundConfig, bots: &[BotRecord; 2]) -> Header {
         turn_cap: config.turn_cap,
         frames_per_turn: config.frames_per_turn,
         preview: 5,
+        profile: config.profile.as_str(),
+        start_garbage: start_garbage.to_vec(),
     }
 }
 
@@ -534,6 +546,7 @@ fn forfeit_report(
     slot: usize,
     detail: String,
 ) -> RoundReport {
+    let start_garbage = config.profile.start_garbage(config.seed);
     let engine = Engine::new(config.seed, config.sheet, config.frames_per_turn);
     let bots = [
         BotRecord::from(&agents[0].descriptor()),
@@ -542,7 +555,7 @@ fn forfeit_report(
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
     let winner = Some(1 - slot);
     let records = vec![
-        ReplayRecord::Header(header(config, &bots)),
+        ReplayRecord::Header(header(config, &bots, &start_garbage)),
         ReplayRecord::Result(ResultRecord {
             winner: winner.map(|slot| slot as u8),
             reason: "Forfeit".to_string(),
@@ -566,6 +579,7 @@ fn forfeit_report(
         seed: config.seed,
         sheet: config.sheet.as_str().to_string(),
         started_at: config.started_at.clone(),
+        profile: config.profile.as_str(),
         winner: winner.map(|slot| slot as u8),
         reason: "Forfeit".to_string(),
         detail: Some(detail),

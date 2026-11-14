@@ -10,11 +10,15 @@ import glob
 import json
 import math
 import os
+import platform
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EVIDENCE = os.path.join(ROOT, "scripts", "evidence", "m2-tuning")
-REPORT = os.path.join(ROOT, "docs", "m2-tuning-report.md")
+EVIDENCE = os.environ.get(
+    "EVIDENCE", os.path.join(ROOT, "scripts", "evidence", "m2-tuning")
+)
+REPORT = os.environ.get("REPORT", os.path.join(ROOT, "docs", "m2-tuning-report.md"))
+TITLE = os.environ.get("TITLE", "M2 tuning match report (intetrigence vs attax)")
 
 
 def wilson(wins, games, z=1.959964):
@@ -139,6 +143,16 @@ def main():
     bot_p95 = [game["think_p95_ms"][0] for game in games]
     attax_think = [game["think_median_ms"][1] for game in games]
     attax_p95 = [game["think_p95_ms"][1] for game in games]
+    bot_p99 = [audits[(game["seed"], game["sheet"])]["think"][0]["p99_ms"] for game in games]
+    bot_max = [audits[(game["seed"], game["sheet"])]["think"][0]["max_ms"] for game in games]
+    attax_p99 = [audits[(game["seed"], game["sheet"])]["think"][1]["p99_ms"] for game in games]
+    attax_max = [audits[(game["seed"], game["sheet"])]["think"][1]["max_ms"] for game in games]
+    bot_first = [
+        audits[(game["seed"], game["sheet"])]["first_choice"][0]["rate"] for game in games
+    ]
+    attax_first = [
+        audits[(game["seed"], game["sheet"])]["first_choice"][1]["rate"] for game in games
+    ]
     fallbacks = sum(audits[key]["bot_fallbacks"] for key in audits)
     nodes = sum(audits[key]["bot_nodes_total"] for key in audits)
     start_resends = sum(len(audits[key]["start_resends"]) for key in audits)
@@ -149,9 +163,19 @@ def main():
     verified = sum(1 for game in games if game["verified"])
 
     lines = []
-    lines.append("# M2 tuning match report (intetrigence vs attax)\n")
+    lines.append(f"# {TITLE}\n")
     lines.append(f"- evidence: `{os.path.relpath(EVIDENCE, ROOT).replace(os.sep, '/')}`")
+    profile = header.get("profile", "official")
+    if profile == "official":
+        lines.append(
+            "- profile: **official** (empty start board; the only profile usable for final claims)"
+        )
+    else:
+        lines.append(
+            f"- profile: **{profile}** (diagnostic; **not** usable for final claims, protocol v1.11 §1.3)"
+        )
     lines.append(f"- games: {len(games)} (tuning seeds 9001-9010 x sheets A/B)")
+    lines.append("- held-out: seeds 10001+ were **not** used (tuning seeds only)")
     lines.append(
         f"- intetrigence: real search, `--ms 100`, 8 threads, commit "
         f"`{header['bots']['0'].get('commit', '?')}`"
@@ -161,6 +185,13 @@ def main():
         f"- attax: `{attax_info.get('commit', '?')}`, bun `{attax_info.get('bun_version', '?')}`"
     )
     lines.append(f"- rules: `{header.get('rules', '?')}` / `{header.get('protocol', '?')}`")
+    lines.append(
+        f"- environment: {platform.platform()}, {os.cpu_count()} logical CPUs"
+    )
+    lines.append(
+        f"- commands: intetrigence `intetrigence {' '.join(header['bots']['0'].get('args', []))}`; "
+        f"attax `{attax_info.get('command_line', '?')}`"
+    )
     lines.append("")
     lines.append("## Result\n")
     lines.append(f"- wins / losses / draws: **{wins} / {losses} / {draws}**")
@@ -183,21 +214,45 @@ def main():
     )
     lines.append(f"- replay verified: **{verified}/{len(games)}**")
     lines.append("- per sheet: " + ", ".join(f"{sheet} {w}/{n}" for sheet, w, n in sheet_rows))
+    loss_sheets = sorted({game["sheet"] for game in games if game["winner"] == 1})
     lines.append(
-        "- seat note: the 2 losses are both sheet A (intetrigence in seat 1); sheet B is 10/10. "
+        f"- seat note: losses by sheet {loss_sheets}; the per-sheet split is above. "
         "The sample is too small to separate a seat effect from the opponent's forfeits."
+    )
+    lines.append("")
+    lines.append("## Claims\n")
+    if profile == "official":
+        lines.append(
+            "- This report does **not** claim a win rate against a full-vision opponent: "
+            "all vision forfeit wins are reported separately and the non-forfeit (40-row) "
+            "record is stated above."
+        )
+    else:
+        lines.append(
+            "- **Diagnostic profile**: these numbers are not usable for final claims "
+            "(protocol v1.11 §1.3)."
+        )
+    lines.append(
+        "- The spin rule is more lenient than TETR.IO (see Caveats); intetrigence's labels are "
+        "backed by rotation-ending input sequences."
     )
     lines.append("")
     lines.append("## Think time\n")
     lines.append(
         f"- intetrigence: median {sum(bot_think) / len(bot_think):.1f} ms, "
-        f"p95 (mean over games) {sum(bot_p95) / len(bot_p95):.1f} ms"
+        f"p95 {sum(bot_p95) / len(bot_p95):.1f} ms, p99 {sum(bot_p99) / len(bot_p99):.1f} ms, "
+        f"max {max(bot_max):.1f} ms (median/p95/p99 are means of per-game values; max is the match worst)"
     )
     lines.append(
         f"- attax: median {sum(attax_think) / len(attax_think):.1f} ms, "
-        f"p95 (mean over games) {sum(attax_p95) / len(attax_p95):.1f} ms"
+        f"p95 {sum(attax_p95) / len(attax_p95):.1f} ms, p99 {sum(attax_p99) / len(attax_p99):.1f} ms, "
+        f"max {max(attax_max):.1f} ms"
     )
     lines.append(f"- placements over the 200 ms budget: intetrigence {bot['think_over_budget']}, attax {attax['think_over_budget']}")
+    lines.append(
+        f"- first-choice acceptance (mean over games): intetrigence "
+        f"{sum(bot_first) / len(bot_first):.2f}, attax {sum(attax_first) / len(attax_first):.2f}"
+    )
     lines.append("")
     lines.append("## Attack and garbage\n")
     lines.append(
@@ -241,6 +296,11 @@ def main():
         "intetrigence's labels are backed by rotation-ending input sequences, so the leniency only helps a cell-only client."
     )
     lines.append("- Tuning seeds only. Held-out seeds (10001+) were not used.")
+    lines.append("")
+    lines.append("## Reproduction\n")
+    lines.append("- `scripts/m2-match.sh` (tuning seeds 9001-9010, `--ms 100`, 8 threads)")
+    lines.append("- `arena verify scripts/evidence/m2-tuning`")
+    lines.append("- `python scripts/analyze-m2.py`")
     lines.append("")
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

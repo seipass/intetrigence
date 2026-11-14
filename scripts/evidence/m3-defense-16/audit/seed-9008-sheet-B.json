@@ -1,0 +1,184 @@
+{
+  "seed": 9008,
+  "sheet": "B",
+  "started_at": "unix:1794635828",
+  "profile": "defense-stress:16",
+  "winner": 0,
+  "reason": "Forfeit",
+  "detail": "none of the 0 candidates is reachable",
+  "forfeit_cause": "vision",
+  "turns": 84,
+  "totals": [
+    {
+      "sent_total": 57,
+      "received_total": 31,
+      "attack_total": 76,
+      "pieces_placed": 83
+    },
+    {
+      "sent_total": 35,
+      "received_total": 46,
+      "attack_total": 62,
+      "pieces_placed": 83
+    }
+  ],
+  "think": [
+    {
+      "count": 83,
+      "median_ms": 96.7,
+      "p95_ms": 98.338,
+      "p99_ms": 99.006,
+      "max_ms": 99.006,
+      "mean_ms": 96.852,
+      "over_budget": 0
+    },
+    {
+      "count": 84,
+      "median_ms": 28.955,
+      "p95_ms": 35.438,
+      "p99_ms": 38.856,
+      "max_ms": 38.856,
+      "mean_ms": 28.621,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 83,
+      "accepted_first": 83,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 83,
+      "accepted_first": 83,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 83,
+      "spin_checked": 83,
+      "spin_matches": 83,
+      "spin_mismatches": 0,
+      "attack_checked": 83,
+      "attack_matches": 83,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 76,
+      "recomputed_total": 76,
+      "examples": []
+    },
+    {
+      "placements": 83,
+      "spin_checked": 83,
+      "spin_matches": 83,
+      "spin_mismatches": 0,
+      "attack_checked": 83,
+      "attack_matches": 83,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 62,
+      "recomputed_total": 62,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 1,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 9942659254812042929,
+      "turn": 29
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9111616487265549869,
+      "turn": 30
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5717268264422173252,
+      "turn": 35
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13675331392917537030,
+      "turn": 48
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15527515364082586955,
+      "turn": 59
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8713413992869281825,
+      "turn": 74
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13928440467646991551,
+      "turn": 79
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6334373723291850520,
+      "turn": 82
+    }
+  ],
+  "attax": {
+    "info_name": "Attax",
+    "info_version": "overhaul/full",
+    "info_author": "attax",
+    "command_line": "bun C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts",
+    "bun_version": "1.4.0",
+    "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+    "decision_log": "scripts/evidence/m3-defense-16\\logs\\seed-9008-sheet-B-attax.jsonl",
+    "decisions_logged": 84,
+    "nodes_total": 784875,
+    "extra_ms_total": 2340.5,
+    "suggestions_with_stats": 84,
+    "cells_above_row20": false,
+    "hold_matches": 83,
+    "hold_mismatches": 0
+  },
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "c1535af",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Attax",
+      "version": "overhaul/full",
+      "commit": "7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b",
+      "args": [
+        "bun",
+        "C:/Users/Hasilan/Projects/attax\\tbp\\attax-tbp.ts"
+      ],
+      "visible_rows": 20
+    }
+  ],
+  "replay": "replays/seed-9008-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9008,
+    "sheet": "B",
+    "turns": 84,
+    "placements": 166,
+    "mismatches": []
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 78731
+}
