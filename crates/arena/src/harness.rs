@@ -850,6 +850,82 @@ impl MatchSummary {
 }
 
 /// Runs every (seed, sheet) pair, writes replays + audits and returns the summary.
+/// Content check for the opponent decision log (protocol v1.32 §8.3.1.2).
+///
+/// A file that merely exists is not evidence: it can be 0 bytes, end in a
+/// partial JSON line, or stop before the game did. For a TBP transcript we
+/// require one `suggestion` per turn, one `play` per turn (or turns - 1 for a
+/// forfeit), at least one `start`, and at least one non-empty suggestion. For
+/// an attax decision log we require one decision line per turn.
+fn check_opponent_log(
+    path: &std::path::Path,
+    turns: u32,
+    reason: &str,
+    tbp: bool,
+) -> Result<(), String> {
+    let text = std::fs::read_to_string(path).map_err(|error| format!("read: {error}"))?;
+    if text.trim().is_empty() {
+        return Err("empty log".into());
+    }
+    let mut lines = 0u32;
+    let mut starts = 0u32;
+    let mut suggestions = 0u32;
+    let mut nonempty_suggestions = 0u32;
+    let mut plays = 0u32;
+    for (index, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let value: serde_json::Value = serde_json::from_str(line)
+            .map_err(|error| format!("line {} is not complete JSON: {error}", index + 1))?;
+        lines += 1;
+        if tbp {
+            match value.get("type").and_then(|value| value.as_str()) {
+                Some("start") => starts += 1,
+                Some("suggestion") => {
+                    suggestions += 1;
+                    let has_candidate = value
+                        .get("payload")
+                        .and_then(|payload| payload.get("moves"))
+                        .and_then(|moves| moves.as_array())
+                        .map(|moves| !moves.is_empty())
+                        .unwrap_or(false);
+                    if has_candidate {
+                        nonempty_suggestions += 1;
+                    }
+                }
+                Some("play") => plays += 1,
+                _ => {}
+            }
+        }
+    }
+    if tbp {
+        if starts == 0 {
+            return Err("no start message".into());
+        }
+        if suggestions != turns {
+            return Err(format!(
+                "suggestion count {suggestions} != replay turns {turns}"
+            ));
+        }
+        if nonempty_suggestions == 0 && reason != "Forfeit" {
+            return Err("no suggestion with a candidate".into());
+        }
+        let expected_plays = if reason == "Forfeit" {
+            turns.saturating_sub(1)
+        } else {
+            turns
+        };
+        if plays != expected_plays {
+            return Err(format!("play count {plays} != expected {expected_plays}"));
+        }
+    } else if lines != turns {
+        return Err(format!("decision count {lines} != replay turns {turns}"));
+    }
+    Ok(())
+}
+
 pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
@@ -978,18 +1054,24 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 .write(&audit_path)
                 .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
-            let opponent_log = if config.tbp_opponent.is_some() {
+            let tbp_opponent = config.tbp_opponent.is_some();
+            let opponent_log = if tbp_opponent {
                 logs.join(format!("{name}-opponent.jsonl"))
             } else {
                 log_path.clone()
             };
-            if !replay_path.exists() || !audit_path.exists() || !opponent_log.exists() {
+            // `exists()` is not proof of completeness: a 0-byte file, a
+            // truncated final line, or a log that stops mid-game all exist.
+            // Check the content against the replay's turn count instead.
+            let log_check =
+                check_opponent_log(&opponent_log, audit.turns, &audit.reason, tbp_opponent);
+            if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
                 measurement_incomplete += 1;
                 eprintln!(
                     "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
                     replay_path.exists(),
                     audit_path.exists(),
-                    opponent_log.exists()
+                    log_check.as_ref().err().map(String::as_str).unwrap_or("ok")
                 );
             }
             println!(
@@ -1065,6 +1147,72 @@ pub fn verify_all(dir: &Path) -> Result<Vec<(String, VerifyReport)>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opponent_log_content_check_rejects_truncated_transcripts() {
+        let dir = std::env::temp_dir().join(format!("arena-log-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("transcript.jsonl");
+        let mut text = String::from(
+            "{\"type\":\"start\",\"payload\":{}}
+",
+        );
+        for _ in 0..3 {
+            text.push_str(
+                "{\"type\":\"suggestion\",\"payload\":{\"moves\":[{\"location\":{}}]}}
+",
+            );
+            text.push_str(
+                "{\"type\":\"play\",\"move\":{}}
+",
+            );
+        }
+        std::fs::write(&path, &text).unwrap();
+        assert!(check_opponent_log(&path, 3, "TopOut", true).is_ok());
+
+        // A log that stops after 2 of 3 turns exists but is not complete.
+        let truncated = text.lines().take(5).collect::<Vec<_>>().join(
+            "
+",
+        );
+        std::fs::write(&path, truncated).unwrap();
+        assert!(check_opponent_log(&path, 3, "TopOut", true).is_err());
+
+        // A 0-byte file exists but carries no evidence.
+        std::fs::write(&path, "").unwrap();
+        assert!(check_opponent_log(&path, 3, "TopOut", true).is_err());
+
+        // A partial final line is not valid JSON.
+        std::fs::write(
+            &path,
+            "{\"type\":\"start\"}
+{\"type\":\"suggestion\"",
+        )
+        .unwrap();
+        assert!(check_opponent_log(&path, 1, "TopOut", true).is_err());
+
+        // A forfeit has one fewer play than suggestions.
+        let mut forfeit = String::from(
+            "{\"type\":\"start\",\"payload\":{}}
+",
+        );
+        forfeit.push_str(
+            "{\"type\":\"suggestion\",\"payload\":{\"moves\":[{}]}}
+",
+        );
+        forfeit.push_str(
+            "{\"type\":\"suggestion\",\"payload\":{\"moves\":[]}}
+",
+        );
+        forfeit.push_str(
+            "{\"type\":\"play\",\"move\":{}}
+",
+        );
+        std::fs::write(&path, forfeit).unwrap();
+        assert!(check_opponent_log(&path, 2, "Forfeit", true).is_ok());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn wilson_interval_is_sane() {
