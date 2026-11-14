@@ -240,3 +240,10 @@ intetrigence/
   - `crates/arena/src/referee.rs` の TurnCap 判定から `received_total` / `sent_total` の比較を削除。
   - `crates/arena/src/replay.rs` の verify 側にも同じ比較が複製されていたため削除(記録と再計算が食い違う原因になっていた)。
   - ゲートは `turncap == 0` を要求(1 件でも未決着があれば不通過)。
+
+- **🔍 2026-11-15 S2 ルール監査(ユーザー指示)**: 実装と文書の全規則を [S2 準拠] / [我々のプロトコル] / [誤り] に 3 分類。**docs/s2-rule-audit.md**(レフェリー・文書)と **docs/core-rule-audit.md**(core)を作成。
+  - **勝者決定の経路は 4 つだけ**(`referee.rs` の `match &end`)。W1 `TopOut` = S2 準拠 / W2 `Stuck` = 誤り / W3 `TurnCap` = 修正済み / W4 `Forfeit` = 修正(no contest)
+  - **修正した誤り**: ①TurnCap の攻撃量勝者決定(referee + verify の 2 箇所)②`Stuck` を `TopOut` と記録 ③`Forfeit` で相手を勝者に ④`draws` が未決着と引き分けを混同 ⑤`wins_forfeit_other` が `cause == None` も数える ⑥ゲートが存在しない `wins_turncap` を参照 ⑦**0 ライン設置に直前 combo の `ln` 攻撃が乗る**(実バグ)⑧protocol §6.3 に攻撃量順位付けの記述が残存
+  - **ゲートを goal に合わせて厳格化**: 段階 1 = `wins_topout == 50 && losses_topout == 0 && turncap == 0 && no_contest == 0`(完全試合)、段階 2・3 = `wins_topout >= 48 && turncap == 0`。**5 項目の合計 == 50 の検算を必須化**
+  - **真の実力が判明**: 40 行パッチ + spawn 修正済み attax に対して **TopOut 勝ち 2/18 = 11.1%**(tuning 20 ゲーム)、スモーク 10 ゲームは **0 勝 9 敗 1 未決着**。旧「94%」「95%」「8 勝 2 敗」はすべて無効
+  - **残る計測ギャップ**: 40 行パッチ後も forfeit-other が 2/20(10%)。`no_contest == 0` がゲート条件なので公式ラウンド前に desync 修正が必要(attax-integration が board dump 診断で対応中)
