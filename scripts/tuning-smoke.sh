@@ -9,6 +9,7 @@
 #   OUT        evidence root (default: <repo>/scripts/evidence)
 #   SEEDS      comma separated seeds (default: 9001..9010)
 #   CC2_SHEETS default A,B (20 games); CLYS_SHEETS default A (10 games)
+#   PROFILE=1  print the per-game search profile after each match
 #   TURNS      turn cap (default: 1000)
 #   CC2_DIR    CC2 checkout (default: C:/Users/Hasilan/Projects/cold-clear-2)
 #   CLYS_DIR   clys checkout (default: C:/Users/Hasilan/Projects/clys)
@@ -45,3 +46,10 @@ cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --tbp-cwd C:/Users/Hasilan/Projects/intetrigence --tbp-visible-rows 40 \
   --tbp-name clys \
   --note "Tuning smoke vs clys (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
+
+if [ "${PROFILE:-0}" = "1" ]; then
+  echo "search profile: CC2"
+  python scripts/search-profile.py "$OUT/tuning-cc2"
+  echo "search profile: clys"
+  python scripts/search-profile.py "$OUT/tuning-clys"
+fi
