@@ -230,6 +230,7 @@ impl Agent for BotAgent {
         let mut depth = None;
         let mut width = None;
         let mut fallback = true;
+        let mut aborted = false;
         match self.searcher.search(&root) {
             Some(result) => {
                 self.searches += 1;
@@ -268,7 +269,7 @@ impl Agent for BotAgent {
             depth,
             width,
             fallback,
-            aborted: false,
+            aborted,
         })
     }
 
