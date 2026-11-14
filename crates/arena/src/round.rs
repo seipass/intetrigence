@@ -780,6 +780,21 @@ fn stage_section(
             bot.search_turns,
             bot.fallback_rate * 100.0
         )?;
+        writeln!(
+            out,
+            "- net damage/game: **{:+.1}** (negative games {}/{}); collapses **{}/{}**; opener lines/game **{:.2}**",
+            bot.net_damage_per_game,
+            bot.negative_net_games,
+            games,
+            bot.collapses,
+            games,
+            bot.opener_lines_per_game
+        )?;
+        writeln!(
+            out,
+            "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}**",
+            bot.max_burst_1, bot.max_burst_5, bot.burst_over_capacity
+        )?;
     }
     writeln!(
         out,
