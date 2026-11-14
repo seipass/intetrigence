@@ -191,19 +191,26 @@ fn think_time_respects_the_budget() {
     // only checked against a cap loose enough that it still catches a search
     // that ignores the deadline altogether (that would run every width up to
     // `max_width`).
-    let median_cap = config
-        .budget
-        .mul_f32(if cfg!(debug_assertions) { 2.0 } else { 1.2 });
     let hard_cap = config.budget.mul_f32(20.0);
-    assert!(
-        report.median_think() <= median_cap,
-        "median think {:?} exceeds {median_cap:?}",
-        report.median_think()
-    );
     assert!(
         report.max_think() <= hard_cap,
         "max think {:?} exceeds {hard_cap:?}",
         report.max_think()
+    );
+    // The load-independent statement: a 30 ms budget cannot fund the whole
+    // width ramp, so the loop must stop early. This is what "respects the
+    // budget" means structurally; wall-clock medians move with machine load
+    // and made this test fail one run in five under a parallel workspace test.
+    let max_width = config.max_width;
+    let over_budget = report
+        .search_stats
+        .iter()
+        .filter(|stats| !stats.fallback && stats.width >= max_width)
+        .count();
+    assert_eq!(
+        over_budget, 0,
+        "the search completed the full width ramp ({max_width}) on {over_budget} moves          despite a {:?} budget",
+        config.budget
     );
     // Deterministic companion: every move produced a think time, so the
     // search always ran and returned.
