@@ -24,7 +24,7 @@ fn deterministic_schedule_cost() {
         "{:<18} {:>6} {:>8} {:>8} {:>8} {:>7}",
         "schedule", "moves", "median", "p99", "max", "over100"
     );
-    for (depth, width) in [(4usize, 128usize), (6, 96), (6, 128), (8, 96), (8, 64)] {
+    for (depth, width) in [(6usize, 128usize)] {
         let config = SearchConfig {
             deterministic: true,
             depth,
@@ -35,7 +35,7 @@ fn deterministic_schedule_cost() {
         };
         // 400 turns on the official profile: long enough to reach the tall,
         // sparse boards where the candidate count peaks.
-        let report = play_game_with_setup(9001, &config, 400, &injections, 0);
+        let report = play_game_with_setup(9001, &config, 1200, &injections, 0);
         let mut times = report.think_times.clone();
         times.sort();
         let n = times.len();
@@ -59,6 +59,15 @@ fn deterministic_schedule_cost() {
             p99.as_secs_f64() * 1000.0,
             max.as_secs_f64() * 1000.0,
         );
-        println!("  aborted {aborted}  worst iteration {:?}", worst_level);
+        let aborted_depths: Vec<usize> = report
+            .search_stats
+            .iter()
+            .filter(|s| s.aborted)
+            .map(|s| s.depth)
+            .collect();
+        println!(
+            "  aborted {aborted}  depths {aborted_depths:?}  worst iteration {:?}",
+            worst_level
+        );
     }
 }
