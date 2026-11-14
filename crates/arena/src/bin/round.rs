@@ -272,8 +272,14 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             seeds.last().copied().unwrap_or(0),
             seeds_source
         );
-        println!("seeds commit: {}", seeds_commit.as_deref().unwrap_or("uncommitted"));
-        println!("build commit: {}", build_commit.as_deref().unwrap_or("unknown"));
+        println!(
+            "seeds commit: {}",
+            seeds_commit.as_deref().unwrap_or("uncommitted")
+        );
+        println!(
+            "build commit: {}",
+            build_commit.as_deref().unwrap_or("unknown")
+        );
         println!("gates: {:?}", gates);
         return Ok(());
     }
