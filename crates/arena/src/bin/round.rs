@@ -53,6 +53,17 @@ fn usage() {
     );
 }
 
+fn parse_env(text: &str) -> Vec<(String, String)> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| {
+            part.split_once('=')
+                .map(|(key, value)| (key.trim().to_string(), value.trim().to_string()))
+        })
+        .collect()
+}
+
 fn parse_args(text: &str) -> Vec<String> {
     text.split(',')
         .map(str::trim)
@@ -76,6 +87,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut cc2_suggest_delay_ms = 100u64;
     let mut cc2_retry_empty_ms = 2000u64;
     let mut cc2_cwd: Option<PathBuf> = None;
+    let mut cc2_env: Vec<(String, String)> = Vec::new();
     let mut clys_program: Option<String> = None;
     let mut clys_args: Vec<String> = Vec::new();
     let mut clys_commit: Option<String> = None;
@@ -83,6 +95,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_suggest_delay_ms = 0u64;
     let mut clys_retry_empty_ms = 0u64;
     let mut clys_cwd: Option<PathBuf> = None;
+    let mut clys_env: Vec<(String, String)> = Vec::new();
     let mut gates = [50u32, 48, 48];
     let mut ms = 100u64;
     let mut threads = 8usize;
@@ -173,6 +186,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 cc2_cwd = Some(PathBuf::from(value(1)?));
                 index += 2;
             }
+            "--cc2-env" => {
+                cc2_env = parse_env(&value(1)?);
+                index += 2;
+            }
             "--clys-program" => {
                 clys_program = Some(value(1)?);
                 index += 2;
@@ -205,6 +222,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             }
             "--clys-cwd" => {
                 clys_cwd = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--clys-env" => {
+                clys_env = parse_env(&value(1)?);
                 index += 2;
             }
             "--gate-attax" => {
@@ -308,6 +329,18 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         return Ok(());
     }
 
+    let attax_commit = attax_commit.or_else(|| {
+        attax_dir.as_ref().and_then(|dir| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(dir)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        })
+    });
     let attax = match attax_dir {
         Some(dir) => OpponentSpec {
             key: "attax".into(),
@@ -334,6 +367,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.suggest_delay_ms = cc2_suggest_delay_ms;
             config.retry_empty_suggest_ms = cc2_retry_empty_ms;
             config.cwd = cc2_cwd;
+            config.env = cc2_env;
             OpponentSpec {
                 key: "cc2".into(),
                 display: "Cold Clear 2".into(),
@@ -356,6 +390,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.suggest_delay_ms = clys_suggest_delay_ms;
             config.retry_empty_suggest_ms = clys_retry_empty_ms;
             config.cwd = clys_cwd;
+            config.env = clys_env;
             OpponentSpec {
                 key: "clys".into(),
                 display: "clys".into(),

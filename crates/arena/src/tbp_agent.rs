@@ -149,12 +149,12 @@ pub fn refill_pieces(queue: &[PieceKind], current_len: usize) -> Vec<Piece> {
         .collect()
 }
 
-fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<u8>>> {
+fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<char>>> {
     (0..intetrigence_core::Board::HEIGHT)
         .map(|y| {
             let row = board.row(y);
             (0..intetrigence_core::Board::WIDTH)
-                .map(|x| (row & (1u16 << x) != 0).then_some(8))
+                .map(|x| (row & (1u16 << x) != 0).then_some('G'))
                 .collect()
         })
         .collect()

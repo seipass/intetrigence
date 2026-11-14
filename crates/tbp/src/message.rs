@@ -168,7 +168,8 @@ pub struct InfoPayload {
 /// occupied (`docs/attax-integration.md` §3.1).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StartPayload {
-    pub board: Vec<Vec<Option<u8>>>,
+    /// TBP 0001: `null` or a piece character (`"I"`, `"G"`, ...).
+    pub board: Vec<Vec<Option<char>>>,
     pub queue: Vec<Piece>,
     pub hold: Option<Piece>,
     pub combo: u32,
@@ -205,12 +206,13 @@ pub struct NewPiecePayload {
 }
 
 /// Search statistics reported by the bot (`attax-integration.md` §5.3).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MoveInfo {
     #[serde(default)]
     pub nodes: u64,
+    /// Nodes per second. CC2 emits a float here, so keep it as `f64`.
     #[serde(default)]
-    pub nps: u64,
+    pub nps: f64,
     #[serde(default)]
     pub extra: Option<String>,
 }
@@ -229,7 +231,7 @@ impl MoveInfo {
 }
 
 /// `suggestion` payload: candidates in priority order.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SuggestionPayload {
     pub moves: Vec<Move>,
     #[serde(default)]
@@ -257,7 +259,7 @@ pub enum HostMessage {
 }
 
 /// Bot-to-host messages.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BotMessage {
     Info(InfoPayload),
     Ready,
