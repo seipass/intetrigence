@@ -1,12 +1,24 @@
-# intetrigence 再建計画 — attax に勝率 90% (TETR.IO S2 ルール・完全新規)
+# intetrigence 計画 — attax 100% + 汎化検証(TETR.IO S2 ルール)
 
-## 1. ゴール
+## 1. 現行 goal(2026-11-14 改訂・旧 goal は §8 進捗ログ参照)
 
 > **goal文(圧縮耐性版)**
 >
-> TETR.IO Season 2(TETRA LEAGUE デフォルト相当: B2B Charging/surge, All-Mini+, Opener Phase, Multiplier コンボ)で動く versus Tetris AI「intetrigence」を、旧実装(CC2 派生)に依存せず Rust でゼロから構築する。S2 ルールエンジン・レフェリー・監査機能(思考時間記録・verify-replay・採点オーディット)も自作する。ライセンスは AGPL-3.0(ハーネス周りは attax コードの利用可・作者許可済み、本体 bot は独自実装)。
+> TETR.IO Season 2(TETRA LEAGUE デフォルト相当)ルールで動く versus Tetris AI「intetrigence」を、旧実装(CC2 派生)に依存せず Rust で構築・強化する。S2 ルールエンジン・レフェリー・監査機能(replay 検証・思考時間記録・採点オーディット)は自作済みの資産(crates/*、docs/s2-spec.md、docs/s2-referee-protocol.md)を引き続き使用する。ライセンスは AGPL-3.0(ハーネス周りは attax コードの利用可・作者許可済み、本体 bot は独自実装)。
 >
-> 達成条件: attax(https://github.com/souta-lab/attax の S2 対応版、接続 I/F は作者合意のものを使用)との公式マッチ — 両プロジェクトで未使用の held-out seeds 50 個 × 両シート = 100 ゲーム、5 PPS、思考 100ms、5 preview + hold、全ゲーム replay 検証 — で **90 勝以上(点推定 ≥ 90%)** を達成し、Wilson 95% CI・attack/piece・受信ゴミ・両者の思考時間を明記した再現可能なレポートを docs/ に残すこと。
+> 達成条件(同一ビルド・同一コミットの intetrigence で、1 ラウンド内で段階的に満たすこと):
+> 1. **attax(https://github.com/souta-lab/attax、現行公開版 7b38f51 をコミット固定)との公式マッチ — 事前確定の held-out seeds 25 個 × 両シート = 50 ゲーム、5 PPS、思考 100ms、5 preview + hold、S2 ルール、全ゲーム replay 検証 — で 50 勝 0 敗(勝率 100%)**
+> 2. attax が 50 勝 0 敗だった場合のみ、続けて同一条件で:
+>    - **Cold Clear 2(MinusKelvin、最新公開版をコミット固定、TBP 接続)との公式マッチで 50 ゲーム中 48 勝以上(勝率 95% 以上)**
+>    - **clys(citrus610、最新公開版をコミット固定、専用アダプタで接続)との公式マッチで 50 ゲーム中 48 勝以上(勝率 95% 以上)**
+>    両ボットは S2 非対応のため、レフェリー側で採点・監査する。この 2 マッチは attax への過学習を防ぐ汎化検証であり、勝率の解釈(S2 非対応ボット相手である旨)をレポートに明記する
+> 3. **レポート**: 3 マッチの勝率 + Wilson 95% CI、勝ちの種類別内訳(TopOut / forfeit / turn-cap)、attack/piece、受信ゴミ、両者の思考時間、対戦相手と intetrigence のビルドコミット固定を docs/ に残すこと
+>
+> シード規則(特定シード値への最適化の禁止):
+> - **評価 seeds(ラウンドで使用する 25 seeds)はラウンド実行前にコミットで事前確定し、重み・パラメータ・評価関数の調整に一切使わない**。調整は評価 seeds と番号が重ならない専用 tuning seeds のみで行う
+> - **評価 seeds は公式マッチで使ったら焼き付き**(以後チューニングに使わない)
+> - **再挑戦はラウンド全体のやり直し**: どの段階で基準未達でも、修正後の新しいビルド + 新しい事前確定 seeds でラウンド全体(attax 50 → CC2 50 → clys 50)を最初からやり直す。部分再実行・過去の合格結果とのつなぎ合わせは不可
+> - 診断プロファイル(defense-stress / garbage-pressure 等)の数字を公式主張に混ぜない(protocol の規律)
 >
 > コンテキストを失った場合は、まず本書(PLAN.md)と docs/s2-spec.md(S2 ルール仕様)を読んでから再開すること。
 
@@ -201,3 +213,5 @@ intetrigence/
 - **2026-11-14 ユーザー判断: 待機を解除してプロジェクトを停止**。「S2 版の公開をここから待っても早くならない」ため、block 状態でチーム全員アイドルのまま停止する。**再開手順(attax S2 版が公開されたら)**: ①attax-integration が S2 コミットを固定・視野(40/20 行)を確認 → ②harness-dev が `scripts/m5-final.sh` を seeds 20001–20050 × 両シートで実行(約 2 時間、replay 検証・監査・レポートまで自動)→ ③s2-spec-lead が protocol §7.1 の差し替え条件どおり主張を確定。**現状の成果**: S2 エンジン・探索 bot(防御 v2)・レフェリー・監査・診断プロファイル・プロトコル v1.12 がすべて main に統合済み。暫定マッチ(vs 現行 attax)94–6 = 94.0%(91 は vision-forfeit、非 forfeit 3/9)。最終 seeds 20001–20050 は未使用。
 - **2026-11-14 ユーザー依頼(新しいタスク): リプレイ → 動画レンダラ + intetrigence vs attax の 10 本の動画を作成**。①replay JSONL から再シミュレーションし動画(MP4)を生成する機能(crates/arena または tools/、core で再シミュレート + 盤面ハッシュ検証で動画の正確性を保証、ffmpeg でエンコード)②暫定マッチ(scripts/evidence/m5-provisional/)から 10 ゲームを選んで動画化 — 非 forfeit 9 ゲーム(3 turn-cap 勝ち + 6 TopOut 負け = 本番の激戦)+ 1 短い forfeit 勝ち。動画は videos/(gitignore)、レンダラとマニフェストをコミット。担当: harness-dev。
 - **2026-11-14 動画レンダラ + 10 本の動画が完成(harness-dev、4981aee、main af191d5 で統合)**: `crates/arena/src/render.rs`(5×7 ビットマップフォント内蔵、ffmpeg libx264 パイプエンコード)。**描画前に verify_replay + 毎ターンの盤面ハッシュ照合で動画とリプレイの一致を保証**(検証失敗 replay は拒否)。左右の盤面(ピース色つき)、落下アニメーション(5 PPS 実時間)+ ghost、hold / next 5 / pending garbage バー / B2B / combo / attack / think ms、エンドカード(勝者 + 決着理由)。CLI: `arena render --replay <jsonl> --out <mp4>`。**10 本の動画を videos/ に生成**(非 forfeit 9 = turn-cap 勝ち 3 + TopOut 負け 6、+ forfeit-vision 勝ち 1、計 39MB、全 10 本 verified: true、manifest.json コミット済み)。再レンダリングは `scripts/render-m5-videos.sh`(約 6 分)。cargo test 253 緑。
+- **2026-11-14 goal 改訂(旧 90% goal は終了・新 goal を §1 に移行)**: attax への勝率を**100%**(50 ゲーム)に引き上げ、**CC2 / clys への勝率 95%**(各 50 ゲーム)を汎化検証として追加。**シード規則(特定シード値への最適化の禁止)を導入**: 評価 seeds の事前確定・チューニングとの完全分離・焼き付き・再挑戦はラウンド全体のやり直し。**Seed レジストリ**: 焼き付き済み = 1001–1005(M0)/ 9001–9020(tuning)/ 10001–1040(M4 系)/ 11001–11050(暫定マッチ)、未使用 = 20001–20050(旧 M5 予約・新 goal では未使用のまま)。**評価 seeds は各ラウンド前に新規範囲をコミットで確定する**(例: ラウンド 1 = 30001–30025)。
+- **Wave 8(進行中・新 goal の実装)**: ①bot-dev = **スタック管理の本格再設計**(attax 100% の鍵。6 敗 = downstack 5 + opener 死 1 を潰す。docs/m4-stack-management-report.md の 3 棄却変種を踏まえ、列高さ分布の特徴量等の構造的アプローチ。tuning seeds + 診断プロファイルのみで調整)②attax-integration = **CC2 + clys の統合**(CC2 は TBP ネイティブ、clys は公開 I/F を調査して完璧なアダプタを作成。座標変換はセル集合一致で検証、attax 接続と同等の監査)③s2-spec-lead = ラウンドプロトコルの成文化(段階ゲート・評価 seeds の事前確定手続き・焼き付き台帳)④harness-dev = ラウンドランナー(attax 50 → CC2 50 → clys 50 の段階実行、同一ビルド・同一 seeds、replay 検証・監査・レポート)。**全員の準備が揃ったら評価 seeds をコミット確定 → ラウンド 1 を実行**。
