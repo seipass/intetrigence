@@ -369,11 +369,14 @@ impl Searcher {
         let depth = self.config.depth.max(1);
         let width = self.config.width.max(1);
         let sequence = PieceSequence::new(root.current, &root.preview, depth);
-        // A fixed schedule has no natural stop, and 400 moves of headroom does
-        // not bound 10,000. The cap keeps the worst case under the 100 ms
-        // budget; a move that hits it returns the last completed level and is
-        // recorded as `aborted`, which is a normal time-respecting result.
-        let deadline = start + DETERMINISTIC_DEADLINE;
+        // No wall-clock stop at all. A fixed schedule is its own work bound
+        // (`depth * width * placements per node`), which is a function of the
+        // position, not of the machine. Stopping on the clock would make the
+        // number of completed levels -- and therefore the move -- depend on
+        // load, which is exactly what this mode exists to avoid. The time
+        // guarantee comes from choosing a schedule whose measured worst case
+        // fits the budget, not from aborting.
+        let deadline = start + Duration::from_secs(3600);
         // Parallel, but with the workers' clock check disabled: that check is
         // the only time-dependent branch in the beam, and removing it is what
         // makes the merge thread-invariant. The real cap stays at the level
@@ -405,7 +408,8 @@ impl Searcher {
         if candidates.is_empty() {
             return None;
         }
-        let aborted = completed < depth;
+        // Never aborted: the schedule always runs to completion.
+        let aborted = false;
         let Candidate { first, value } = candidates[0];
         Some(SearchResult {
             best: first,

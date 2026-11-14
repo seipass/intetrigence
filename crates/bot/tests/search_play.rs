@@ -141,8 +141,8 @@ fn a_tight_deadline_still_returns_a_move() {
 fn deterministic_mode_repeats_exactly() {
     let config = SearchConfig {
         deterministic: true,
-        depth: 4,
-        width: 128,
+        depth: 6,
+        width: 96,
         threads: 8,
         ..real_config()
     };
