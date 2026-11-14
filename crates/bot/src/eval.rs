@@ -26,6 +26,12 @@ use crate::movegen::Placement;
 /// Columns of the playfield.
 pub const COLUMNS: usize = 10;
 
+/// Garbage queued (rows) at which the evaluation switches to survival mode.
+pub const SURVIVAL_PENDING: u32 = 8;
+
+/// Stack height at which the evaluation switches to survival mode.
+pub const SURVIVAL_HEIGHT: u32 = 15;
+
 /// Height above which the stack starts to be punished quadratically.
 pub const DANGER_BASE: i32 = 12;
 
@@ -217,6 +223,14 @@ pub struct Weights {
     pub opener_attack: f64,
     /// Reward per garbage row cleared (downstack efficiency).
     pub garbage_clear: f64,
+    /// Enable survival mode: when the queue is deep or the stack is high the
+    /// shape terms are **removed** (not scaled) and every cleared line is
+    /// worth `survival_line`, so the bot digs instead of building. The
+    /// provisional losses all came from playing 7-8 zero-line placements
+    /// while the queue grew to 10-12.
+    pub survival: bool,
+    /// Value of one cleared line in survival mode.
+    pub survival_line: f64,
     /// Penalty per row of pending garbage (linear, on top of the projected
     /// danger).
     pub incoming: f64,
@@ -258,6 +272,8 @@ impl Default for Weights {
             combo: 2.0,
             opener_attack: 6.0,
             garbage_clear: 10.0,
+            survival: true,
+            survival_line: 12.0,
             incoming: -1.0,
             softdrop: -0.05,
 
@@ -367,8 +383,14 @@ pub fn apply_placement(
         && context.t_slot > 0
         && placement.spin == SpinType::None;
 
+    let survival = weights.survival
+        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
     let mut value = weights.attack * f64::from(attack.total);
-    value += weights.clear[placement.spin.index()][clear.lines as usize];
+    value += if survival {
+        weights.survival_line * f64::from(clear.lines)
+    } else {
+        weights.clear[placement.spin.index()][clear.lines as usize]
+    };
     if clear.perfect_clear {
         value += weights.perfect_clear;
     }
@@ -428,6 +450,8 @@ pub fn leaf_value(
     t_available: usize,
 ) -> f64 {
     let BoardAnalysis { heights, features } = analyse(board);
+    let survival = weights.survival
+        && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.holes * features.holes
@@ -437,7 +461,20 @@ pub fn leaf_value(
         + weights.bumpiness_sq * features.bumpiness_sq
         + weights.row_transitions * features.row_transitions
         + weights.well_depth * features.well_depth
-        + weights.extra_wells * features.extra_wells;
+        + if survival {
+            // Survival mode removes the shape terms instead of scaling them:
+            // under a deep queue a hole is worth less than a cleared row.
+            0.0
+        } else {
+            weights.holes * features.holes
+                + weights.hole_cover * features.hole_cover
+                + weights.hole_rows * features.hole_rows
+                + weights.bumpiness * features.bumpiness
+                + weights.bumpiness_sq * features.bumpiness_sq
+                + weights.row_transitions * features.row_transitions
+                + weights.well_depth * features.well_depth
+                + weights.extra_wells * features.extra_wells
+        };
 
     // Versus: the height this stack will have once the pending garbage lands.
     let projected = features.max_height + f64::from(context.incoming);

@@ -108,7 +108,43 @@ the shortcut was exact. It did **not** speed anything up: the reachable state
 count is unchanged (9921 states over 7 pieces on an empty board) and the cost
 is dominated by the per-cell `fits` checks, not by the empty rows. Reverted.
 
-## 4. Conclusion
+## 4. Correction: the win numbers were forfeits, and we never release surge
+
+The manager re-tallied all 220 attax games: **0 top-out wins, 13 top-out losses,
+13 turn-cap wins, 194 forfeits** (the attax adapter returns zero candidates).
+The real record is 13/220 = 5.9%, and every "94%" / "92.5%" figure in this and
+earlier reports measured the adapter, not the bot.
+
+Two consequences for this document:
+
+- the loss analysis in §1 stands (13 top-out losses, same mechanism);
+- the *win* side was never real, so "attack/piece 0.965 vs 0.862" has never
+  converted into a kill. attax has not been topped out once in 220 games.
+
+### The bot never releases surge
+
+`compute_attack` pays a surge release as attack lines, and the reward follows:
+a single that breaks a B2B streak of 12 pays `attack 11 -> reward 188`
+(measured with `eval::apply_placement` on a synthetic board), against `-12`
+for the same single at B2B 0. So the evaluation *does* want to cash the charge.
+
+Yet the replay dumps show B2B streaks of 10-14 and per-turn attack values of
+0-5: the charge is never released. Every attack we have ever sent is the
+regular per-clear attack. That is the most likely reason attax never dies: it
+never has to absorb a burst larger than a quad, which its 20-row view handles.
+
+This is the highest-value open question in the bot: **why does the search not
+find the release**, given the reward is large and positive? Candidates:
+
+1. the streak is high only in positions where no non-difficult clear exists
+   (the bot keeps taking T-spins and quads, which are difficult clears and
+   therefore keep the streak alive);
+2. the release is 1 ply away but the beam prunes it before the leaf (the
+   reward is immediate, so this should not happen);
+3. `Weights.b2b_break = -20` plus the clear-table penalty plus the shape cost
+   of the clearing placement outweighs the burst in the actual positions.
+
+## 5. Conclusion
 
 Four evaluation-weight variants have now been rejected (`garbage_buried`,
 `DANGER_BASE` 10, `flatness`, `downstack`). They all trade attack for height,
