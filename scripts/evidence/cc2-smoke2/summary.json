@@ -1,0 +1,163 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794679273",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9001,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 41,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        4,
+        3
+      ],
+      "turns_with_b2b_ge_4": [
+        3,
+        0
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        98.033,
+        100.143
+      ],
+      "think_p95_ms": [
+        100.865,
+        100.332
+      ],
+      "think_p99_ms": [
+        101.319,
+        100.359
+      ],
+      "think_max_ms": [
+        101.319,
+        100.359
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.683,
+        0.537
+      ],
+      "spin_mismatches": [
+        0,
+        0
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        22,
+        18
+      ],
+      "received_total": [
+        12,
+        17
+      ],
+      "attack_total": [
+        28,
+        22
+      ],
+      "pieces_placed": [
+        41,
+        41
+      ],
+      "start_resends": 6,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-A.jsonl"
+    }
+  ],
+  "wins": 1,
+  "losses": 0,
+  "draws": 0,
+  "forfeits": 0,
+  "wins_topout": 1,
+  "wins_turncap": 0,
+  "losses_turncap": 0,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "losses_topout": 0,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "surge_released": [
+    0,
+    0
+  ],
+  "max_b2b_streak": [
+    4,
+    3
+  ],
+  "turns_with_b2b_ge_4": [
+    3,
+    0
+  ],
+  "win_rate": 1.0,
+  "wilson_low": 0.2065,
+  "wilson_high": 1.0,
+  "verified": 1,
+  "verify_failures": 0,
+  "resumed_games": 0,
+  "measurement_complete": true,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "placements": 41,
+      "spin_checked": 41,
+      "spin_mismatches": 0,
+      "attack_checked": 41,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.683,
+      "received_per_game": 12.0,
+      "visible_rows": 40,
+      "mean_height": 6.44,
+      "max_height": 13.0
+    },
+    {
+      "slot": 1,
+      "name": "Cold Clear 2",
+      "placements": 41,
+      "spin_checked": 41,
+      "spin_mismatches": 0,
+      "attack_checked": 41,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.537,
+      "received_per_game": 17.0,
+      "visible_rows": 40,
+      "mean_height": 9.17,
+      "max_height": 22.0
+    }
+  ],
+  "notes": [
+    "The intetrigence side is the bot recorded in each replay header.",
+    "CC2 smoke v2"
+  ]
+}

@@ -58,20 +58,31 @@ fn think_time_respects_the_budget() {
         ..real_config()
     };
     let report = play_game(3, &config, 10);
-    // The deadline is checked inside each level, so a level can overshoot a
-    // little. Unoptimised builds are several times slower, which makes one
-    // level a larger fraction of the budget, so the cap is debug-aware.
-    let cap = if cfg!(debug_assertions) {
-        config.budget.mul_f32(2.5)
-    } else {
-        config.budget.mul_f32(1.3)
-    };
+    // The deadline is checked between widening iterations, so a single level
+    // can overshoot. Asserting the *maximum* against a tight cap made this
+    // test fail roughly one run in five when the whole workspace ran in
+    // parallel and the CPU was saturated, which is a property of the machine,
+    // not of the search. The median is the load-robust statement; the max is
+    // only checked against a cap loose enough that it still catches a search
+    // that ignores the deadline altogether (that would run every width up to
+    // `max_width`).
+    let median_cap = config
+        .budget
+        .mul_f32(if cfg!(debug_assertions) { 2.0 } else { 1.2 });
+    let hard_cap = config.budget.mul_f32(20.0);
     assert!(
-        report.max_think() <= cap,
-        "max think {:?} exceeds {cap:?}",
+        report.median_think() <= median_cap,
+        "median think {:?} exceeds {median_cap:?}",
+        report.median_think()
+    );
+    assert!(
+        report.max_think() <= hard_cap,
+        "max think {:?} exceeds {hard_cap:?}",
         report.max_think()
     );
-    assert!(report.median_think() <= cap);
+    // Deterministic companion: every move produced a think time, so the
+    // search always ran and returned.
+    assert_eq!(report.think_times.len(), report.turns as usize);
 }
 
 #[test]
