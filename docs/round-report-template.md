@@ -36,6 +36,7 @@
 - win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
 - no-contest record: `<wins_topout>/<games - no_contest>` (TopOut games)
 - attack/piece: `<a>` vs `<b>`
+- attack/line: `<a>`, spin rate: `<a>%`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
 - think over 200 ms: `<n>` vs `<n>`

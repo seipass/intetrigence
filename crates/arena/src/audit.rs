@@ -304,6 +304,9 @@ pub struct GameAudit {
     /// Lines cleared in the opener phase (the first 14 placements per slot).
     #[serde(default)]
     pub opener_lines: [u32; 2],
+    /// Placements with a non-none spin label per slot.
+    #[serde(default)]
+    pub spin_placements: [u32; 2],
 }
 
 impl GameAudit {

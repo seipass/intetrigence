@@ -450,13 +450,19 @@ pub fn run_round(
 
     let mut opener_lines = [0u32; 2];
     let mut opener_placements = [0u32; 2];
+    let mut spin_placements = [0u32; 2];
     for record in &records {
         if let ReplayRecord::Turn(turn) = record {
             for placement in &turn.placements {
                 let slot = placement.slot as usize;
-                if slot < 2 && opener_placements[slot] < 14 {
-                    opener_lines[slot] += u32::from(placement.lines);
-                    opener_placements[slot] += 1;
+                if slot < 2 {
+                    if placement.spin != "none" {
+                        spin_placements[slot] += 1;
+                    }
+                    if opener_placements[slot] < 14 {
+                        opener_lines[slot] += u32::from(placement.lines);
+                        opener_placements[slot] += 1;
+                    }
                 }
             }
         }
@@ -515,6 +521,7 @@ pub fn run_round(
         bot_nodes_total: agent_audits[0].nodes_total,
         search,
         opener_lines,
+        spin_placements,
     };
 
     Ok(RoundReport {
@@ -649,13 +656,19 @@ fn forfeit_report(
     };
     let mut opener_lines = [0u32; 2];
     let mut opener_placements = [0u32; 2];
+    let mut spin_placements = [0u32; 2];
     for record in &records {
         if let ReplayRecord::Turn(turn) = record {
             for placement in &turn.placements {
                 let slot = placement.slot as usize;
-                if slot < 2 && opener_placements[slot] < 14 {
-                    opener_lines[slot] += u32::from(placement.lines);
-                    opener_placements[slot] += 1;
+                if slot < 2 {
+                    if placement.spin != "none" {
+                        spin_placements[slot] += 1;
+                    }
+                    if opener_placements[slot] < 14 {
+                        opener_lines[slot] += u32::from(placement.lines);
+                        opener_placements[slot] += 1;
+                    }
                 }
             }
         }
@@ -690,6 +703,7 @@ fn forfeit_report(
         bot_nodes_total: 0,
         search: [Vec::new(), Vec::new()],
         opener_lines: [0, 0],
+        spin_placements: [0, 0],
     };
     for agent in agents.iter_mut() {
         let _ = agent.end_round();

@@ -385,6 +385,12 @@ pub struct GameSummary {
     /// Lines cleared in the opener phase (first 14 placements) per slot.
     #[serde(default)]
     pub opener_lines: [u32; 2],
+    /// Total lines cleared per slot.
+    #[serde(default)]
+    pub lines_cleared: [u32; 2],
+    /// Placements with a non-none spin label per slot.
+    #[serde(default)]
+    pub spin_placements: [u32; 2],
     /// Garbage burst profile per slot.
     #[serde(default)]
     pub burst: [crate::replay::BurstProfile; 2],
@@ -468,6 +474,12 @@ pub struct BotAggregate {
     /// Five-turn windows exceeding the stack capacity.
     #[serde(default)]
     pub burst_over_capacity: u32,
+    /// Attack per cleared line.
+    #[serde(default)]
+    pub attack_per_line: f64,
+    /// Share of placements with a non-none spin label.
+    #[serde(default)]
+    pub spin_rate: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -713,6 +725,8 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         ],
         final_height: [audit.heights[0].final_height, audit.heights[1].final_height],
         opener_lines: audit.opener_lines,
+        lines_cleared: [audit.totals[0].lines_cleared, audit.totals[1].lines_cleared],
+        spin_placements: audit.spin_placements,
         burst: audit.verify.burst.clone(),
     }
 }
@@ -934,6 +948,14 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .iter()
                 .map(|game| game.burst[slot].burst_over_capacity)
                 .sum(),
+            attack_per_line: ratio(
+                games.iter().map(|game| game.attack_total[slot]).sum(),
+                games.iter().map(|game| game.lines_cleared[slot]).sum(),
+            ),
+            spin_rate: ratio(
+                games.iter().map(|game| game.spin_placements[slot]).sum(),
+                games.iter().map(|game| game.pieces_placed[slot]).sum(),
+            ),
         }
     });
     MatchSummary {
@@ -1127,6 +1149,23 @@ impl MatchSummary {
 /// Recompute the opener-phase lines (first 14 placements per slot) from a
 /// replay. Used when a verified game is resumed: the audit may predate the
 /// `opener_lines` field.
+fn spin_placements_from_replay(path: &std::path::Path) -> [u32; 2] {
+    let mut spins = [0u32; 2];
+    if let Ok(records) = crate::replay::read_replay(path) {
+        for record in &records {
+            if let crate::replay::ReplayRecord::Turn(turn) = record {
+                for placement in &turn.placements {
+                    let slot = placement.slot as usize;
+                    if slot < 2 && placement.spin != "none" {
+                        spins[slot] += 1;
+                    }
+                }
+            }
+        }
+    }
+    spins
+}
+
 fn opener_lines_from_replay(path: &std::path::Path) -> [u32; 2] {
     let mut lines = [0u32; 2];
     let mut placements = [0u32; 2];
@@ -1258,6 +1297,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                             if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
                                 audit.verify = verify;
                                 audit.opener_lines = opener_lines_from_replay(&replay_path);
+                                audit.spin_placements = spin_placements_from_replay(&replay_path);
                                 println!("{name}: resumed (verified)");
                                 audits.push(audit);
                                 resumed_games += 1;
