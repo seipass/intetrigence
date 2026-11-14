@@ -45,10 +45,6 @@ pub const SURVIVAL_PROJECTED: u32 = 21;
 /// Projected height at which zero-line placements start to be discouraged.
 pub const WARNING_PROJECTED: u32 = 18;
 
-/// Garbage queued (rows) at which the evaluation switches to survival mode.
-
-/// Stack height at which the evaluation switches to survival mode.
-
 /// Height above which the stack starts to be punished quadratically.
 pub const DANGER_BASE: i32 = 15;
 
