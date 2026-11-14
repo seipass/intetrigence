@@ -1,0 +1,208 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794670000",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9002,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 55,
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.512,
+        113.103
+      ],
+      "think_p95_ms": [
+        99.777,
+        134.169
+      ],
+      "think_p99_ms": [
+        100.179,
+        161.608
+      ],
+      "think_max_ms": [
+        100.179,
+        161.608
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.055
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.927
+      ],
+      "attack_per_piece": [
+        0.964,
+        0.782
+      ],
+      "spin_mismatches": [
+        0,
+        52
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        44,
+        26
+      ],
+      "received_total": [
+        15,
+        23
+      ],
+      "attack_total": [
+        53,
+        43
+      ],
+      "pieces_placed": [
+        55,
+        55
+      ],
+      "start_resends": 5,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9002-sheet-A.jsonl"
+    },
+    {
+      "seed": 9002,
+      "sheet": "B",
+      "winner": 1,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 75,
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.628,
+        116.303
+      ],
+      "think_p95_ms": [
+        99.392,
+        131.05
+      ],
+      "think_p99_ms": [
+        100.108,
+        134.939
+      ],
+      "think_max_ms": [
+        100.108,
+        134.939
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.067
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.867
+      ],
+      "attack_per_piece": [
+        0.973,
+        1.133
+      ],
+      "spin_mismatches": [
+        0,
+        70
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        47,
+        64
+      ],
+      "received_total": [
+        36,
+        26
+      ],
+      "attack_total": [
+        73,
+        85
+      ],
+      "pieces_placed": [
+        75,
+        75
+      ],
+      "start_resends": 10,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9002-sheet-B.jsonl"
+    }
+  ],
+  "wins": 1,
+  "losses": 1,
+  "draws": 0,
+  "forfeits": 0,
+  "wins_topout": 1,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "losses_topout": 1,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "win_rate": 0.5,
+  "wilson_low": 0.0945,
+  "wilson_high": 0.9055,
+  "verified": 2,
+  "verify_failures": 0,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "placements": 130,
+      "spin_checked": 130,
+      "spin_mismatches": 0,
+      "attack_checked": 130,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.969,
+      "received_per_game": 25.5,
+      "visible_rows": 40,
+      "mean_height": 6.4,
+      "max_height": 16.0
+    },
+    {
+      "slot": 1,
+      "name": "clys",
+      "placements": 130,
+      "spin_checked": 130,
+      "spin_mismatches": 122,
+      "attack_checked": 130,
+      "attack_mismatches": 14,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.985,
+      "received_per_game": 24.5,
+      "visible_rows": 40,
+      "mean_height": 6.27,
+      "max_height": 21.0
+    }
+  ],
+  "notes": [
+    "Staged round (protocol v1.13 §1.4); evaluation seeds are pre-committed and burned after use."
+  ]
+}

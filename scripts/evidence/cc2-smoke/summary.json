@@ -1,0 +1,208 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794669447",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9001,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 97,
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.49,
+        100.134
+      ],
+      "think_p95_ms": [
+        100.174,
+        100.192
+      ],
+      "think_p99_ms": [
+        101.249,
+        100.301
+      ],
+      "think_max_ms": [
+        101.249,
+        100.301
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.897,
+        0.856
+      ],
+      "spin_mismatches": [
+        0,
+        0
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        75,
+        54
+      ],
+      "received_total": [
+        42,
+        45
+      ],
+      "attack_total": [
+        87,
+        83
+      ],
+      "pieces_placed": [
+        97,
+        97
+      ],
+      "start_resends": 15,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-A.jsonl"
+    },
+    {
+      "seed": 9001,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 79,
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.035,
+        100.141
+      ],
+      "think_p95_ms": [
+        99.521,
+        100.247
+      ],
+      "think_p99_ms": [
+        99.843,
+        100.311
+      ],
+      "think_max_ms": [
+        99.843,
+        100.311
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.897,
+        0.709
+      ],
+      "spin_mismatches": [
+        0,
+        0
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        39,
+        46
+      ],
+      "received_total": [
+        15,
+        28
+      ],
+      "attack_total": [
+        70,
+        56
+      ],
+      "pieces_placed": [
+        78,
+        79
+      ],
+      "start_resends": 7,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-B.jsonl"
+    }
+  ],
+  "wins": 2,
+  "losses": 0,
+  "draws": 0,
+  "forfeits": 0,
+  "wins_topout": 2,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "losses_topout": 0,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "win_rate": 1.0,
+  "wilson_low": 0.3424,
+  "wilson_high": 1.0,
+  "verified": 2,
+  "verify_failures": 0,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "placements": 175,
+      "spin_checked": 175,
+      "spin_mismatches": 0,
+      "attack_checked": 175,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.897,
+      "received_per_game": 28.5,
+      "visible_rows": 40,
+      "mean_height": 7.15,
+      "max_height": 17.5
+    },
+    {
+      "slot": 1,
+      "name": "Cold Clear 2",
+      "placements": 176,
+      "spin_checked": 176,
+      "spin_mismatches": 0,
+      "attack_checked": 176,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "attack_per_piece": 0.79,
+      "received_per_game": 36.5,
+      "visible_rows": 40,
+      "mean_height": 9.54,
+      "max_height": 19.0
+    }
+  ],
+  "notes": [
+    "Staged round (protocol v1.13 §1.4); evaluation seeds are pre-committed and burned after use."
+  ]
+}

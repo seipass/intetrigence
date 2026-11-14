@@ -1,0 +1,68 @@
+diff --git a/src/ai/bot/movegen.ts b/src/ai/bot/movegen.ts
+index b60da6a..4095089 100644
+--- a/src/ai/bot/movegen.ts
++++ b/src/ai/bot/movegen.ts
+@@ -17,7 +17,7 @@ import { asRotation, type Kick, kickTable } from "../../core/srs.js";
+ import { classifyTspin, type TspinKind } from "../../core/tspin.js";
+ 
+ export const COLS = 10;
+-export const ROWS = 20;
++export const ROWS = 40;
+ export const FULL_ROW = 0x3ff;
+ 
+ export type BitBoard = Uint16Array;
+@@ -92,8 +92,11 @@ export function collides(
+ }
+ 
+ /** Engine spawn position for a freshly drawn piece. */
++export const SPAWN_BOTTOM_ROW = 18; // 40-row grid: S2 spawn bottom = TBP row 21
+ export function spawnPosition(kind: PieceKind): { rotation: number; x: number; y: number } {
+-  return { rotation: 0, x: 3, y: -(SHAPES[kind][0] as Shape).minY };
++  const shape = SHAPES[kind][0] as Shape;
++  const maxY = shape.minY + shape.rows.length - 1;
++  return { rotation: 0, x: 3, y: SPAWN_BOTTOM_ROW - maxY };
+ }
+ 
+ export interface Placement {
+@@ -111,7 +114,7 @@ export interface Placement {
+ const X_OFF = 3;
+ const Y_OFF = 4;
+ const X_SPAN = 16;
+-const Y_SPAN = 32;
++const Y_SPAN = 48;
+ const STATE_COUNT = 4 * Y_SPAN * X_SPAN;
+ 
+ const visited = new Uint32Array(STATE_COUNT);
+diff --git a/tbp/attax-tbp.ts b/tbp/attax-tbp.ts
+index 0ea4454..05ccfb4 100644
+--- a/tbp/attax-tbp.ts
++++ b/tbp/attax-tbp.ts
+@@ -123,7 +123,7 @@ function tbpLocations(kind: Kind, cells: [number, number][]): Loc[] {
+ 
+ /** Attax placement (kind, rotation, x, top-row y) -> absolute TBP cells. */
+ function attaxCellsToTbp(kind: Kind, rotation: number, x: number, y: number): [number, number][] {
+-  return cellsFor(kind, rotation).map((c: { x: number; y: number }) => [x + c.x, 19 - (y + c.y)]);
++  return cellsFor(kind, rotation).map((c: { x: number; y: number }) => [x + c.x, 39 - (y + c.y)]);
+ }
+ 
+ // ---- tracked game state (TBP coordinates) ------------------------------------------------
+@@ -169,14 +169,15 @@ const bot = createBot({ name: "attax" }); // default preview 5, beam width 48, d
+ 
+ function snapshot(): GameSnapshot {
+   // Attax grid: 20 rows, index 0 = top.  Cells above TBP row 19 cannot be represented.
+-  const grid = Array.from({ length: 20 }, (_, r) => (rows[19 - r] ?? []).map((f) => (f ? 8 : 0)));
++  const grid = Array.from({ length: 40 }, (_, r) => (rows[39 - r] ?? []).map((f) => (f ? 8 : 0)));
+   const kind = queue[0];
+   if (!kind) throw new Error("suggest requires a nonempty queue from start");
+   const shape = cellsFor(kind, 0) as { x: number; y: number }[];
+-  const minY = Math.min(0, ...shape.map((c) => c.y));
+-  const posY = -minY;
++  const maxY = Math.max(...shape.map((c) => c.y));
++  // S2 spawn: the piece bottom sits on grid row 18 (TBP row 21).
++  const posY = 18 - maxY;
+   return {
+-    board: { cols: 10, rows: 20, grid },
++    board: { cols: 10, rows: 40, grid },
+     active: {
+       kind,
+       rotation: 0,

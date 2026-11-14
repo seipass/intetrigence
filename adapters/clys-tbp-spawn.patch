@@ -1,0 +1,38 @@
+diff --git a/core/move.cpp b/core/move.cpp
+index cf3ac59..fa58037 100644
+--- a/core/move.cpp
++++ b/core/move.cpp
+@@ -372,7 +372,7 @@ std::vector<Placement> generate(const Board& board, piece::Type type)
+     if (fast && move::is_convex(board, collision)) {
+         for (i8 r = 0; r < 4; ++r) {
+             for (i8 x = 0; x < 10; ++x) {
+-                if (collision.data[r][x] & (1ULL << 19)) {
++                if (collision.data[r][x] & (1ULL << 21)) {
+                     continue;
+                 }
+ 
+@@ -415,7 +415,7 @@ std::vector<Placement> generate(const Board& board, piece::Type type)
+ 
+         for (i8 r = 0; r < 4; ++r) {
+             for (i8 x = 0; x < 10; ++x) {
+-                if (collision.data[r][x] & (1ULL << 19)) {
++                if (collision.data[r][x] & (1ULL << 21)) {
+                     continue;
+                 }
+ 
+@@ -437,12 +437,12 @@ std::vector<Placement> generate(const Board& board, piece::Type type)
+     }
+ 
+     // Move generation from the starting position
+-    Placement init = Placement(i8(4), i8(19), piece::Rotation::UP, type);
++    Placement init = Placement(i8(4), i8(21), piece::Rotation::UP, type);
+ 
+-    if (collision.data[0][4] & (1ULL << 19)) {
++    if (collision.data[0][4] & (1ULL << 21)) {
+         init.y += 1;
+ 
+-        if (collision.data[0][4] & (1ULL << 20)) {
++        if (collision.data[0][4] & (1ULL << 22)) {
+             return {};
+         }
+     }

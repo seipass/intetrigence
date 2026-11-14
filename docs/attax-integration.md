@@ -79,6 +79,37 @@ sh C:\Users\Hasilan\Projects\attax\tbp\attax-tbp.sh
 PowerShell から `.sh` を直接実行することはできない(`.sh` は sh スクリプトのため)。我々のレフェリーは
 `bun <attax>/tbp/attax-tbp.ts` を直接 spawn するのが最も移植性が高い。
 
+### 2.2 40 行パッチ(視野)
+
+上流 `7b38f51` のアダプタは **TBP の 40 行のうち下 20 行だけ**を attax の 20 行グリッドに写像する:
+
+```ts
+const grid = Array.from({ length: 20 }, (_, r) => (rows[19 - r] ?? []).map(...));
+```
+
+S2 のスポーンは **最下段セル = row 21**(可視 20 行の 2 行上)なので、attax の 20 行グリッドでは
+active が最上段(row 19)に置かれ、**row 19 に 1 つでもブロックがあると movegen が 0 候補**になる。
+実際、m5-provisional の forfeit 194 件はすべてこの 20 行切り詰めが原因だった(§13)。
+
+`adapters/attax-vision-40.patch`(68 行、SHA-256 `e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70`)で 40 行対応にする:
+
+- `src/ai/bot/movegen.ts`: `ROWS = 20` → `40`、`Y_SPAN = 32` → `48`(BFS の y 範囲を 40 行に拡張)、
+  `spawnPosition()` を S2 spawn(`SPAWN_BOTTOM_ROW = 18`)に
+- `tbp/attax-tbp.ts`:
+  - `snapshot()` の grid を 40 行(`rows[39 - r]`)、`board.rows = 40`
+  - `attaxCellsToTbp()` の `19 - (y + c.y)` → `39 - (y + c.y)`
+  - `snapshot()` の active を **S2 spawn**(grid y = 18)に(`posY = 18 - maxY`)。旧 `posY = -minY` は grid 最上段で、
+    レフェリーの spawn と 18 行ずれていた
+
+```powershell
+cd C:\Users\Hasilan\Projects\attax
+git apply C:\Users\Hasilan\Projects\intetrigence\adapters\attax-40-row.patch
+bun run typecheck
+```
+
+パッチ後、seed 11012 は **1000 turn 完走(forfeit 0)**。`cellsAboveRow20` は情報フラグになり、
+attax は 40 行すべてを見る(`visible_rows = 40` として扱える)。
+
 ---
 
 ## 3. メッセージフロー
@@ -503,3 +534,111 @@ S2 側の確定仕様(攻撃テーブル・B2B charging・コンボ乗算・All-
 > 注: このスモークは**ホスト側シミュレーション**であり、実際の versus ゲームではない。
 > 盤面モデル・ピース形状・hold/queue 追跡は我々の Rust レフェリーが実装すべき仕様を写したもの。
 > 実ゲームでの検証は、Rust レフェリーの TBP host 実装後に行う(M0 の合否条件)。
+
+---
+
+## 13. attax の forfeit 分析(2026-11-15)
+
+### 13.1 事実(m5-provisional、220 ゲーム)
+
+| 結果 | 件数 |
+|---|---|
+| TopOut 勝ち | **0** |
+| TopOut 負け | 13 |
+| TurnCap 勝ち | 13 |
+| **forfeit-vision** | **194** |
+| 実勝率 | 13/220 = **5.9%** |
+
+### 13.2 根本原因: 20 行切り詰め
+
+`tbp/attax-tbp.ts::snapshot()` は TBP の 40 行のうち **下 20 行だけ**を attax の 20 行グリッドに写像する:
+
+```ts
+const grid = Array.from({ length: 20 }, (_, r) => (rows[19 - r] ?? []).map(...));
+```
+
+S2 のスポーンは **最下段セル = row 21**(可視 20 行の 2 行上)。attax のグリッドでは active が
+最上段(row 19)に置かれるため、**row 19 に 1 つでもブロックがあると movegen が 0 候補**になる。
+`ATTAX_TBP_LOG` の forfeit 直前の行は:
+
+```json
+{"ms":0.12,"nodes":0,"depth":0,"primary":null,"first":null,"cellsAboveRow20":true}
+```
+
+- `nodes: 0` = 探索が 1 ノードも展開していない(root の `generatePlacements` が空)
+- `primary: null` = `findBestMove` が `null` を返した
+- `cellsAboveRow20: true` = 盤面に row 20 以上のセルがある(切り詰めで失われた)
+
+seed 11012 の forfeit は **turn 33**、attax 側のスタック高さ **23**。row 19 まで積まれていたため、
+20 行グリッドの最上段で active が衝突し、0 候補になった。盤面が「低い」のではなく、
+**attax から見える範囲の最上段が埋まっていた**のが原因。
+
+### 13.3 分類バグ
+
+`crates/arena/src/referee.rs::classify_forfeit` は
+
+```rust
+let lowest_cell = active.cells().iter().map(|&(_, y)| y).min().unwrap_or(0);
+if lowest_cell as u32 >= visible_rows { return ForfeitCause::Vision; }
+```
+
+S2 のスポーンは常に row 21、`visible_rows=20` なので **無条件に Vision** になっていた。
+この判定を削除し、`stack_top >= visible_rows`(盤面が隠しバッファに届いている)と
+「可視行に収まる合法配置が無い」の 2 条件だけで分類するようにした。
+
+### 13.4 修正と結果
+
+`adapters/attax-vision-40.patch`(68 行、SHA-256 `e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70`)で
+attax を 40 行対応にした(upstream は **20 行**。パッチ適用後のみ 40 行):
+`ROWS=40`、BFS の `Y_SPAN=48`、`snapshot()` の grid 40 行、`attaxCellsToTbp` の `39 - ...`、
+**`snapshot()` の active を S2 spawn(grid y=18)に**(旧 `posY=-minY` は grid 最上段で 18 行ずれ)。
+
+- ベース: upstream `7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b` + 本パッチ(attax は TypeScript を直接実行するため追加ビルドなし)
+- 適用: `cd <attax> && git apply <repo>/adapters/attax-vision-40.patch`
+- 変更は**視野のみ**(探索幅・深さ・評価項・重み・思考時間は不変)
+
+- seed 11012 sheet A: **1000 turn 完走、forfeit 0**(以前は turn 33 で forfeit)
+- seed 11012 sheet B: **1000 turn 完走、forfeit 0**(以前は turn 38 の low-stack `other`)
+- seed 11001〜11012 の 24 ゲーム(300 turn)の再実行結果は §13.5 に追記。
+
+### 13.5 再実行結果(パッチ後)
+
+**代表 10 ゲーム(seed 11001–11005 × 両シート、1000 turn、`--ms 100 --threads 8`)**
+
+```text
+summary: 10 games, wins 8 losses 2 draws 0 forfeits 0, verified 10/10
+```
+
+| ゲーム | 結果 | turns |
+|---|---|---|
+| 11001 A | 勝ち(TurnCap) | 1000 |
+| 11001 B | 勝ち(TopOut) | 804 |
+| 11002 A | 勝ち(TurnCap) | 1000 |
+| 11002 B | 勝ち(TopOut) | 411 |
+| 11003 A | 勝ち(TopOut) | 351 |
+| 11003 B | 勝ち(TopOut) | 723 |
+| 11004 A | **負け(TopOut)** | 724 |
+| 11004 B | 勝ち(TopOut) | 938 |
+| 11005 A | **負け(TopOut)** | 191 |
+| 11005 B | 勝ち(TopOut) | 322 |
+
+- **forfeit 0**。旧 194 forfeit(162 other + 32 vision)は、40 行 + posY 修正で消えた。
+- `nodes` は 10,000 前後、depth 6、ms median 35(旧 31.5)。探索は走っている。
+- 勝率 8/10 = 80%。**パッチ適用 attax は本物の 40 行相手として強い**。50-0 は「ハンディ付き attax」ではなく
+  実力勝負になる。敗因は TopOut(スタック管理)で、surge/opener の攻防ではない。
+- エビデンス: `scripts/evidence/attax-40-smoke/{summary.json,audit/}`
+
+### 13.5.1 個別確認
+
+| ゲーム | 結果 | 備考 |
+|---|---|---|
+| seed 11012 sheet A | 1000 turn 完走、forfeit 0 | 旧: turn 33 forfeit(高スタック 23) |
+| seed 11012 sheet B | 1000 turn 完走、forfeit 0 | 旧: turn 38 forfeit(低スタック 19) |
+| seed 11001 sheet A(別 run) | 834 turn、TopOut(attax 勝ち) | 旧: forfeit。attax nodes 8,036〜9,417、depth 6 |
+
+### 13.6 注意: upstream は 20 行
+
+- **upstream `7b38f51` は 20 行**(`ROWS=20`、grid 20 行、`19 - ...`)。
+- パッチ適用後の作業ツリーは 40 行に見えるが、それは `adapters/attax-vision-40.patch` の結果。
+- `visible_rows` は **upstream では 20、パッチ適用後は 40**。パッチとセットで宣言を上げる。
+- パッチ SHA-256: `e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70`(68 行)。

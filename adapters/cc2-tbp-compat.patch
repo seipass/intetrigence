@@ -1,0 +1,116 @@
+diff --git a/src/bot/freestyle.rs b/src/bot/freestyle.rs
+index 0a50093..6903726 100644
+--- a/src/bot/freestyle.rs
++++ b/src/bot/freestyle.rs
+@@ -54,7 +54,12 @@ impl Mode for Freestyle {
+             let mut moves = EnumMap::default();
+             {
+                 puffin::profile_scope!("movegen");
+-                for piece in next_possibilities | state.reserve {
++                let hold_pieces = if state.reserve_is_hold {
++                    EnumSet::only(state.reserve)
++                } else {
++                    EnumSet::empty()
++                };
++                for piece in next_possibilities | hold_pieces {
+                     moves[piece] = find_moves(&state.board, piece);
+                 }
+             }
+@@ -64,7 +69,7 @@ impl Mode for Freestyle {
+             {
+                 puffin::profile_scope!("eval");
+                 for next in next_possibilities {
+-                    let moves = moves[next].iter().chain(if next == state.reserve {
++                    let moves = moves[next].iter().chain(if !state.reserve_is_hold || next == state.reserve {
+                         [].iter()
+                     } else {
+                         moves[state.reserve].iter()
+@@ -159,7 +164,7 @@ fn evaluate(
+ 
+     // cutouts
+     let cutout_count = state.bag.contains(Piece::T) as usize
+-        + (state.reserve == Piece::T) as usize
++        + (state.reserve_is_hold && state.reserve == Piece::T) as usize
+         + (state.bag.len() <= 3) as usize;
+     for _ in 0..cutout_count {
+         let location =
+diff --git a/src/data.rs b/src/data.rs
+index 0c00ba6..22dd5be 100644
+--- a/src/data.rs
++++ b/src/data.rs
+@@ -13,6 +13,9 @@ pub struct GameState {
+     pub board: Board,
+     pub bag: EnumSet<Piece>,
+     pub reserve: Piece,
++    /// True when `reserve` is the hold slot; false when the hold is empty
++    /// (`reserve` is then a placeholder and must not be offered as a hold).
++    pub reserve_is_hold: bool,
+     pub back_to_back: bool,
+     pub combo: u8,
+ }
+@@ -291,6 +294,7 @@ impl GameState {
+         }
+         if placement.location.piece != next {
+             self.reserve = next;
++            self.reserve_is_hold = true;
+         }
+         self.board.place(placement.location);
+         let cleared_mask = self.board.line_clears();
+diff --git a/src/lib.rs b/src/lib.rs
+index dfa2cb0..2f02f29 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -7,7 +7,7 @@ use futures::prelude::*;
+ use tbp::Randomizer;
+ 
+ use crate::bot::Bot;
+-use crate::data::GameState;
++use crate::data::{GameState, Piece};
+ use crate::sync::BotSyncronizer;
+ use crate::tbp::{BotMessage, FrontendMessage};
+ 
+@@ -89,8 +89,12 @@ pub async fn run(
+     }
+ }
+ 
+-fn create_bot(mut start: tbp::Start, config: Arc<BotConfig>) -> Bot {
+-    let reserve = start.hold.unwrap_or_else(|| start.queue.remove(0));
++fn create_bot(start: tbp::Start, config: Arc<BotConfig>) -> Bot {
++    // TBP `start.queue` includes the current piece at index 0. Cold Clear's
++    // `GameState.reserve` is the hold slot, which may be empty; `Piece` has no
++    // "empty" variant, so use a placeholder and `reserve_is_hold = false`.
++    let reserve = start.hold.unwrap_or(Piece::I);
++    let reserve_is_hold = start.hold.is_some();
+ 
+     let speculate = matches!(start.randomizer, Randomizer::SevenBag { .. });
+     let bag = match start.randomizer {
+@@ -108,6 +112,7 @@ fn create_bot(mut start: tbp::Start, config: Arc<BotConfig>) -> Bot {
+ 
+     let state = GameState {
+         reserve,
++        reserve_is_hold,
+         back_to_back: start.back_to_back,
+         combo: start.combo.try_into().unwrap_or(255),
+         bag,
+diff --git a/src/movegen.rs b/src/movegen.rs
+index 59ce9f2..b7b9b77 100644
+--- a/src/movegen.rs
++++ b/src/movegen.rs
+@@ -26,7 +26,7 @@ pub fn find_moves(board: &Board, piece: Piece) -> Vec<(Placement, u32)> {
+                     piece,
+                     rotation,
+                     x,
+-                    y: 19,
++                    y: 21,
+                 };
+                 if collision_map.obstructed(location) {
+                     continue;
+@@ -64,7 +64,7 @@ pub fn find_moves(board: &Board, piece: Piece) -> Vec<(Placement, u32)> {
+             piece,
+             rotation: Rotation::North,
+             x: 4,
+-            y: 19,
++            y: 21,
+         };
+         if collision_map.obstructed(spawned) {
+             spawned.y += 1;
