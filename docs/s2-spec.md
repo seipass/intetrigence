@@ -166,6 +166,13 @@ shuffle(a):  for i = len-1 downto 1:
                r = floor(next_float() * (i+1)); swap(a[i], a[r])
 ```
 
+**初期配列順(重要)**: シャッフル対象の配列は **`[I, O, T, S, Z, J, L]`** の固定順から始める。
+
+- 同じ seed でも**初期順が違えば袋列が変わる**。両者(および attax S2 版)が同じ順を使わないと一致しない。
+- 出典: `crates/core/src/piece.rs` の `ALL_PIECES`。**TETR.IO の内部順は非公開**なので、これは**我々のプロトコル**(§11-U7 と同じ扱い)。
+- 検算: `seed = 0` の先頭 7 ピースをテストで固定している(`crates/core/src/bag.rs`)。
+- **attax 作者と共有すべき項目**(§11-U7 の共有リストに含める)。
+
 **重要**: 本マッチでは**両者同一 seed**を使う(PLAN §3.1)。seed → 乱数系列の対応は §7.7 の MINSTD を共通に使い、ピース袋とゴミ列で**別々の RNG インスタンス**を持つ(TETR.IO と同じ。混ぜない)。
 
 ### 2.5 hold
@@ -436,13 +443,16 @@ if lines > 0 and N_after >= 2:      # N_after = その設置を反映した後�
 ### 6.3 Multiplier コンボ
 
 ```
-if combo >= 1:
-    base = base * (1 + 0.25 * combo)
-if combo >= 2:
-    base = max(base, ln(1 + 1.25 * combo))
+if lines > 0:                     # ← 0 ライン設置では combo 乗数を適用しない
+    if combo >= 1:
+        base = base * (1 + 0.25 * combo)
+    if combo >= 2:
+        base = max(base, ln(1 + 1.25 * combo))
 ```
 
 - `combo` は §5 の 0-based。1 回目の消去は `combo = 0` なので**乗算なし**。
+- **`lines > 0` のときだけ適用する**。0 ライン設置では combo がリセットされる(S7 は乗算の**前**に `stats.combo = -1` にする)ので、**`combo = 0` として扱う**。このガードが無いと、直前の combo が残ったまま 0 ライン設置をすると `ln` 項が攻撃を作る(2026-11-15 修正)。
+- **テスト**: `crates/core` の `no_clear_resets_combo_but_keeps_b2b`(combo=5 / lines=0 で events 空・base 0 を固定)。`docs/s2-attack-examples.json` の 18 件は全て `lines > 0` なので、この経路は fixture では検出できない。
 - **`ln` 項は「置き換え」ではなく `max`**。base > 0 のとき combo が小さいと ln 項が負けるので実質効かない。**base = 0(Single / TSM / 非 T mini single)のときだけ ln 項が攻撃を作る**。これが S1 の「If the base attack is 0, the function ln(1+1.25x) is used for 2-combo and above」の実装上の意味。
 - 出典: S1、S5、S7 `garbageCalcV2`
 - 浮動小数の注意: `1 + 0.25*combo` は combo < 2^50 で正確、`base ≤ 10` との積も正確。**乗算側は浮動小数誤差が出ない**。`ln` 側は `ln_1p` を使い、丸めは floor。
@@ -577,11 +587,12 @@ fn attack(clear, state) -> (attack_events, next_state):
     if clear.lines > 0 and N_after >= 2:
         base += 1
 
-    # 3. combo multiplier(§6.3)
-    if combo >= 1:
-        base = base * (1 + 0.25 * combo)
-    if combo >= 2:
-        base = max(base, ln_1p(1.25 * combo))
+    # 3. combo multiplier(§6.3)。0 ライン設置では適用しない
+    if clear.lines > 0:
+        if combo >= 1:
+            base = base * (1 + 0.25 * combo)
+        if combo >= 2:
+            base = max(base, ln_1p(1.25 * combo))
 
     # 4. 通常攻撃イベント(§6.6 GSB 込み)
     gsb  = 1 if (clear.g_cleared > 0 and (clear.spin != none or clear.lines >= 4)) else 0
@@ -1164,6 +1175,7 @@ garbage_rng(slot) = MINSTD(garbage_seed(slot))
 | 2_147_483_646 | 2_147_483_646 | 2_147_466_840 | 1_865_008_398 |
 
 - **衝突しないこと**: `piece_seed`、`garbage_seed(0)`、`garbage_seed(1)` は相異なり、いずれも 0 にならない(M が素数で `s ≠ 0` のため)。20 万個のランダム seed で検証済み。
+- **袋の初期配列順も同じプロトコルの一部**(§2.4): `[I, O, T, S, Z, J, L]`。seed 導出と袋順は**セットで共有**する。
 - **v1.2 からの変更理由**: v1.2 の暫定案 `garbage_rng(p) = MINSTD(seed ^ (p * 0x9E3779B9))` は **`p = 0` のとき `MINSTD(seed)` となり、ピース袋とゴミ列が同一の乱数ストリームになる**。slot 0 の穴列が bag 順と完全に相関するため、対称性が壊れる。**この案は破棄する。**
 - **差し替え条件**: 次のいずれか。
   1. TETR.IO のリプレイと**穴列まで一致**させたい要求が出た場合(現状は不要。我々のレフェリーが正)。
@@ -1442,3 +1454,5 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.11 | 2026-11-13 | §12.7 を更新。`notes` のハードコードを修正済みに。`vision` 判定を protocol v1.9 の 3 条件に追随(スタック上端だけでは 9 件以上を誤分類)。再実行後の M2 内訳を反映。 |
 | v1.3.12 | 2026-11-13 | §12.5 を更新。movegen の二重実装を**解消済み**に(`f1c2e79` で `intetrigence_bot::movegen` に一本化、`movegen_crosscheck.rs` が `(cells, spin)` の集合一致を恒久検証)。`vision` 判定と `notes` の修正も解消済みに。 |
 | v1.3.13 | 2026-11-13 | §12.8 を追加。M3 ゲート(20–0、内訳 forfeit 19 / TurnCap 1 / TopOut 0)と、9006-A の生存 7.7 倍を記録。**TopOut 勝ちは 0 件**であること、`forfeit_cause` が M3 証拠に無いこと(要再生成)、レポートの「2/2 wins」行が誤解を招くことを指摘。 |
+| v1.3.14 | 2026-11-15 | **§6.3 / §6.8 のバグ修正**: combo 乗数と `ln` 項を `lines > 0` のときだけ適用する。0 ライン設置では combo がリセットされる(S7 は乗算前に `stats.combo = -1`)ので `combo = 0` として扱う。ガードが無いと、直前の combo が残ったまま 0 ライン設置すると `ln` 項が攻撃を作る(core-engine の監査 `docs/core-rule-audit.md` F1)。 |
+| v1.3.15 | 2026-11-15 | §2.4 に**袋の初期配列順** `[I, O, T, S, Z, J, L]` を明記(同じ seed でも初期順が違えば列が変わる)。§11-U7 に「袋順も同じプロトコル」と追記。core-engine の監査 F4 への対応。 |
