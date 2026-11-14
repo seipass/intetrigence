@@ -155,11 +155,18 @@ pub fn compute_attack(input: &ClearInput) -> Attack {
     }
 
     // 3. Combo multiplier. The ln term is a max, not a replacement.
-    if combo >= 1 {
-        base *= 1.0 + 0.25 * combo as f64;
-    }
-    if combo >= 2 {
-        base = base.max((1.25 * combo as f64).ln_1p());
+    //
+    // A 0-line placement never attacks, even when the pre-placement combo is
+    // stale (>0, e.g. the previous placement cleared). The §6.8 pseudocode
+    // omits this guard; without it the ln term would create garbage for a
+    // placement that cleared nothing.
+    if input.lines > 0 {
+        if combo >= 1 {
+            base *= 1.0 + 0.25 * combo as f64;
+        }
+        if combo >= 2 {
+            base = base.max((1.25 * combo as f64).ln_1p());
+        }
     }
 
     // 4. Garbage Special Bonus: flat +1, inside the final floor.

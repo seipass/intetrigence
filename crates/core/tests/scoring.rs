@@ -193,11 +193,11 @@ fn garbage_special_bonus_conditions() {
 
 #[test]
 fn no_clear_resets_combo_but_keeps_b2b() {
-    // A no-clear placement normally arrives with combo 0 (the previous
-    // placement's no-clear reset it). The §6.8 formula uses the pre-value, so
-    // a synthetic combo > 0 would still apply the ln term to a 0-line clear.
+    // A 0-line placement never attacks, even when the pre-placement combo is
+    // stale (the previous placement cleared). The §6.8 pseudocode omits this
+    // guard; the core applies the combo multiplier only when lines > 0.
     let mut clear = input(0, SpinType::Full);
-    clear.combo = 0;
+    clear.combo = 5;
     clear.b2b_streak = 3;
     let attack = compute_attack(&clear);
     assert!(attack.events.is_empty());
