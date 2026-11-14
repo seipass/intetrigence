@@ -30,6 +30,8 @@ pub struct AttaxConfig {
     /// `<dir>/src/ai/bot/movegen.ts` (`ROWS = N`); upstream `7b38f51` is 20,
     /// the vision patch sets 40.
     pub visible_rows: u32,
+    /// SHA-256 of the compatibility patch applied to attax (if any).
+    pub patch_sha256: Option<String>,
     pub timeout: Duration,
 }
 
@@ -41,6 +43,7 @@ impl AttaxConfig {
             commit: None,
             bun_version: None,
             visible_rows: 0,
+            patch_sha256: None,
             timeout: Duration::from_secs(30),
         }
     }
@@ -371,7 +374,15 @@ pub struct MatchSummary {
     pub games: Vec<GameSummary>,
     pub wins: u32,
     pub losses: u32,
-    pub draws: u32,
+    /// TurnCap games (no winner decided).
+    #[serde(default)]
+    pub unresolved: u32,
+    /// Forfeit games (no contest; no winner recorded).
+    #[serde(default)]
+    pub no_contest: u32,
+    /// Stuck top-outs (no legal placement, not block-out).
+    #[serde(default)]
+    pub stuck: u32,
     pub forfeits: u32,
     /// Win/loss breakdown (protocol v1.8 §7.1).
     pub wins_topout: u32,
@@ -381,6 +392,12 @@ pub struct MatchSummary {
     pub losses_turncap: u32,
     pub wins_forfeit_vision: u32,
     pub wins_forfeit_other: u32,
+    #[serde(default)]
+    pub forfeit_vision: u32,
+    #[serde(default)]
+    pub forfeit_other: u32,
+    #[serde(default)]
+    pub forfeit_unknown: u32,
     pub losses_topout: u32,
     pub losses_forfeit: u32,
     pub turncap: u32,
@@ -401,6 +418,9 @@ pub struct MatchSummary {
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
+    /// SHA-256 of the attax compatibility patch applied for this match.
+    #[serde(default)]
+    pub attax_patch_sha256: Option<String>,
     pub attax: Option<AttaxSummary>,
     pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
@@ -488,7 +508,9 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
     let games: Vec<GameSummary> = audits.iter().map(game_summary).collect();
     let wins = games.iter().filter(|game| game.winner == Some(0)).count() as u32;
     let losses = games.iter().filter(|game| game.winner == Some(1)).count() as u32;
-    let draws = games.iter().filter(|game| game.winner.is_none()).count() as u32;
+    let unresolved = games.iter().filter(|game| game.reason == "TurnCap").count() as u32;
+    let no_contest = games.iter().filter(|game| game.reason == "Forfeit").count() as u32;
+    let stuck = games.iter().filter(|game| game.reason == "Stuck").count() as u32;
     let forfeits = games.iter().filter(|game| game.reason == "Forfeit").count() as u32;
     let wins_topout = games
         .iter()
@@ -515,7 +537,25 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         .filter(|game| {
             game.winner == Some(0)
                 && game.reason == "Forfeit"
-                && game.forfeit_cause.as_deref() != Some("vision")
+                && game.forfeit_cause.as_deref() == Some("other")
+        })
+        .count() as u32;
+    let forfeit_vision = games
+        .iter()
+        .filter(|game| game.reason == "Forfeit" && game.forfeit_cause.as_deref() == Some("vision"))
+        .count() as u32;
+    let forfeit_other = games
+        .iter()
+        .filter(|game| game.reason == "Forfeit" && game.forfeit_cause.as_deref() == Some("other"))
+        .count() as u32;
+    let forfeit_unknown = games
+        .iter()
+        .filter(|game| {
+            game.reason == "Forfeit"
+                && !matches!(
+                    game.forfeit_cause.as_deref(),
+                    Some("vision") | Some("other")
+                )
         })
         .count() as u32;
     let losses_topout = games
@@ -637,13 +677,18 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         games: games.clone(),
         wins,
         losses,
-        draws,
+        unresolved,
+        no_contest,
+        stuck,
         forfeits,
         wins_topout,
         wins_turncap,
         losses_turncap,
         wins_forfeit_vision,
         wins_forfeit_other,
+        forfeit_vision,
+        forfeit_other,
+        forfeit_unknown,
         losses_topout,
         losses_forfeit,
         turncap,
@@ -674,6 +719,7 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         verify_failures: games.len() as u32 - verified,
         resumed_games: 0,
         measurement_complete: false,
+        attax_patch_sha256: None,
         attax,
         bots,
         notes,
@@ -695,8 +741,8 @@ impl MatchSummary {
         text.push_str("# S2 match summary\n\n");
         text.push_str(&format!("- games: {}\n", self.games.len()));
         text.push_str(&format!(
-            "- intetrigence wins / losses / draws / forfeits: {} / {} / {} / {}\n",
-            self.wins, self.losses, self.draws, self.forfeits
+            "- intetrigence wins / losses / unresolved / no-contest: {} / {} / {} / {}\n",
+            self.wins, self.losses, self.unresolved, self.no_contest
         ));
         text.push_str(&format!(
             "- win rate: {:.1}% (Wilson 95% CI {:.1}%..{:.1}%)\n",
@@ -947,6 +993,10 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let mut summary = summarize(&audits, config.notes.clone());
     summary.resumed_games = resumed_games;
     summary.measurement_complete = measurement_incomplete == 0;
+    summary.attax_patch_sha256 = config
+        .attax
+        .as_ref()
+        .and_then(|attax| attax.patch_sha256.clone());
     if resumed_games > 0 {
         println!("resume: {resumed_games} verified game(s) reused");
     }
@@ -1020,13 +1070,18 @@ mod tests {
             games: vec![],
             wins: 0,
             losses: 0,
-            draws: 0,
+            unresolved: 0,
+            no_contest: 0,
+            stuck: 0,
             forfeits: 0,
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,
             wins_forfeit_vision: 0,
             wins_forfeit_other: 0,
+            forfeit_vision: 0,
+            forfeit_other: 0,
+            forfeit_unknown: 0,
             losses_topout: 0,
             losses_forfeit: 0,
             turncap: 0,
@@ -1040,6 +1095,7 @@ mod tests {
             verify_failures: 0,
             resumed_games: 0,
             measurement_complete: true,
+            attax_patch_sha256: None,
             attax: None,
             bots: [
                 BotAggregate {

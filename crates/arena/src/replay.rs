@@ -179,6 +179,9 @@ pub struct ResultRecord {
     /// Set only for `Forfeit` (protocol v1.8 §7.1).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forfeit_cause: Option<ForfeitCause>,
+    /// Slot that forfeited (no-contest; the winner is `None`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forfeit_slot: Option<u8>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: Vec<PlayerRecord>,
@@ -594,8 +597,15 @@ fn verify_result(
         .filter(|&slot| engine.players[slot].game.is_over())
         .collect();
     let (winner, reason) = if result.reason == "Forfeit" {
-        // A forfeit ends the round early; the engine state is not the result.
+        // A forfeit is a no-contest: no winner is recorded.
         (result.winner, result.reason.clone())
+    } else if result.reason == "Stuck" {
+        // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
+        // placement even though the game is not block-out.
+        match result.winner.map(|winner| 1 - winner as usize) {
+            Some(loser) if !engine.has_legal_move(loser) => (result.winner, "Stuck".to_string()),
+            _ => (None, "Stuck".to_string()),
+        }
     } else if let Some(&loser) = over.first() {
         (Some(1 - loser as u8), "TopOut".to_string())
     } else if result.reason == "TopOut" {
@@ -649,8 +659,12 @@ fn verify_result(
             .as_deref()
             .unwrap_or("")
             .contains("candidates is reachable");
+        let loser = result
+            .forfeit_slot
+            .map(usize::from)
+            .or_else(|| result.winner.map(|winner| 1 - winner as usize));
         if candidate_failure {
-            if let Some(loser) = result.winner.map(|winner| 1 - winner as usize) {
+            if let Some(loser) = loser {
                 let actual = crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
                 report.forfeit_cause = Some(actual);
                 if let Some(recorded) = result.forfeit_cause {

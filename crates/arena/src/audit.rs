@@ -252,6 +252,9 @@ pub struct GameAudit {
     pub detail: Option<String>,
     /// Forfeit cause (protocol v1.8 §7.1); `None` for non-forfeit results.
     pub forfeit_cause: Option<crate::replay::ForfeitCause>,
+    /// Slot that forfeited (no-contest); `None` otherwise.
+    #[serde(default)]
+    pub forfeit_slot: Option<u8>,
     pub turns: u32,
     /// Surge releases per player (S2 B2B charging payoff).
     #[serde(default)]

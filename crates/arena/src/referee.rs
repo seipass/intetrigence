@@ -79,6 +79,8 @@ pub struct RoundOutcome {
     pub reason: String,
     pub detail: Option<String>,
     pub forfeit_cause: Option<ForfeitCause>,
+    /// Slot that forfeited (no-contest); `None` otherwise.
+    pub forfeit_slot: Option<u8>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: [PlayerSummary; 2],
@@ -351,7 +353,7 @@ pub fn run_round(
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
         End::Stuck { loser } => (
             Some(1 - loser),
-            "TopOut".to_string(),
+            "Stuck".to_string(),
             Some("no legal placement".to_string()),
             None,
         ),
@@ -376,15 +378,19 @@ pub fn run_round(
             (winner, "TurnCap".to_string(), None, None)
         }
         End::Forfeit {
-            slot,
+            slot: _,
             detail,
             cause,
         } => (
-            Some(1 - slot),
+            None,
             "Forfeit".to_string(),
             Some(detail.clone()),
             Some(*cause),
         ),
+    };
+    let forfeit_slot = match &end {
+        End::Forfeit { slot, .. } => Some(*slot as u8),
+        _ => None,
     };
 
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
@@ -393,6 +399,7 @@ pub fn run_round(
         reason: reason.clone(),
         detail: detail.clone(),
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.clone(),
@@ -403,6 +410,7 @@ pub fn run_round(
         reason,
         detail,
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.iter().map(player_record).collect(),
@@ -437,6 +445,7 @@ pub fn run_round(
         reason: outcome.reason.clone(),
         detail: outcome.detail.clone(),
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
         surge_released: [per_player[0].surge_released, per_player[1].surge_released],
         max_b2b_streak: [per_player[0].max_b2b, per_player[1].max_b2b],
@@ -587,7 +596,7 @@ fn forfeit_report(
         BotRecord::from(&agents[1].descriptor()),
     ];
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
-    let winner = Some(1 - slot);
+    let winner: Option<usize> = None;
     let records = vec![
         ReplayRecord::Header(header(config, &bots, &start_garbage)),
         ReplayRecord::Result(ResultRecord {
@@ -595,6 +604,7 @@ fn forfeit_report(
             reason: "Forfeit".to_string(),
             detail: Some(detail.clone()),
             forfeit_cause: Some(ForfeitCause::Unknown),
+            forfeit_slot: Some(slot as u8),
             turns: 0,
             final_frame: 0,
             per_player: per_player.iter().map(player_record).collect(),
@@ -605,6 +615,7 @@ fn forfeit_report(
         reason: "Forfeit".to_string(),
         detail: Some(detail.clone()),
         forfeit_cause: Some(ForfeitCause::Unknown),
+        forfeit_slot: Some(slot as u8),
         turns: 0,
         final_frame: 0,
         per_player: per_player.clone(),
@@ -618,6 +629,7 @@ fn forfeit_report(
         reason: "Forfeit".to_string(),
         detail: Some(detail),
         forfeit_cause: Some(ForfeitCause::Unknown),
+        forfeit_slot: Some(slot as u8),
         turns: 0,
         surge_released: [0, 0],
         max_b2b_streak: [0, 0],

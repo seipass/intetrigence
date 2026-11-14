@@ -16,24 +16,25 @@
 
 ## Gates
 
-| stage | opponent | gate | games | W-L-D | result |
+| stage | opponent | gate (TopOut wins, no turn-cap) | games | W-L / U / NC | result |
 |---|---|---|---|---|---|
-| 1 | attax | 50 wins | 50 | 50-0-0 | PASSED |
-| 2 | Cold Clear 2 | 48 wins | 50 | 48-2-0 | PASSED |
-| 3 | clys | 48 wins | 50 | 48-2-0 | PASSED |
+| 1 | attax | 50 TopOut wins, 0 losses, 0 turn-cap, 0 no-contest | 50 | 50-0 / 0 / 0 | PASSED |
+| 2 | Cold Clear 2 | 48 TopOut wins, 0 turn-cap | 50 | 48-2 / 0 / 0 | PASSED |
+| 3 | clys | 48 TopOut wins, 0 turn-cap | 50 | 48-2 / 0 / 0 | PASSED |
 
 - A failed gate stops the round; the remaining stages are not run.
-- A `forfeit-other` win is an invalid game and fails the stage (protocol v1.13 §7.1.3-4).
+- A `forfeit-other` is an adapter failure recorded as no-contest; stage 1 fails on any no-contest (protocol v1.27 §1.4).
 - A retry needs a new build and a new pre-committed seed set; partial reruns are not allowed.
 
 ## Stage 1 — ATTAX
 
 - opponent commit: `<attax commit>`
 - games: 50 (25 seeds × sheets A/B)
-- opponent vision: `<20 | 40>` rows (20 = vision forfeits possible; 40 = full board, TopOut / turn-cap)
-- result: **50 W / 0 L / 0 D** — 100.0% (Wilson 95% CI 92.9..100.0%)
-- win breakdown: TopOut `<n>`, forfeit-vision `<n>`, forfeit-other `<n>`, turn-cap `<n>`
-- non-forfeit record: `<w>/<n>` (TopOut + turn-cap games)
+- opponent vision: `40` rows (patched; full board, TopOut / turn-cap)
+- raw games: 50 W / 0 L; unresolved (TurnCap): 0; no-contest (forfeit): 0; stuck: 0
+- **gate record: 50 TopOut wins / 50 games** — 100.0% (Wilson 95% CI 92.9..100.0%)
+- win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
+- no-contest record: `<wins_topout>/<games - no_contest>` (TopOut games)
 - attack/piece: `<a>` vs `<b>`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
@@ -75,10 +76,10 @@ v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 
 - Only the `official` profile is used; diagnostic profiles are never part of a round.
 - Spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; intetrigence's labels are backed by rotation-ending input sequences.
-- This report does not claim a win rate against a full-vision opponent: forfeit wins are reported separately and the non-forfeit record is stated per stage.
+- This report does not claim a win rate against a full-vision opponent: no-contest games are reported separately and the TopOut-only record is stated per stage.
 - CC2 and clys are not S2-native. The referee applies S2 scoring to both sides and records the bots' declared values as audit only (protocol v1.13 §7.2); their stages are a generalization check, not an S2-vs-S2 claim.
-- A `forfeit-other` win is an invalid game (protocol v1.13 §7.1.3-4) and fails the stage.
-- Stage 1 (attax, 20-row vision) is largely decided by vision forfeits; stages 2-3 (CC2/clys, 40-row vision) are real TopOut battles. The stage win rates are therefore not directly comparable; the non-forfeit record per stage is the honest strength signal.
+- A `forfeit-other` is an adapter failure recorded as no-contest (protocol v1.13 §7.1.3-4); stage 1 fails on any no-contest.
+- Stage 1 (attax, 40-row patched) and stages 2-3 (CC2/clys, 40-row vision) are real TopOut battles. The stage win rates are still not directly comparable across opponents; the TopOut-only record per stage is the honest strength signal.
 
 ## Reproduction
 
@@ -91,9 +92,9 @@ v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 - [ ] profile is `official`
 - [ ] seed range and held-out basis (unused by both projects)
 - [ ] game count and sheet assignment
-- [ ] wins/losses and Wilson 95% CI
-- [ ] win breakdown: TopOut / forfeit-vision / forfeit-other / turn-cap
-- [ ] non-forfeit record stated separately
+- [ ] wins_topout / losses_topout / unresolved / no-contest and Wilson 95% CI
+- [ ] win breakdown: TopOut / unresolved (TurnCap) / no-contest (forfeit) / stuck
+- [ ] TopOut-only record stated separately
 - [ ] no claim of a win rate against a full-vision opponent
 - [ ] both sides' think time (median / p95 / p99 / max) and 200 ms overruns
 - [ ] both sides' attack/piece and received garbage/game

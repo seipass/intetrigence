@@ -45,6 +45,7 @@ pub struct OpponentSpec {
     /// Protocol-compatibility patch disclosure (v1.14 §7.3): file names,
     /// line count, purpose, and the "no search/eval changes" statement.
     pub patch_note: Option<String>,
+    pub patch_sha256: Option<String>,
     pub kind: OpponentKind,
 }
 
@@ -82,19 +83,26 @@ pub struct StageReport {
     pub opponent: String,
     pub commit: Option<String>,
     pub patch_note: Option<String>,
+    pub patch_sha256: Option<String>,
     pub games: u32,
     pub wins: u32,
     pub losses: u32,
-    pub draws: u32,
     pub gate: u32,
     pub passed: bool,
     pub reason: String,
     pub summary_path: String,
     pub verified: u32,
     pub verify_failures: u32,
-    pub forfeit_other: u32,
     #[serde(default)]
     pub topout_wins: u32,
+    #[serde(default)]
+    pub unresolved: u32,
+    #[serde(default)]
+    pub no_contest: u32,
+    #[serde(default)]
+    pub stuck: u32,
+    #[serde(default)]
+    pub turncap: u32,
     #[serde(default)]
     pub turncap_wins: u32,
     #[serde(default)]
@@ -352,16 +360,16 @@ pub fn check_seed_discipline(
 fn gate_check(
     index: usize,
     topout_wins: u32,
-    turncap_wins: u32,
     topout_losses: u32,
-    forfeit_other: u32,
+    turncap: u32,
+    no_contest: u32,
     measurement_complete: bool,
     verified: u32,
     games: u32,
     gate: u32,
 ) -> bool {
-    // A `forfeit-other` win is an invalid game (protocol v1.13 §7.1.3-4).
-    if forfeit_other > 0 {
+    // A stage is exactly 50 games (25 seeds x 2 sheets).
+    if games != 50 {
         return false;
     }
     // Every game needs replay + verify + audit + opponent decision log
@@ -373,13 +381,22 @@ fn gate_check(
     if verified != games {
         return false;
     }
-    // Forfeits are not wins: the gate counts only TopOut and TurnCap wins
-    // (protocol v1.20 §1.4). Stage 1 additionally caps TopOut losses at 5.
-    let gate_wins = topout_wins + turncap_wins;
+    // TurnCap is not a win: every game must be decided by TopOut (user rule,
+    // protocol v1.26 §1.4).
+    if turncap > 0 {
+        return false;
+    }
+    // Every game must be accounted for. `Stuck` is not one of the four
+    // outcomes, so a stuck game makes the total short and fails the gate.
+    if topout_wins + topout_losses + turncap + no_contest != games {
+        return false;
+    }
     if index == 0 {
-        gate_wins >= gate && topout_losses <= 5
+        // Stage 1 is a perfect record: 50 TopOut wins, no loss, no turn-cap,
+        // no forfeit (protocol v1.27 §1.4).
+        topout_wins == gate && topout_losses == 0 && no_contest == 0
     } else {
-        gate_wins >= gate
+        topout_wins >= gate
     }
 }
 
@@ -387,9 +404,9 @@ fn stage_gate(index: usize, summary: &MatchSummary, gate: u32) -> bool {
     gate_check(
         index,
         summary.wins_topout,
-        summary.wins_turncap,
         summary.losses_topout,
-        summary.wins_forfeit_other,
+        summary.turncap,
+        summary.no_contest,
         summary.measurement_complete,
         summary.verified,
         summary.games.len() as u32,
@@ -401,10 +418,10 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
     if passed {
         return "passed".into();
     }
-    if summary.wins_forfeit_other > 0 {
+    if index == 0 && summary.no_contest > 0 {
         return format!(
-            "invalid: {} forfeit-other win(s) (protocol v1.13 §7.1.3-4)",
-            summary.wins_forfeit_other
+            "invalid: {} no-contest (forfeit) game(s) in stage 1 (protocol v1.27 §1.4)",
+            summary.no_contest
         );
     }
     if !summary.measurement_complete {
@@ -413,19 +430,24 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
     if summary.verify_failures > 0 {
         return format!("{} replay verification failure(s)", summary.verify_failures);
     }
-    let gate_wins = summary.wins_topout + summary.wins_turncap;
+    if summary.turncap > 0 {
+        return format!(
+            "gate failed: {} turn-cap game(s) (every game must be decided by TopOut)",
+            summary.turncap
+        );
+    }
     if index == 0 {
         format!(
-            "gate failed: {} TopOut+TurnCap wins / {} games (needs {}; TopOut losses {}/5)",
-            gate_wins,
+            "gate failed: {} TopOut wins / {} games (needs {}; TopOut losses {})",
+            summary.wins_topout,
             summary.games.len(),
             gate,
             summary.losses_topout
         )
     } else {
         format!(
-            "gate failed: {} TopOut+TurnCap wins / {} games (needs {})",
-            gate_wins,
+            "gate failed: {} TopOut wins / {} games (needs {})",
+            summary.wins_topout,
             summary.games.len(),
             gate
         )
@@ -452,18 +474,21 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 opponent: opponent.display.clone(),
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
+                patch_sha256: opponent.patch_sha256.clone(),
                 games: 0,
                 wins: 0,
                 losses: 0,
-                draws: 0,
                 gate,
                 passed: false,
                 reason: "opponent not configured".into(),
                 summary_path: String::new(),
                 verified: 0,
                 verify_failures: 0,
-                forfeit_other: 0,
                 topout_wins: 0,
+                unresolved: 0,
+                no_contest: 0,
+                stuck: 0,
+                turncap: 0,
                 turncap_wins: 0,
                 topout_losses: 0,
                 forfeit_vision: 0,
@@ -493,6 +518,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                     attax.bun = bun.clone();
                     attax.commit = commit.clone();
                     attax.visible_rows = *visible_rows;
+                    attax.patch_sha256 = opponent.patch_sha256.clone();
                     config.attax = Some(attax);
                 }
                 OpponentKind::Tbp(tbp) => {
@@ -507,18 +533,21 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 opponent: opponent.display.clone(),
                 commit: opponent.commit.clone(),
                 patch_note: opponent.patch_note.clone(),
+                patch_sha256: opponent.patch_sha256.clone(),
                 games: summary.games.len() as u32,
                 wins: summary.wins,
                 losses: summary.losses,
-                draws: summary.draws,
                 gate,
                 passed,
                 reason: stage_reason(index, &summary, gate, passed),
                 summary_path: out_dir.join("summary.json").display().to_string(),
                 verified: summary.verified,
                 verify_failures: summary.verify_failures,
-                forfeit_other: summary.wins_forfeit_other,
                 topout_wins: summary.wins_topout,
+                unresolved: summary.unresolved,
+                no_contest: summary.no_contest,
+                stuck: summary.stuck,
+                turncap: summary.turncap,
                 turncap_wins: summary.wins_turncap,
                 topout_losses: summary.losses_topout,
                 forfeit_vision: summary.wins_forfeit_vision,
@@ -608,6 +637,9 @@ fn stage_section(
     if let Some(note) = &stage.patch_note {
         writeln!(out, "- compatibility patch: {note}")?;
     }
+    if let Some(sha) = &stage.patch_sha256 {
+        writeln!(out, "- compatibility patch SHA-256: `{sha}`")?;
+    }
     writeln!(
         out,
         "- gate: **{}** (wins needed) — {}",
@@ -630,7 +662,7 @@ fn stage_section(
         return Ok(());
     };
     let games = summary.games.len() as u32;
-    let gate_wins = summary.wins_topout + summary.wins_turncap;
+    let gate_wins = summary.wins_topout;
     let (low, high) = wilson_interval(gate_wins, games, 1.959_964);
     writeln!(
         out,
@@ -638,6 +670,9 @@ fn stage_section(
         games,
         games / 2
     )?;
+    if let Some(sha) = &summary.attax_patch_sha256 {
+        writeln!(out, "- opponent patch SHA-256: `{sha}`")?;
+    }
     writeln!(
         out,
         "- opponent vision: **{} rows**{}",
@@ -650,12 +685,12 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- raw games: {} W / {} L / {} D (forfeits: {}; this is **not** a win rate)",
-        summary.wins, summary.losses, summary.draws, summary.forfeits
+        "- raw games: {} W / {} L; unresolved (TurnCap): {}; no-contest (forfeit): {}; stuck: {} (this is **not** a win rate)",
+        summary.wins, summary.losses, summary.unresolved, summary.no_contest, summary.stuck
     )?;
     writeln!(
         out,
-        "- **gate record: {} TopOut+TurnCap wins / {} games** — {:.1}% (Wilson 95% CI {:.1}..{:.1}%)",
+        "- **gate record: {} TopOut wins / {} games** — {:.1}% (Wilson 95% CI {:.1}..{:.1}%)",
         gate_wins,
         games,
         if games == 0 {
@@ -668,11 +703,8 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- win breakdown: TopOut **{}**, forfeit-vision **{}**, forfeit-other **{}**, turn-cap **{}**",
-        summary.wins_topout,
-        summary.wins_forfeit_vision,
-        summary.wins_forfeit_other,
-        summary.turncap
+        "- win breakdown: TopOut **{}**; forfeit-vision **{}** (no contest); forfeit-other **{}** (invalid); turn-cap **{}** (unresolved)",
+        summary.wins_topout, summary.forfeit_vision, summary.forfeit_other, summary.turncap
     )?;
     let non_forfeit_games = games - summary.forfeits;
     let non_forfeit_wins = summary.wins_topout + summary.turncap;
@@ -836,14 +868,15 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     for (index, stage) in report.stages.iter().enumerate() {
         writeln!(
             out,
-            "| {} | {} | {} wins | {} | {}-{}-{} | {} |",
+            "| {} | {} | {} wins | {} | {}W-{}L (U{}, NC{}) | {} |",
             index + 1,
             stage.opponent,
             stage.gate,
             stage.games,
             stage.wins,
             stage.losses,
-            stage.draws,
+            stage.unresolved,
+            stage.no_contest,
             if stage.passed { "PASSED" } else { "FAILED" }
         )
         .map_err(|e| e.to_string())?;
@@ -1013,18 +1046,22 @@ mod tests {
     }
 
     #[test]
-    fn stage_gate_counts_only_topout_and_turncap_wins() {
-        // Stage 1: >= 45 TopOut+TurnCap wins and <= 5 TopOut losses.
-        assert!(gate_check(0, 40, 5, 5, 0, true, 50, 50, 45));
-        assert!(!gate_check(0, 39, 5, 5, 0, true, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 6, 0, true, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 5, 1, true, 50, 50, 45));
-        assert!(!gate_check(0, 40, 5, 5, 0, true, 49, 50, 45));
-        assert!(!gate_check(0, 40, 5, 5, 0, false, 50, 50, 45));
-        // Forfeit-vision wins are not part of the gate.
-        assert!(!gate_check(0, 44, 0, 0, 0, true, 50, 50, 45));
-        // Stage 2/3: >= 48 TopOut+TurnCap wins.
-        assert!(gate_check(1, 46, 2, 2, 0, true, 50, 50, 48));
-        assert!(!gate_check(1, 45, 2, 3, 0, true, 50, 50, 48));
+    fn stage_gate_counts_only_topout_wins_and_rejects_turncap() {
+        // Stage 1: 50 TopOut wins, 0 TopOut losses, 0 turn-cap games.
+        assert!(gate_check(0, 50, 0, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 49, 0, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 1, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 1, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 1, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, false, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, true, 49, 50, 50));
+        // Missing games must fail even when the TopOut count is 50.
+        assert!(!gate_check(0, 50, 0, 0, 0, true, 51, 51, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, true, 49, 49, 50));
+        // Stage 2/3: >= 48 TopOut wins, no turn-cap.
+        assert!(gate_check(1, 48, 2, 0, 0, true, 50, 50, 48));
+        assert!(!gate_check(1, 47, 3, 0, 0, true, 50, 50, 48));
+        assert!(!gate_check(1, 48, 2, 1, 0, true, 50, 50, 48));
+        assert!(!gate_check(1, 48, 1, 0, 0, true, 50, 50, 48));
     }
 }

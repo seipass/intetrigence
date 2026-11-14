@@ -82,6 +82,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut attax_commit: Option<String> = None;
     let mut attax_patch: Option<String> = None;
     let mut attax_visible_rows = 0u32;
+    let mut attax_patch_sha256: Option<String> = None;
     let mut cc2_program: Option<String> = None;
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
@@ -100,7 +101,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_retry_empty_ms = 0u64;
     let mut clys_cwd: Option<PathBuf> = None;
     let mut clys_env: Vec<(String, String)> = Vec::new();
-    let mut gates = [45u32, 48, 48];
+    let mut gates = [50u32, 48, 48];
     let mut ms = 100u64;
     let mut threads = 8usize;
     let mut turn_cap = 1000u32;
@@ -167,6 +168,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 attax_visible_rows = value(1)?
                     .parse()
                     .map_err(|error| format!("--attax-visible-rows: {error}"))?;
+                index += 2;
+            }
+            "--attax-patch-sha256" => {
+                attax_patch_sha256 = Some(value(1)?);
                 index += 2;
             }
             "--cc2-program" => {
@@ -384,6 +389,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "attax".into(),
             commit: attax_commit.clone(),
             patch_note: attax_patch.clone(),
+            patch_sha256: attax_patch_sha256.clone(),
             kind: OpponentKind::Attax {
                 dir,
                 bun: attax_bun,
@@ -396,6 +402,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "attax".into(),
             commit: None,
             patch_note: attax_patch.clone(),
+            patch_sha256: attax_patch_sha256.clone(),
             kind: OpponentKind::Missing,
         },
     };
@@ -413,6 +420,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 display: "Cold Clear 2".into(),
                 commit: cc2_commit,
                 patch_note: cc2_patch,
+                patch_sha256: None,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -421,6 +429,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "Cold Clear 2".into(),
             commit: None,
             patch_note: cc2_patch,
+            patch_sha256: None,
             kind: OpponentKind::Missing,
         },
     };
@@ -438,6 +447,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 display: "clys".into(),
                 commit: clys_commit,
                 patch_note: clys_patch,
+                patch_sha256: None,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -446,6 +456,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "clys".into(),
             commit: None,
             patch_note: clys_patch,
+            patch_sha256: None,
             kind: OpponentKind::Missing,
         },
     };
@@ -492,11 +503,12 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     );
     for stage in &report.stages {
         println!(
-            "  {}: {}-{}-{} (gate {}) {} — {}",
+            "  {}: {}W-{}L (U{}, NC{}) (gate {}) {} — {}",
             stage.key,
             stage.wins,
             stage.losses,
-            stage.draws,
+            stage.unresolved,
+            stage.no_contest,
             stage.gate,
             if stage.passed { "PASSED" } else { "FAILED" },
             stage.reason

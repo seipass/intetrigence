@@ -76,6 +76,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_name = "tbp-bot".to_string();
     let mut attax_visible_rows = 0u32;
     let mut weight_overrides: Vec<(String, String)> = Vec::new();
+    let mut attax_patch_sha256: Option<String> = None;
 
     let mut index = 0;
     while index < args.len() {
@@ -237,6 +238,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 weight_overrides.extend(parse_weight_overrides(&value(1)?)?);
                 index += 2;
             }
+            "--attax-patch-sha256" => {
+                attax_patch_sha256 = Some(value(1)?);
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -267,6 +272,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.commit = commit;
         attax_config.bun_version = bun_version;
         attax_config.visible_rows = attax_visible_rows;
+        attax_config.patch_sha256 = attax_patch_sha256;
         attax_config.timeout = Duration::from_secs(timeout);
         config.attax = Some(attax_config);
     }
@@ -322,12 +328,12 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     );
     let summary = run_match(&config)?;
     println!(
-        "summary: {} games, wins {} losses {} draws {} forfeits {}, verified {}/{}",
+        "summary: {} games, wins {} losses {} unresolved {} no-contest {}, verified {}/{}",
         summary.games.len(),
         summary.wins,
         summary.losses,
-        summary.draws,
-        summary.forfeits,
+        summary.unresolved,
+        summary.no_contest,
         summary.verified,
         summary.games.len()
     );
@@ -425,12 +431,12 @@ fn cmd_report(args: &[String]) -> Result<(), String> {
         .write(&dir)
         .map_err(|error| format!("write summary: {error}"))?;
     println!(
-        "{} games: wins {} losses {} draws {} forfeits {}, verified {}/{}",
+        "{} games: wins {} losses {} unresolved {} no-contest {}, verified {}/{}",
         summary.games.len(),
         summary.wins,
         summary.losses,
-        summary.draws,
-        summary.forfeits,
+        summary.unresolved,
+        summary.no_contest,
         summary.verified,
         summary.games.len()
     );
