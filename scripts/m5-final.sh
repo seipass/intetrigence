@@ -45,6 +45,7 @@ cargo run --release -p intetrigence-arena --bin arena -- verify "$OUT_DIR"
 EVIDENCE="$OUT_DIR" REPORT="$REPORT" TITLE="$TITLE" \
   SEED_RANGE="held-out final seeds 20001-20050" \
   SEED_NOTE="seeds 20001-20050 are reserved for this match and were **not** used in either project's tuning, diagnostics or prior matches" \
+  ATTAX_NOTE="attax at this commit is guideline-scored and has a 20-row vision limit; the S2 version is not released upstream (7b38f51 vs upstream 57a5a6a: docs/page-generation only, no scoring/search/vision changes)." \
   HELDOUT="attax: tuning 2001-2060 (scripts/tune.ts), held-out benchmark 1001-1200, prior matches 5001-5050 and 7001-7050; intetrigence: M0 1001-1005, M2 9001-9010, M4 10001-10020. Seeds 20001-20050 appear in neither project's evidence." \
   REPRO="scripts/m5-final.sh" \
   python "$ROOT/scripts/analyze-m2.py"

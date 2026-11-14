@@ -24,6 +24,10 @@ SEED_NOTE = os.environ.get(
     "SEED_NOTE", "held-out: seeds 10001+ were **not** used (tuning seeds only)"
 )
 HELDOUT = os.environ.get("HELDOUT", "")
+ATTAX_NOTE = os.environ.get(
+    "ATTAX_NOTE",
+    "attax at this commit is guideline-scored and has a 20-row vision limit.",
+)
 REPRO = os.environ.get("REPRO", "scripts/m2-match.sh")
 
 
@@ -341,7 +345,7 @@ def main():
         )
     lines.append("")
     lines.append("## Caveats\n")
-    lines.append("- attax at this commit is guideline-scored and has a 20-row vision limit.")
+    lines.append(f"- {ATTAX_NOTE}")
     lines.append(
         "- spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; "
         "intetrigence's labels are backed by rotation-ending input sequences, so the leniency only helps a cell-only client."
