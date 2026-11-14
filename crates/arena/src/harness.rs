@@ -208,6 +208,10 @@ pub struct BotAggregate {
     pub attack_per_piece: f64,
     pub received_per_game: f64,
     pub visible_rows: u32,
+    /// Mean over games of the per-game mean board height.
+    pub mean_height: f64,
+    /// Mean over games of the per-game max board height.
+    pub max_height: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -419,6 +423,30 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             .first()
             .map(|audit| audit.bots[slot].visible_rows)
             .unwrap_or(0),
+        mean_height: if audits.is_empty() {
+            0.0
+        } else {
+            (audits
+                .iter()
+                .map(|audit| audit.heights[slot].mean)
+                .sum::<f64>()
+                / audits.len() as f64
+                * 100.0)
+                .round()
+                / 100.0
+        },
+        max_height: if audits.is_empty() {
+            0.0
+        } else {
+            (audits
+                .iter()
+                .map(|audit| f64::from(audit.heights[slot].max))
+                .sum::<f64>()
+                / audits.len() as f64
+                * 100.0)
+                .round()
+                / 100.0
+        },
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
@@ -535,12 +563,12 @@ impl MatchSummary {
         }
         text.push_str("\n## Per-bot audit\n\n");
         text.push_str(
-            "| slot | bot | visible rows | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
+            "| slot | bot | visible rows | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | mean/max height | think > 200ms |\n",
         );
-        text.push_str("|---|---|---|---|---|---|---|---|---|\n");
+        text.push_str("|---|---|---|---|---|---|---|---|---|---|\n");
         for bot in &self.bots {
             text.push_str(&format!(
-                "| {} | {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
+                "| {} | {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {:.1} / {:.1} | {} |\n",
                 bot.slot,
                 bot.name,
                 bot.visible_rows,
@@ -551,6 +579,8 @@ impl MatchSummary {
                 bot.attack_checked,
                 bot.attack_per_piece,
                 bot.received_per_game,
+                bot.mean_height,
+                bot.max_height,
                 bot.think_over_budget,
             ));
         }
@@ -759,6 +789,8 @@ mod tests {
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
                     visible_rows: 0,
+                    mean_height: 0.0,
+                    max_height: 0.0,
                 },
                 BotAggregate {
                     slot: 1,
@@ -773,6 +805,8 @@ mod tests {
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
                     visible_rows: 0,
+                    mean_height: 0.0,
+                    max_height: 0.0,
                 },
             ],
             notes: vec!["note".into()],

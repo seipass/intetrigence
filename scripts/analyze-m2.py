@@ -19,6 +19,11 @@ EVIDENCE = os.environ.get(
 )
 REPORT = os.environ.get("REPORT", os.path.join(ROOT, "docs", "m2-tuning-report.md"))
 TITLE = os.environ.get("TITLE", "M2 tuning match report (intetrigence vs attax)")
+SEED_RANGE = os.environ.get("SEED_RANGE", "tuning seeds 9001-9010")
+SEED_NOTE = os.environ.get(
+    "SEED_NOTE", "held-out: seeds 10001+ were **not** used (tuning seeds only)"
+)
+REPRO = os.environ.get("REPRO", "scripts/m2-match.sh")
 
 
 def wilson(wins, games, z=1.959964):
@@ -177,8 +182,8 @@ def main():
         lines.append(
             f"- profile: **{profile}** (diagnostic; **not** usable for final claims, protocol v1.11 §1.3)"
         )
-    lines.append(f"- games: {len(games)} (tuning seeds 9001-9010 x sheets A/B)")
-    lines.append("- held-out: seeds 10001+ were **not** used (tuning seeds only)")
+    lines.append(f"- games: {len(games)} ({SEED_RANGE} x sheets A/B)")
+    lines.append(f"- {SEED_NOTE}")
     args0 = " ".join(header["bots"]["0"].get("args", []))
     lines.append(
         f"- intetrigence: real search (`{args0}`), commit "
@@ -338,7 +343,7 @@ def main():
         "- spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; "
         "intetrigence's labels are backed by rotation-ending input sequences, so the leniency only helps a cell-only client."
     )
-    lines.append("- Tuning seeds only. Held-out seeds (10001+) were not used.")
+    lines.append(f"- {SEED_NOTE}.")
     lines.append("")
     lines.append("## Reproduction\n")
     if self_play:
@@ -346,8 +351,10 @@ def main():
     elif profile.startswith("defense-stress"):
         lines.append("- `scripts/m3-defense.sh`")
     else:
-        lines.append("- `scripts/m2-match.sh` (tuning seeds 9001-9010)")
-    lines.append("- `arena verify scripts/evidence/m2-tuning`")
+        lines.append(f"- `{REPRO}`")
+    lines.append(
+        f"- `arena verify {os.path.relpath(EVIDENCE, ROOT).replace(os.sep, '/')}`"
+    )
     lines.append("- `python scripts/analyze-m2.py`")
     lines.append("")
 
