@@ -275,6 +275,10 @@ pub struct MatchSummary {
     pub forfeits: u32,
     /// Win/loss breakdown (protocol v1.8 §7.1).
     pub wins_topout: u32,
+    #[serde(default)]
+    pub wins_turncap: u32,
+    #[serde(default)]
+    pub losses_turncap: u32,
     pub wins_forfeit_vision: u32,
     pub wins_forfeit_other: u32,
     pub losses_topout: u32,
@@ -377,6 +381,14 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
     let wins_topout = games
         .iter()
         .filter(|game| game.winner == Some(0) && game.reason == "TopOut")
+        .count() as u32;
+    let wins_turncap = games
+        .iter()
+        .filter(|game| game.winner == Some(0) && game.reason == "TurnCap")
+        .count() as u32;
+    let losses_turncap = games
+        .iter()
+        .filter(|game| game.winner == Some(1) && game.reason == "TurnCap")
         .count() as u32;
     let wins_forfeit_vision = games
         .iter()
@@ -516,6 +528,8 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         draws,
         forfeits,
         wins_topout,
+        wins_turncap,
+        losses_turncap,
         wins_forfeit_vision,
         wins_forfeit_other,
         losses_topout,
@@ -851,6 +865,8 @@ mod tests {
             draws: 0,
             forfeits: 0,
             wins_topout: 0,
+            wins_turncap: 0,
+            losses_turncap: 0,
             wins_forfeit_vision: 0,
             wins_forfeit_other: 0,
             losses_topout: 0,

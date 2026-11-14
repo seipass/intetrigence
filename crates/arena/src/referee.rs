@@ -653,22 +653,12 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
     let Some(active) = player.game.active() else {
         return ForfeitCause::Other;
     };
-    // A piece entirely in the hidden buffer cannot be represented by the bot's
-    // visible rows: the adapter places it at the top of its grid, overlapping
-    // the stack, and its movegen returns nothing.
-    let lowest_cell = active.cells().iter().map(|&(_, y)| y).min().unwrap_or(0);
-    if lowest_cell as u32 >= visible_rows {
-        return ForfeitCause::Vision;
-    }
+    // The only criterion is whether the referee has a legal placement that fits
+    // entirely inside the bot's visible rows. The S2 spawn is in the hidden
+    // buffer (row 21), so "the active is above row 20" says nothing about the
+    // stack: a low board still has visible placements. (The old check returned
+    // Vision for every spawn, which misclassified 194 attax games.)
     let board = player.game.board();
-    let stack_top = (0..intetrigence_core::Board::HEIGHT)
-        .rev()
-        .find(|&y| board.row(y) != 0);
-    if let Some(top) = stack_top {
-        if top as u32 >= visible_rows {
-            return ForfeitCause::Vision;
-        }
-    }
     let moves = crate::movegen::generate(board, active, false);
     if moves.is_empty() {
         return ForfeitCause::Other;
@@ -683,6 +673,42 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
         ForfeitCause::Other
     } else {
         ForfeitCause::Vision
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use intetrigence_core::{ActivePiece, Board, FULL_ROW, Game, PieceKind, Rotation};
+
+    #[test]
+    fn low_board_with_hidden_spawn_is_not_vision() {
+        let engine = Engine::new(1, Sheet::A, 12);
+        // The active piece spawns at row 21 (hidden), but the board is empty:
+        // the referee has visible placements, so the bot's empty suggestion is
+        // its own failure, not a vision limitation.
+        assert!(engine.players[0].game.active().is_some());
+        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Other);
+    }
+
+    #[test]
+    fn full_visible_rows_are_vision() {
+        // A tall stack with a diagonal hole per row: no piece fits entirely in
+        // rows 0..19, and no row is full (so `from_position` accepts it).
+        let mut board = Board::new();
+        for y in 0..20 {
+            board.set_row(y, FULL_ROW & !(1u16 << (y % 10)));
+        }
+        let active = ActivePiece {
+            kind: PieceKind::T,
+            rotation: Rotation::Zero,
+            x: 3,
+            y: 20,
+        };
+        let game = Game::from_position(1, board, active).expect("legal test position");
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.players[0].game = game;
+        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Vision);
     }
 }
 

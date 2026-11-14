@@ -33,6 +33,7 @@ fn main() {
         "verify" => cmd_verify(&args[1..]),
         "report" => cmd_report(&args[1..]),
         "render" => cmd_render(&args[1..]),
+        "reclassify" => cmd_reclassify(&args[1..]),
         "-h" | "--help" | "help" => {
             usage();
             Ok(())
@@ -538,5 +539,127 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
             "verified": report.verified,
         })
     );
+    Ok(())
+}
+
+fn cmd_reclassify(args: &[String]) -> Result<(), String> {
+    let path = args
+        .first()
+        .ok_or_else(|| "reclassify needs a match directory or replay file".to_string())?;
+    let path = Path::new(path);
+    let mut files = Vec::new();
+    if path.is_dir() {
+        let replays = path.join("replays");
+        let entries = std::fs::read_dir(&replays)
+            .map_err(|error| format!("read {}: {error}", replays.display()))?;
+        for entry in entries {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let file = entry.path();
+            if file.extension().and_then(|ext| ext.to_str()) == Some("jsonl") {
+                files.push(file);
+            }
+        }
+    } else {
+        files.push(path.to_path_buf());
+    }
+    files.sort();
+    let mut games = 0u32;
+    let mut wins = 0u32;
+    let mut losses = 0u32;
+    let mut draws = 0u32;
+    let mut topout_wins = 0u32;
+    let mut turncap_wins = 0u32;
+    let mut topout_losses = 0u32;
+    let mut forfeit_vision = 0u32;
+    let mut forfeit_other = 0u32;
+    let mut forfeit_unknown = 0u32;
+    let mut verified = 0u32;
+    let mut cause_mismatches = 0u32;
+    for file in &files {
+        let records = intetrigence_arena::replay::read_replay(file)
+            .map_err(|error| format!("read {}: {error}", file.display()))?;
+        let result = records.iter().find_map(|record| match record {
+            intetrigence_arena::ReplayRecord::Result(result) => Some(result),
+            _ => None,
+        });
+        let Some(result) = result else {
+            continue;
+        };
+        let report = intetrigence_arena::replay::verify_replay(file)
+            .map_err(|error| format!("verify {}: {error}", file.display()))?;
+        games += 1;
+        match result.winner {
+            Some(0) => wins += 1,
+            Some(1) => losses += 1,
+            _ => draws += 1,
+        }
+        let non_cause = report
+            .mismatches
+            .iter()
+            .filter(|mismatch| !mismatch.contains("forfeit_cause"))
+            .count();
+        if non_cause == 0 {
+            verified += 1;
+        }
+        cause_mismatches += report
+            .mismatches
+            .iter()
+            .filter(|mismatch| mismatch.contains("forfeit_cause"))
+            .count() as u32;
+        match result.reason.as_str() {
+            "TopOut" => {
+                if result.winner == Some(0) {
+                    topout_wins += 1;
+                } else if result.winner == Some(1) {
+                    topout_losses += 1;
+                }
+            }
+            "TurnCap" => {
+                if result.winner == Some(0) {
+                    turncap_wins += 1;
+                }
+            }
+            "Forfeit" => match report.forfeit_cause {
+                Some(intetrigence_arena::replay::ForfeitCause::Vision) => forfeit_vision += 1,
+                Some(intetrigence_arena::replay::ForfeitCause::Other) => forfeit_other += 1,
+                _ => forfeit_unknown += 1,
+            },
+            _ => {}
+        }
+    }
+    let gate_wins = topout_wins + turncap_wins;
+    let summary = serde_json::json!({
+        "dir": path.display().to_string(),
+        "games": games,
+        "wins": wins,
+        "losses": losses,
+        "draws": draws,
+        "topout_wins": topout_wins,
+        "turncap_wins": turncap_wins,
+        "topout_losses": topout_losses,
+        "forfeit_vision": forfeit_vision,
+        "forfeit_other": forfeit_other,
+        "forfeit_unknown": forfeit_unknown,
+        "gate_wins": gate_wins,
+        "verified": verified,
+        "cause_mismatches": cause_mismatches,
+    });
+    let out = if path.is_dir() {
+        path.join("summary-reclassified.json")
+    } else {
+        path.with_extension("reclassified.json")
+    };
+    std::fs::write(
+        &out,
+        serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?
+            + "
+",
+    )
+    .map_err(|error| format!("write {}: {error}", out.display()))?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?
+    );
+    println!("wrote {}", out.display());
     Ok(())
 }

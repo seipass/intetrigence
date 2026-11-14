@@ -286,6 +286,10 @@ pub struct VerifyReport {
     pub turns: u32,
     pub placements: u32,
     pub mismatches: Vec<String>,
+    /// Forfeit cause recomputed by the current classifier (reclassification
+    /// support; `None` for non-forfeit games).
+    #[serde(default)]
+    pub forfeit_cause: Option<ForfeitCause>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -627,18 +631,16 @@ fn verify_result(
             .unwrap_or("")
             .contains("candidates is reachable");
         if candidate_failure {
-            if let Some(recorded) = result.forfeit_cause {
-                if recorded != ForfeitCause::Unknown {
-                    if let Some(loser) = result.winner.map(|winner| 1 - winner as usize) {
-                        let actual =
-                            crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
-                        if actual != recorded {
-                            report.mismatches.push(format!(
-                                "result forfeit_cause: recorded {}, recomputed {}",
-                                recorded.as_str(),
-                                actual.as_str()
-                            ));
-                        }
+            if let Some(loser) = result.winner.map(|winner| 1 - winner as usize) {
+                let actual = crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
+                report.forfeit_cause = Some(actual);
+                if let Some(recorded) = result.forfeit_cause {
+                    if recorded != ForfeitCause::Unknown && actual != recorded {
+                        report.mismatches.push(format!(
+                            "result forfeit_cause: recorded {}, recomputed {}",
+                            recorded.as_str(),
+                            actual.as_str()
+                        ));
                     }
                 }
             }

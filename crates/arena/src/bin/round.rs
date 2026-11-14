@@ -99,7 +99,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_retry_empty_ms = 0u64;
     let mut clys_cwd: Option<PathBuf> = None;
     let mut clys_env: Vec<(String, String)> = Vec::new();
-    let mut gates = [50u32, 48, 48];
+    let mut gates = [45u32, 48, 48];
     let mut ms = 100u64;
     let mut threads = 8usize;
     let mut turn_cap = 1000u32;
