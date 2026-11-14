@@ -25,6 +25,8 @@ TURNS="${TURNS:-1000}"
 MS="${MS:-100}"
 THREADS="${THREADS:-8}"
 START_ROWS="${START_ROWS:-12}"
+REPORT="${REPORT:-$ROOT/docs/m3-defense-report.md}"
+TITLE="${TITLE:-M3 defense-stress baseline ($START_ROWS start garbage rows)}"
 
 if [ ! -f "$ATTAX_DIR/tbp/attax-tbp.ts" ]; then
   echo "attax entry point not found: $ATTAX_DIR/tbp/attax-tbp.ts" >&2
@@ -43,7 +45,4 @@ cargo run --release -p intetrigence-arena --bin arena -- match \
 
 cargo run --release -p intetrigence-arena --bin arena -- verify "$OUT_DIR"
 
-EVIDENCE="$OUT_DIR" \
-  REPORT="$ROOT/docs/m3-defense-report.md" \
-  TITLE="M3 defense-stress baseline (intetrigence vs attax)" \
-  python "$ROOT/scripts/analyze-m2.py"
+EVIDENCE="$OUT_DIR" REPORT="$REPORT" TITLE="$TITLE" python "$ROOT/scripts/analyze-m2.py"

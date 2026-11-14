@@ -19,11 +19,11 @@
 - **non-forfeit games (40-row TopOut / TurnCap, n=2)**: 0 wins / 2 losses = **0.0%** (Wilson 95% CI 0.0%..65.8%)
 - replay verified: **20/20**
 - per sheet: A 8/10, B 10/10
-- seat note: the 2 losses are both sheet A (intetrigence in seat 1); sheet B is 10/10. The sample is too small to separate a seat effect from the opponent's forfeits.
+- seat note: losses by sheet ['A']; the per-sheet split is above. The sample is too small to separate a seat effect from the opponent's forfeits.
 
 ## Claims
 
-- This report does **not** claim a win rate against a full-vision opponent: all 18 wins are vision forfeits and the non-forfeit (40-row) record is 0/2.
+- This report does **not** claim a win rate against a full-vision opponent: all vision forfeit wins are reported separately and the non-forfeit (40-row) record is stated above.
 - The spin rule is more lenient than TETR.IO (see Caveats); intetrigence's labels are backed by rotation-ending input sequences.
 
 ## Think time

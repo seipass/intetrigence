@@ -163,7 +163,7 @@ def main():
     verified = sum(1 for game in games if game["verified"])
 
     lines = []
-    lines.append("# M2 tuning match report (intetrigence vs attax)\n")
+    lines.append(f"# {TITLE}\n")
     lines.append(f"- evidence: `{os.path.relpath(EVIDENCE, ROOT).replace(os.sep, '/')}`")
     profile = header.get("profile", "official")
     if profile == "official":
@@ -214,16 +214,24 @@ def main():
     )
     lines.append(f"- replay verified: **{verified}/{len(games)}**")
     lines.append("- per sheet: " + ", ".join(f"{sheet} {w}/{n}" for sheet, w, n in sheet_rows))
+    loss_sheets = sorted({game["sheet"] for game in games if game["winner"] == 1})
     lines.append(
-        "- seat note: the 2 losses are both sheet A (intetrigence in seat 1); sheet B is 10/10. "
+        f"- seat note: losses by sheet {loss_sheets}; the per-sheet split is above. "
         "The sample is too small to separate a seat effect from the opponent's forfeits."
     )
     lines.append("")
     lines.append("## Claims\n")
-    lines.append(
-        "- This report does **not** claim a win rate against a full-vision opponent: "
-        "all 18 wins are vision forfeits and the non-forfeit (40-row) record is 0/2."
-    )
+    if profile == "official":
+        lines.append(
+            "- This report does **not** claim a win rate against a full-vision opponent: "
+            "all vision forfeit wins are reported separately and the non-forfeit (40-row) "
+            "record is stated above."
+        )
+    else:
+        lines.append(
+            "- **Diagnostic profile**: these numbers are not usable for final claims "
+            "(protocol v1.11 §1.3)."
+        )
     lines.append(
         "- The spin rule is more lenient than TETR.IO (see Caveats); intetrigence's labels are "
         "backed by rotation-ending input sequences."
