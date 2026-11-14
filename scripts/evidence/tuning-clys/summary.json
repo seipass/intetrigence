@@ -1,44 +1,44 @@
 {
   "schema": "intetrigence/s2-match-summary/1",
-  "started_at": "unix:1794679808",
+  "started_at": "unix:1794683924",
   "profile": "official",
   "games": [
     {
       "seed": 9001,
       "sheet": "A",
-      "winner": 0,
+      "winner": 1,
       "reason": "TopOut",
       "forfeit_cause": null,
-      "turns": 108,
+      "turns": 212,
       "surge_released": [
-        15,
-        5
+        6,
+        13
       ],
       "max_b2b_streak": [
-        9,
-        6
+        7,
+        14
       ],
       "turns_with_b2b_ge_4": [
-        37,
-        15
+        7,
+        44
       ],
       "verified": true,
       "verify_mismatches": 0,
       "think_median_ms": [
-        96.983,
-        114.537
+        97.634,
+        115.786
       ],
       "think_p95_ms": [
-        99.24,
-        130.796
+        99.536,
+        136.434
       ],
       "think_p99_ms": [
-        99.472,
-        138.276
+        99.962,
+        144.596
       ],
       "think_max_ms": [
-        100.142,
-        138.402
+        101.803,
+        151.631
       ],
       "first_choice_rate": [
         1.0,
@@ -46,19 +46,19 @@
       ],
       "spin_match_rate": [
         1.0,
-        0.074
+        0.076
       ],
       "attack_match_rate": [
         1.0,
-        0.824
+        0.796
       ],
       "attack_per_piece": [
-        1.12,
-        1.009
+        0.802,
+        0.981
       ],
       "spin_mismatches": [
         0,
-        100
+        195
       ],
       "attack_mismatches_same_spin": [
         0,
@@ -69,62 +69,90 @@
         0
       ],
       "sent_total": [
-        93,
-        64
+        109,
+        150
       ],
       "received_total": [
-        36,
-        45
+        88,
+        52
       ],
       "attack_total": [
-        121,
-        109
+        170,
+        207
       ],
       "pieces_placed": [
-        108,
-        108
+        212,
+        211
       ],
-      "start_resends": 12,
+      "start_resends": 19,
       "cells_above_row20": false,
       "queue_invariant_violations": 0,
-      "replay": "replays/seed-9001-sheet-A.jsonl"
+      "replay": "replays/seed-9001-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 212,
+          "fallback_turns": 0,
+          "depth_median": 4.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 343.0,
+          "nodes_p95": 747.0,
+          "nodes_max": 916
+        },
+        {
+          "turns": 211,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 369577.0,
+          "nodes_p95": 1119790.0,
+          "nodes_max": 1183937
+        }
+      ]
     },
     {
       "seed": 9002,
       "sheet": "A",
-      "winner": 1,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 137,
+      "winner": null,
+      "reason": "Forfeit",
+      "forfeit_cause": "other",
+      "turns": 78,
       "surge_released": [
         0,
-        11
+        4
       ],
       "max_b2b_streak": [
-        2,
-        12
+        3,
+        5
       ],
       "turns_with_b2b_ge_4": [
         0,
-        42
+        12
       ],
       "verified": true,
       "verify_mismatches": 0,
       "think_median_ms": [
-        97.135,
-        109.756
+        97.853,
+        114.749
       ],
       "think_p95_ms": [
-        99.247,
-        129.546
+        99.794,
+        137.788
       ],
       "think_p99_ms": [
-        99.834,
-        143.312
+        101.847,
+        143.036
       ],
       "think_max_ms": [
-        100.956,
-        157.313
+        101.847,
+        143.036
       ],
       "first_choice_rate": [
         1.0,
@@ -132,19 +160,589 @@
       ],
       "spin_match_rate": [
         1.0,
-        0.096
+        0.065
       ],
       "attack_match_rate": [
         1.0,
-        0.86
+        0.883
       ],
       "attack_per_piece": [
-        0.839,
-        1.147
+        0.885,
+        0.857
       ],
       "spin_mismatches": [
         0,
-        123
+        72
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        60,
+        47
+      ],
+      "received_total": [
+        37,
+        31
+      ],
+      "attack_total": [
+        69,
+        66
+      ],
+      "pieces_placed": [
+        78,
+        77
+      ],
+      "start_resends": 17,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9002-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 78,
+          "fallback_turns": 0,
+          "depth_median": 4.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 360.0,
+          "nodes_p95": 747.0,
+          "nodes_max": 892
+        },
+        {
+          "turns": 77,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 372178.0,
+          "nodes_p95": 1151104.0,
+          "nodes_max": 1191863
+        }
+      ]
+    },
+    {
+      "seed": 9003,
+      "sheet": "A",
+      "winner": 1,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 127,
+      "surge_released": [
+        0,
+        16
+      ],
+      "max_b2b_streak": [
+        3,
+        12
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        70
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.616,
+        117.795
+      ],
+      "think_p95_ms": [
+        101.714,
+        141.998
+      ],
+      "think_p99_ms": [
+        104.554,
+        148.407
+      ],
+      "think_max_ms": [
+        108.078,
+        182.403
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.071
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.857
+      ],
+      "attack_per_piece": [
+        0.614,
+        0.929
+      ],
+      "spin_mismatches": [
+        0,
+        117
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        42,
+        96
+      ],
+      "received_total": [
+        59,
+        20
+      ],
+      "attack_total": [
+        78,
+        117
+      ],
+      "pieces_placed": [
+        127,
+        126
+      ],
+      "start_resends": 11,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9003-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 127,
+          "fallback_turns": 0,
+          "depth_median": 5.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 216.0,
+          "width_max": 216,
+          "nodes_median": 359.0,
+          "nodes_p95": 888.0,
+          "nodes_max": 933
+        },
+        {
+          "turns": 126,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 353173.0,
+          "nodes_p95": 434602.0,
+          "nodes_max": 1179855
+        }
+      ]
+    },
+    {
+      "seed": 9004,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 592,
+      "surge_released": [
+        16,
+        53
+      ],
+      "max_b2b_streak": [
+        5,
+        19
+      ],
+      "turns_with_b2b_ge_4": [
+        29,
+        280
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.579,
+        116.225
+      ],
+      "think_p95_ms": [
+        99.175,
+        135.546
+      ],
+      "think_p99_ms": [
+        100.396,
+        140.613
+      ],
+      "think_max_ms": [
+        102.453,
+        147.225
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.076
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.867
+      ],
+      "attack_per_piece": [
+        0.792,
+        0.973
+      ],
+      "spin_mismatches": [
+        0,
+        547
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        316,
+        372
+      ],
+      "received_total": [
+        217,
+        112
+      ],
+      "attack_total": [
+        469,
+        576
+      ],
+      "pieces_placed": [
+        592,
+        592
+      ],
+      "start_resends": 52,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9004-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 592,
+          "fallback_turns": 3,
+          "depth_median": 4.0,
+          "depth_p95": 7.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 357.0,
+          "nodes_p95": 738.0,
+          "nodes_max": 933
+        },
+        {
+          "turns": 592,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 394506.0,
+          "nodes_p95": 509895.0,
+          "nodes_max": 1188951
+        }
+      ]
+    },
+    {
+      "seed": 9005,
+      "sheet": "A",
+      "winner": 1,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 329,
+      "surge_released": [
+        8,
+        24
+      ],
+      "max_b2b_streak": [
+        5,
+        7
+      ],
+      "turns_with_b2b_ge_4": [
+        16,
+        72
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.518,
+        115.091
+      ],
+      "think_p95_ms": [
+        99.196,
+        137.616
+      ],
+      "think_p99_ms": [
+        100.041,
+        146.932
+      ],
+      "think_max_ms": [
+        107.307,
+        158.544
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.085
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.851
+      ],
+      "attack_per_piece": [
+        0.787,
+        1.021
+      ],
+      "spin_mismatches": [
+        0,
+        300
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        174,
+        230
+      ],
+      "received_total": [
+        142,
+        69
+      ],
+      "attack_total": [
+        259,
+        335
+      ],
+      "pieces_placed": [
+        329,
+        328
+      ],
+      "start_resends": 33,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9005-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 329,
+          "fallback_turns": 0,
+          "depth_median": 5.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 216.0,
+          "width_max": 216,
+          "nodes_median": 476.0,
+          "nodes_p95": 899.0,
+          "nodes_max": 933
+        },
+        {
+          "turns": 328,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 401338.0,
+          "nodes_p95": 505790.0,
+          "nodes_max": 1194758
+        }
+      ]
+    },
+    {
+      "seed": 9006,
+      "sheet": "A",
+      "winner": 1,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 93,
+      "surge_released": [
+        4,
+        4
+      ],
+      "max_b2b_streak": [
+        5,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        5,
+        17
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.591,
+        115.537
+      ],
+      "think_p95_ms": [
+        99.404,
+        134.043
+      ],
+      "think_p99_ms": [
+        101.868,
+        145.365
+      ],
+      "think_max_ms": [
+        101.868,
+        145.365
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.065
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.826
+      ],
+      "attack_per_piece": [
+        0.742,
+        0.902
+      ],
+      "spin_mismatches": [
+        0,
+        86
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "sent_total": [
+        50,
+        63
+      ],
+      "received_total": [
+        44,
+        30
+      ],
+      "attack_total": [
+        69,
+        83
+      ],
+      "pieces_placed": [
+        93,
+        92
+      ],
+      "start_resends": 10,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9006-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 93,
+          "fallback_turns": 0,
+          "depth_median": 4.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 340.0,
+          "nodes_p95": 649.0,
+          "nodes_max": 908
+        },
+        {
+          "turns": 92,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 375299.0,
+          "nodes_p95": 524211.0,
+          "nodes_max": 1189423
+        }
+      ]
+    },
+    {
+      "seed": 9007,
+      "sheet": "A",
+      "winner": 1,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 157,
+      "surge_released": [
+        5,
+        16
+      ],
+      "max_b2b_streak": [
+        6,
+        12
+      ],
+      "turns_with_b2b_ge_4": [
+        10,
+        72
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        97.556,
+        117.448
+      ],
+      "think_p95_ms": [
+        99.38,
+        135.658
+      ],
+      "think_p99_ms": [
+        99.852,
+        140.448
+      ],
+      "think_max_ms": [
+        100.069,
+        146.099
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.071
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.904
+      ],
+      "attack_per_piece": [
+        0.669,
+        0.936
+      ],
+      "spin_mismatches": [
+        0,
+        145
       ],
       "attack_mismatches_same_spin": [
         0,
@@ -156,454 +754,52 @@
       ],
       "sent_total": [
         72,
-        115
+        98
       ],
       "received_total": [
-        71,
-        31
-      ],
-      "attack_total": [
-        115,
-        156
-      ],
-      "pieces_placed": [
-        137,
-        136
-      ],
-      "start_resends": 20,
-      "cells_above_row20": false,
-      "queue_invariant_violations": 0,
-      "replay": "replays/seed-9002-sheet-A.jsonl"
-    },
-    {
-      "seed": 9003,
-      "sheet": "A",
-      "winner": 1,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 74,
-      "surge_released": [
-        0,
-        8
-      ],
-      "max_b2b_streak": [
-        2,
-        9
-      ],
-      "turns_with_b2b_ge_4": [
-        0,
-        33
-      ],
-      "verified": true,
-      "verify_mismatches": 0,
-      "think_median_ms": [
-        97.039,
-        112.283
-      ],
-      "think_p95_ms": [
-        98.502,
-        131.457
-      ],
-      "think_p99_ms": [
-        100.173,
-        132.963
-      ],
-      "think_max_ms": [
-        100.173,
-        132.963
-      ],
-      "first_choice_rate": [
-        1.0,
-        1.0
-      ],
-      "spin_match_rate": [
-        1.0,
-        0.068
-      ],
-      "attack_match_rate": [
-        1.0,
-        0.904
-      ],
-      "attack_per_piece": [
-        0.595,
-        1.0
-      ],
-      "spin_mismatches": [
-        0,
-        68
-      ],
-      "attack_mismatches_same_spin": [
-        0,
-        0
-      ],
-      "think_over_budget": [
-        0,
-        0
-      ],
-      "sent_total": [
-        31,
-        53
-      ],
-      "received_total": [
-        40,
-        11
-      ],
-      "attack_total": [
-        44,
-        73
-      ],
-      "pieces_placed": [
-        74,
-        73
-      ],
-      "start_resends": 5,
-      "cells_above_row20": false,
-      "queue_invariant_violations": 0,
-      "replay": "replays/seed-9003-sheet-A.jsonl"
-    },
-    {
-      "seed": 9004,
-      "sheet": "A",
-      "winner": 1,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 73,
-      "surge_released": [
-        4,
-        5
-      ],
-      "max_b2b_streak": [
-        5,
-        6
-      ],
-      "turns_with_b2b_ge_4": [
-        10,
+        63,
         24
       ],
-      "verified": true,
-      "verify_mismatches": 0,
-      "think_median_ms": [
-        97.22,
-        108.602
-      ],
-      "think_p95_ms": [
-        98.513,
-        125.029
-      ],
-      "think_p99_ms": [
-        99.064,
-        131.103
-      ],
-      "think_max_ms": [
-        99.064,
-        131.103
-      ],
-      "first_choice_rate": [
-        1.0,
-        1.0
-      ],
-      "spin_match_rate": [
-        1.0,
-        0.028
-      ],
-      "attack_match_rate": [
-        1.0,
-        0.847
-      ],
-      "attack_per_piece": [
-        0.658,
-        0.944
-      ],
-      "spin_mismatches": [
-        0,
-        70
-      ],
-      "attack_mismatches_same_spin": [
-        0,
-        0
-      ],
-      "think_over_budget": [
-        0,
-        0
-      ],
-      "sent_total": [
-        19,
-        61
-      ],
-      "received_total": [
-        31,
-        12
-      ],
       "attack_total": [
-        48,
-        68
+        105,
+        146
       ],
       "pieces_placed": [
-        73,
-        72
+        157,
+        156
       ],
-      "start_resends": 5,
+      "start_resends": 12,
       "cells_above_row20": false,
       "queue_invariant_violations": 0,
-      "replay": "replays/seed-9004-sheet-A.jsonl"
-    },
-    {
-      "seed": 9005,
-      "sheet": "A",
-      "winner": 1,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 100,
-      "surge_released": [
-        0,
-        5
-      ],
-      "max_b2b_streak": [
-        3,
-        10
-      ],
-      "turns_with_b2b_ge_4": [
-        0,
-        57
-      ],
-      "verified": true,
-      "verify_mismatches": 0,
-      "think_median_ms": [
-        96.929,
-        110.704
-      ],
-      "think_p95_ms": [
-        98.764,
-        128.668
-      ],
-      "think_p99_ms": [
-        99.26,
-        133.719
-      ],
-      "think_max_ms": [
-        100.61,
-        133.719
-      ],
-      "first_choice_rate": [
-        1.0,
-        1.0
-      ],
-      "spin_match_rate": [
-        1.0,
-        0.111
-      ],
-      "attack_match_rate": [
-        1.0,
-        0.889
-      ],
-      "attack_per_piece": [
-        0.83,
-        1.152
-      ],
-      "spin_mismatches": [
-        0,
-        88
-      ],
-      "attack_mismatches_same_spin": [
-        0,
-        0
-      ],
-      "think_over_budget": [
-        0,
-        0
-      ],
-      "sent_total": [
-        48,
-        91
-      ],
-      "received_total": [
-        56,
-        22
-      ],
-      "attack_total": [
-        83,
-        114
-      ],
-      "pieces_placed": [
-        100,
-        99
-      ],
-      "start_resends": 6,
-      "cells_above_row20": false,
-      "queue_invariant_violations": 0,
-      "replay": "replays/seed-9005-sheet-A.jsonl"
-    },
-    {
-      "seed": 9006,
-      "sheet": "A",
-      "winner": 0,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 44,
-      "surge_released": [
-        0,
-        0
-      ],
-      "max_b2b_streak": [
-        2,
-        6
-      ],
-      "turns_with_b2b_ge_4": [
-        0,
-        23
-      ],
-      "verified": true,
-      "verify_mismatches": 0,
-      "think_median_ms": [
-        97.122,
-        114.181
-      ],
-      "think_p95_ms": [
-        99.28,
-        124.076
-      ],
-      "think_p99_ms": [
-        99.834,
-        131.447
-      ],
-      "think_max_ms": [
-        99.834,
-        131.447
-      ],
-      "first_choice_rate": [
-        1.0,
-        1.0
-      ],
-      "spin_match_rate": [
-        1.0,
-        0.091
-      ],
-      "attack_match_rate": [
-        1.0,
-        0.955
-      ],
-      "attack_per_piece": [
-        0.75,
-        0.614
-      ],
-      "spin_mismatches": [
-        0,
-        40
-      ],
-      "attack_mismatches_same_spin": [
-        0,
-        0
-      ],
-      "think_over_budget": [
-        0,
-        0
-      ],
-      "sent_total": [
-        28,
-        18
-      ],
-      "received_total": [
-        13,
-        19
-      ],
-      "attack_total": [
-        33,
-        27
-      ],
-      "pieces_placed": [
-        44,
-        44
-      ],
-      "start_resends": 6,
-      "cells_above_row20": false,
-      "queue_invariant_violations": 0,
-      "replay": "replays/seed-9006-sheet-A.jsonl"
-    },
-    {
-      "seed": 9007,
-      "sheet": "A",
-      "winner": 1,
-      "reason": "TopOut",
-      "forfeit_cause": null,
-      "turns": 69,
-      "surge_released": [
-        0,
-        0
-      ],
-      "max_b2b_streak": [
-        3,
-        4
-      ],
-      "turns_with_b2b_ge_4": [
-        0,
-        7
-      ],
-      "verified": true,
-      "verify_mismatches": 0,
-      "think_median_ms": [
-        97.18,
-        111.193
-      ],
-      "think_p95_ms": [
-        99.064,
-        125.836
-      ],
-      "think_p99_ms": [
-        99.779,
-        130.463
-      ],
-      "think_max_ms": [
-        99.779,
-        130.463
-      ],
-      "first_choice_rate": [
-        1.0,
-        1.0
-      ],
-      "spin_match_rate": [
-        1.0,
-        0.088
-      ],
-      "attack_match_rate": [
-        1.0,
-        0.853
-      ],
-      "attack_per_piece": [
-        0.826,
-        1.118
-      ],
-      "spin_mismatches": [
-        0,
-        62
-      ],
-      "attack_mismatches_same_spin": [
-        0,
-        0
-      ],
-      "think_over_budget": [
-        0,
-        0
-      ],
-      "sent_total": [
-        40,
-        56
-      ],
-      "received_total": [
-        39,
-        20
-      ],
-      "attack_total": [
-        57,
-        76
-      ],
-      "pieces_placed": [
-        69,
-        68
-      ],
-      "start_resends": 5,
-      "cells_above_row20": false,
-      "queue_invariant_violations": 0,
-      "replay": "replays/seed-9007-sheet-A.jsonl"
+      "replay": "replays/seed-9007-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 157,
+          "fallback_turns": 0,
+          "depth_median": 5.0,
+          "depth_p95": 7.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 459.0,
+          "nodes_p95": 747.0,
+          "nodes_max": 916
+        },
+        {
+          "turns": 156,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 417449.0,
+          "nodes_p95": 492101.0,
+          "nodes_max": 1184416
+        }
+      ]
     },
     {
       "seed": 9008,
@@ -611,36 +807,36 @@
       "winner": 1,
       "reason": "TopOut",
       "forfeit_cause": null,
-      "turns": 105,
+      "turns": 53,
       "surge_released": [
         0,
-        7
+        0
       ],
       "max_b2b_streak": [
-        4,
-        8
+        2,
+        3
       ],
       "turns_with_b2b_ge_4": [
-        2,
-        27
+        0,
+        0
       ],
       "verified": true,
       "verify_mismatches": 0,
       "think_median_ms": [
-        97.083,
-        113.982
+        97.725,
+        112.049
       ],
       "think_p95_ms": [
-        99.234,
-        130.314
+        99.516,
+        131.681
       ],
       "think_p99_ms": [
-        100.544,
-        134.259
+        101.36,
+        140.463
       ],
       "think_max_ms": [
-        113.138,
-        137.738
+        101.36,
+        140.463
       ],
       "first_choice_rate": [
         1.0,
@@ -648,19 +844,19 @@
       ],
       "spin_match_rate": [
         1.0,
-        0.077
+        0.058
       ],
       "attack_match_rate": [
         1.0,
-        0.904
+        0.846
       ],
       "attack_per_piece": [
-        0.676,
-        0.952
+        0.472,
+        0.865
       ],
       "spin_mismatches": [
         0,
-        96
+        49
       ],
       "attack_mismatches_same_spin": [
         0,
@@ -671,25 +867,53 @@
         0
       ],
       "sent_total": [
-        54,
-        61
+        17,
+        42
       ],
       "received_total": [
-        43,
-        13
+        26,
+        14
       ],
       "attack_total": [
-        71,
-        99
+        25,
+        45
       ],
       "pieces_placed": [
-        105,
-        104
+        53,
+        52
       ],
-      "start_resends": 7,
+      "start_resends": 6,
       "cells_above_row20": false,
       "queue_invariant_violations": 0,
-      "replay": "replays/seed-9008-sheet-A.jsonl"
+      "replay": "replays/seed-9008-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 53,
+          "fallback_turns": 0,
+          "depth_median": 5.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 216.0,
+          "width_max": 216,
+          "nodes_median": 507.0,
+          "nodes_p95": 916.0,
+          "nodes_max": 942
+        },
+        {
+          "turns": 52,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 393828.0,
+          "nodes_p95": 507978.0,
+          "nodes_max": 1197987
+        }
+      ]
     },
     {
       "seed": 9009,
@@ -697,36 +921,36 @@
       "winner": 1,
       "reason": "TopOut",
       "forfeit_cause": null,
-      "turns": 210,
+      "turns": 75,
       "surge_released": [
-        17,
-        10
-      ],
-      "max_b2b_streak": [
-        10,
+        0,
         11
       ],
+      "max_b2b_streak": [
+        2,
+        12
+      ],
       "turns_with_b2b_ge_4": [
-        27,
-        72
+        0,
+        37
       ],
       "verified": true,
       "verify_mismatches": 0,
       "think_median_ms": [
-        97.348,
-        111.703
+        97.305,
+        116.249
       ],
       "think_p95_ms": [
-        99.279,
-        130.943
+        98.913,
+        140.966
       ],
       "think_p99_ms": [
-        99.805,
-        133.148
+        99.121,
+        158.829
       ],
       "think_max_ms": [
-        100.258,
-        136.763
+        99.121,
+        158.829
       ],
       "first_choice_rate": [
         1.0,
@@ -734,19 +958,19 @@
       ],
       "spin_match_rate": [
         1.0,
-        0.077
+        0.108
       ],
       "attack_match_rate": [
         1.0,
-        0.833
+        0.919
       ],
       "attack_per_piece": [
-        0.905,
-        1.077
+        0.653,
+        1.081
       ],
       "spin_mismatches": [
         0,
-        193
+        66
       ],
       "attack_mismatches_same_spin": [
         0,
@@ -757,25 +981,53 @@
         0
       ],
       "sent_total": [
-        125,
-        158
+        33,
+        58
       ],
       "received_total": [
-        93,
-        56
+        41,
+        11
       ],
       "attack_total": [
-        190,
-        225
+        49,
+        80
       ],
       "pieces_placed": [
-        210,
-        209
+        75,
+        74
       ],
-      "start_resends": 26,
+      "start_resends": 7,
       "cells_above_row20": false,
       "queue_invariant_violations": 0,
-      "replay": "replays/seed-9009-sheet-A.jsonl"
+      "replay": "replays/seed-9009-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 75,
+          "fallback_turns": 1,
+          "depth_median": 5.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 144.0,
+          "width_max": 216,
+          "nodes_median": 467.0,
+          "nodes_p95": 893.0,
+          "nodes_max": 916
+        },
+        {
+          "turns": 74,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 421568.0,
+          "nodes_p95": 498201.0,
+          "nodes_max": 1177448
+        }
+      ]
     },
     {
       "seed": 9010,
@@ -783,36 +1035,36 @@
       "winner": 1,
       "reason": "TopOut",
       "forfeit_cause": null,
-      "turns": 81,
+      "turns": 100,
       "surge_released": [
-        0,
-        4
-      ],
-      "max_b2b_streak": [
-        2,
+        8,
         5
       ],
+      "max_b2b_streak": [
+        5,
+        6
+      ],
       "turns_with_b2b_ge_4": [
-        0,
+        12,
         11
       ],
       "verified": true,
       "verify_mismatches": 0,
       "think_median_ms": [
-        97.082,
-        109.479
+        97.252,
+        112.704
       ],
       "think_p95_ms": [
-        98.742,
-        131.492
+        99.687,
+        133.87
       ],
       "think_p99_ms": [
-        99.106,
-        145.872
+        100.941,
+        135.854
       ],
       "think_max_ms": [
-        99.106,
-        145.872
+        101.642,
+        135.854
       ],
       "first_choice_rate": [
         1.0,
@@ -820,19 +1072,19 @@
       ],
       "spin_match_rate": [
         1.0,
-        0.063
+        0.061
       ],
       "attack_match_rate": [
         1.0,
-        0.788
+        0.828
       ],
       "attack_per_piece": [
-        0.716,
-        1.138
+        0.7,
+        0.889
       ],
       "spin_mismatches": [
         0,
-        75
+        93
       ],
       "attack_mismatches_same_spin": [
         0,
@@ -843,101 +1095,152 @@
         0
       ],
       "sent_total": [
-        31,
-        76
+        58,
+        53
       ],
       "received_total": [
-        47,
-        16
+        41,
+        23
       ],
       "attack_total": [
-        58,
-        91
+        70,
+        88
       ],
       "pieces_placed": [
-        81,
-        80
+        100,
+        99
       ],
-      "start_resends": 6,
+      "start_resends": 13,
       "cells_above_row20": false,
       "queue_invariant_violations": 0,
-      "replay": "replays/seed-9010-sheet-A.jsonl"
+      "replay": "replays/seed-9010-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 100,
+          "fallback_turns": 0,
+          "depth_median": 5.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 144.0,
+          "width_p95": 216.0,
+          "width_max": 216,
+          "nodes_median": 484.0,
+          "nodes_p95": 899.0,
+          "nodes_max": 916
+        },
+        {
+          "turns": 99,
+          "fallback_turns": 0,
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 423845.0,
+          "nodes_p95": 1147352.0,
+          "nodes_max": 1186942
+        }
+      ]
     }
   ],
-  "wins": 2,
+  "wins": 1,
   "losses": 8,
   "unresolved": 0,
-  "no_contest": 0,
+  "no_contest": 1,
   "stuck": 0,
-  "forfeits": 0,
-  "wins_topout": 2,
+  "forfeits": 1,
+  "wins_topout": 1,
   "wins_turncap": 0,
   "losses_turncap": 0,
   "wins_forfeit_vision": 0,
   "wins_forfeit_other": 0,
   "forfeit_vision": 0,
-  "forfeit_other": 0,
+  "forfeit_other": 1,
   "forfeit_unknown": 0,
   "losses_topout": 8,
   "losses_forfeit": 0,
   "turncap": 0,
   "surge_released": [
-    36,
-    55
+    47,
+    146
   ],
   "max_b2b_streak": [
-    10,
-    12
+    7,
+    19
   ],
   "turns_with_b2b_ge_4": [
-    76,
-    311
+    79,
+    615
   ],
-  "win_rate": 0.2,
-  "wilson_low": 0.0567,
-  "wilson_high": 0.5098,
+  "win_rate": 0.1,
+  "wilson_low": 0.0179,
+  "wilson_high": 0.4042,
   "verified": 10,
   "verify_failures": 0,
   "resumed_games": 0,
-  "measurement_complete": true,
+  "measurement_complete": false,
   "attax_patch_sha256": null,
   "attax": null,
   "bots": [
     {
       "slot": 0,
       "name": "intetrigence",
-      "placements": 1001,
-      "spin_checked": 1001,
+      "placements": 1816,
+      "spin_checked": 1816,
       "spin_mismatches": 0,
-      "attack_checked": 1001,
+      "attack_checked": 1816,
       "attack_mismatches": 0,
       "attack_mismatches_same_spin": 0,
       "think_over_budget": 0,
-      "attack_per_piece": 0.819,
-      "received_per_game": 46.9,
+      "attack_per_piece": 0.751,
+      "received_per_game": 75.8,
       "visible_rows": 40,
-      "mean_height": 8.24,
-      "max_height": 18.5
+      "mean_height": 7.16,
+      "max_height": 20.1,
+      "search_turns": 1816,
+      "fallback_turns": 4,
+      "fallback_rate": 0.002,
+      "depth_median": 5.0,
+      "depth_p95": 8.0,
+      "depth_max": 8,
+      "width_median": 144.0,
+      "width_p95": 144.0,
+      "width_max": 216,
+      "nodes_median": 459.0,
+      "nodes_p95": 772.0,
+      "nodes_max": 942
     },
     {
       "slot": 1,
       "name": "clys",
-      "placements": 993,
-      "spin_checked": 993,
-      "spin_mismatches": 915,
-      "attack_checked": 993,
-      "attack_mismatches": 141,
+      "placements": 1807,
+      "spin_checked": 1807,
+      "spin_mismatches": 1670,
+      "attack_checked": 1807,
+      "attack_mismatches": 260,
       "attack_mismatches_same_spin": 0,
       "think_over_budget": 0,
-      "attack_per_piece": 1.045,
-      "received_per_game": 24.5,
+      "attack_per_piece": 0.965,
+      "received_per_game": 38.6,
       "visible_rows": 40,
-      "mean_height": 7.2,
-      "max_height": 17.2
+      "mean_height": 8.44,
+      "max_height": 19.0,
+      "search_turns": 1807,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "depth_median": null,
+      "depth_p95": null,
+      "depth_max": null,
+      "width_median": null,
+      "width_p95": null,
+      "width_max": null,
+      "nodes_median": 393181.0,
+      "nodes_p95": 579531.0,
+      "nodes_max": 1197987
     }
   ],
   "notes": [
-    "The intetrigence side is the bot recorded in each replay header.",
-    "Tuning smoke vs clys (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
+    "The intetrigence side is the bot recorded in each replay header."
   ]
 }
