@@ -357,26 +357,7 @@ pub fn run_round(
             Some("no legal placement".to_string()),
             None,
         ),
-        End::TurnCap => {
-            let a = &engine.players[0];
-            let b = &engine.players[1];
-            let winner = if a.received_total() != b.received_total() {
-                Some(if a.received_total() < b.received_total() {
-                    0
-                } else {
-                    1
-                })
-            } else if a.sent_total() != b.sent_total() {
-                Some(if a.sent_total() > b.sent_total() {
-                    0
-                } else {
-                    1
-                })
-            } else {
-                None
-            };
-            (winner, "TurnCap".to_string(), None, None)
-        }
+        End::TurnCap => (None, "TurnCap".to_string(), None, None),
         End::Forfeit {
             slot: _,
             detail,
