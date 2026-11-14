@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use intetrigence_core::{Action, ClearInput, Game, GarbageQueue, S2Scoring};
+use intetrigence_core::{Action, ClearInput, Game, GarbageQueue, S2Scoring, SplitMix64};
 
 use crate::eval::EvalContext;
 use crate::movegen::spawn_piece;
@@ -99,7 +99,29 @@ pub fn play_game_with_garbage(
     max_turns: u32,
     injections: &[(u32, u32)],
 ) -> GameReport {
+    play_game_with_setup(seed, config, max_turns, injections, 0)
+}
+
+/// [`play_game_with_garbage`] plus a starting garbage stack.
+///
+/// `start_rows` garbage rows are inserted on the empty board with holes drawn
+/// deterministically from `seed`, mirroring the referee's `defense-stress`
+/// profile. Combined with `injections` this reproduces the composite scenario:
+/// start on a tall board, recover, then absorb late spikes.
+pub fn play_game_with_setup(
+    seed: u64,
+    config: &SearchConfig,
+    max_turns: u32,
+    injections: &[(u32, u32)],
+    start_rows: u32,
+) -> GameReport {
     let mut game = Game::new(seed);
+    if start_rows > 0 {
+        let mut rng = SplitMix64::new(seed ^ 0x1234_5678_9ABC_DEF0);
+        let holes: Vec<u8> = (0..start_rows).map(|_| rng.below(10) as u8).collect();
+        game.insert_garbage(&holes)
+            .expect("an empty board accepts any number of garbage rows");
+    }
     let mut garbage = GarbageQueue::new(seed ^ 0x5DEE_CE66_D1CE_B00F);
     let mut next_injection = 0usize;
     let mut scoring = S2Scoring::new();
@@ -262,6 +284,20 @@ mod tests {
             report.max_think()
         );
         assert!(report.median_think() <= budget * 3);
+    }
+
+    /// A starting stack is inserted before the first turn, so a nearly full
+    /// board ends the game almost immediately.
+    #[test]
+    fn starting_garbage_is_inserted() {
+        let config = quick_config(2);
+        let stressed = play_game_with_setup(1, &config, 60, &[], 19);
+        assert!(
+            stressed.topped_out || stressed.turns < 20,
+            "19 start rows must end the game quickly: {stressed:?}"
+        );
+        let calm = play_game_with_setup(1, &config, 60, &[], 0);
+        assert!(calm.turns > stressed.turns);
     }
 
     #[test]
