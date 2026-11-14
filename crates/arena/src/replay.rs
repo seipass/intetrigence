@@ -618,7 +618,7 @@ fn verify_result(
     } else {
         // A turn-cap is not a decision (no "higher attack wins on timeout" rule
         // exists). The game is unresolved: no winner, and the round gate rejects
-        // any turn-cap.
+        // any turn-cap (protocol v1.27 §7.1.3.1).
         (None, "TurnCap".to_string())
     };
     if winner != result.winner {

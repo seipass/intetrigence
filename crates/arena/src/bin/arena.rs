@@ -644,6 +644,9 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
             .mismatches
             .iter()
             .filter(|mismatch| !mismatch.contains("forfeit_cause"))
+            // Pre-v1.27 turn-cap replays recorded a winner; the new rule
+            // records none. This is a rule change, not a replay error.
+            .filter(|mismatch| !(result.reason == "TurnCap" && mismatch.contains("result winner")))
             .count();
         if non_cause == 0 {
             verified += 1;
