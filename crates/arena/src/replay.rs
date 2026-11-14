@@ -63,6 +63,9 @@ pub struct Header {
     /// verifier rebuilds the same initial boards from this.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub start_garbage: Vec<u8>,
+    /// Deterministic search mode (fixed schedule, no wall-clock deadline).
+    #[serde(default)]
+    pub deterministic: bool,
 }
 
 /// Why a bot forfeited (protocol v1.8 §7.1).

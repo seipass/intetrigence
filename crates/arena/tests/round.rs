@@ -17,6 +17,7 @@ fn config(seed: u64, sheet: Sheet, turn_cap: u32) -> RoundConfig {
         protocol: "docs/s2-referee-protocol.md@v1.9".into(),
         started_at: "test".into(),
         profile: Profile::Official,
+        deterministic: false,
     }
 }
 

@@ -58,6 +58,9 @@ pub struct RoundSpec {
     pub seeds_source: String,
     pub seeds_commit: Option<String>,
     pub build_commit: Option<String>,
+    /// Deterministic search (fixed schedule). The A/B uses this; the official
+    /// round's mode is recorded in the report.
+    pub deterministic: bool,
     pub out_root: PathBuf,
     pub report_path: PathBuf,
     pub bot: BotChoice,
@@ -124,6 +127,8 @@ pub struct RoundReport {
     pub round: u32,
     pub started_at: String,
     pub build_commit: Option<String>,
+    #[serde(default)]
+    pub deterministic: bool,
     pub seeds: Vec<u64>,
     pub seeds_source: String,
     pub seeds_commit: Option<String>,
@@ -517,6 +522,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.resume = spec.resume;
             config.weights_note = spec.weights_note.clone();
             config.build_commit = spec.build_commit.clone();
+            config.deterministic = spec.deterministic;
             match &opponent.kind {
                 OpponentKind::Attax {
                     dir,
@@ -589,6 +595,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         round: spec.round,
         started_at: now_stamp(),
         build_commit: spec.build_commit.clone(),
+        deterministic: spec.deterministic,
         seeds: spec.seeds.clone(),
         seeds_source: spec.seeds_source.clone(),
         seeds_commit: spec.seeds_commit.clone(),

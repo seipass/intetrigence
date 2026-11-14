@@ -142,6 +142,9 @@ pub struct MatchConfig {
     /// is recorded in the audit and the game summary; used to measure the
     /// anytime search's non-determinism.
     pub repeat: u32,
+    /// Deterministic search (fixed schedule, no wall-clock deadline). The
+    /// official round uses this; the replay header and the summary record it.
+    pub deterministic: bool,
     /// Build commit recorded in every replay header. Captured once at the
     /// start of the match: the repository HEAD can move while a long match is
     /// running, and the recorded commit must be the binary's build, not the
@@ -169,6 +172,7 @@ impl MatchConfig {
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
             weights_note: Vec::new(),
             repeat: 1,
+            deterministic: false,
             build_commit: None,
         }
     }
@@ -552,6 +556,9 @@ pub struct MatchSummary {
     /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
     #[serde(default)]
     pub resumed_games: u32,
+    /// Deterministic search mode (fixed schedule, no wall-clock deadline).
+    #[serde(default)]
+    pub deterministic: bool,
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
@@ -1061,6 +1068,7 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         verified,
         verify_failures: games.len() as u32 - verified,
         resumed_games: 0,
+        deterministic: false,
         measurement_complete: false,
         attax_patch_sha256: None,
         attax,
@@ -1443,6 +1451,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     protocol: config.protocol.clone(),
                     started_at: config.started_at.clone(),
                     profile: config.profile,
+                    deterministic: config.deterministic,
                 };
 
                 let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
@@ -1530,6 +1539,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     );
     let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
+    summary.deterministic = config.deterministic;
     summary.measurement_complete = measurement_incomplete == 0;
     summary.attax_patch_sha256 = config
         .attax
@@ -1684,6 +1694,7 @@ mod tests {
             no_contest: 0,
             stuck: 0,
             forfeits: 0,
+            deterministic: false,
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,

@@ -39,6 +39,8 @@ pub struct RoundConfig {
     pub started_at: String,
     /// Match profile (protocol v1.11 §1.3). `Official` is the empty board.
     pub profile: Profile,
+    /// Deterministic search (fixed schedule, no wall-clock deadline).
+    pub deterministic: bool,
 }
 
 impl RoundConfig {
@@ -50,6 +52,7 @@ impl RoundConfig {
             frames_per_turn: 12,
             rules: "docs/s2-spec.md@v1.3.11".into(),
             protocol: "docs/s2-referee-protocol.md@v1.9".into(),
+            deterministic: false,
             started_at: String::new(),
             profile: Profile::Official,
         }
@@ -558,6 +561,7 @@ fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> 
         preview: 5,
         profile: config.profile.as_str(),
         start_garbage: start_garbage.to_vec(),
+        deterministic: config.deterministic,
     }
 }
 
