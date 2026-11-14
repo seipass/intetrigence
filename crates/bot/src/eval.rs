@@ -423,10 +423,21 @@ pub struct EvalContext {
     pub combo: u32,
     /// Pieces placed before the next placement.
     pub pieces_placed: u32,
+<<<<<<< HEAD
     /// Pending garbage rows, including packets still in flight.
     pub incoming: u32,
     /// Arrived garbage rows: the rows a clear on this placement would actually
     /// block (`docs/s2-burst-defense.md` §6.7).
+=======
+    /// Pending garbage rows, including packets that have not arrived yet.
+    pub incoming: u32,
+    /// Pending rows that have **arrived** and can be inserted on this lock.
+    ///
+    /// `incoming` counts packets still in flight; only arrived rows can
+    /// actually appear (`arrival_frame + GARBAGE_SPEED_FRAMES <= frame`), so
+    /// pricing `incoming` as defence pays for garbage that cannot land this
+    /// turn -- which is exactly the single bias `clear[None] = 0` removed.
+>>>>>>> 2ae563c (fix(bot): price defence on arrived garbage, not on the whole queue)
     pub arrived: u32,
     /// Attack lines sent so far in this game.
     pub sent_total: u32,
@@ -531,7 +542,7 @@ pub fn apply_placement(
     // (safe: 13 <= 20) -- it threw away attack while still alive.
     // One appearance inserts at most `GARBAGE_CAP` rows, so the height that
     // matters is `height + min(pending, 8)`, not `height + pending`.
-    let projected = board.height() as u32 + context.incoming.min(GARBAGE_CAP);
+    let projected = board.height() as u32 + context.arrived.min(GARBAGE_CAP);
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.attack * f64::from(attack.total);
     value += if survival {
@@ -539,11 +550,11 @@ pub fn apply_placement(
     } else {
         weights.clear[placement.spin.index()][clear.lines as usize]
     };
-    if clear.lines > 0 && context.incoming >= 1 {
+    if clear.lines > 0 && context.arrived >= 1 {
         // `risk` keeps the term quiet while the stack is low: stopping an
         // appearance only matters when one would kill us.
         let risk = ((board.height() as f64 - 12.0) / 6.0).clamp(0.0, 1.0);
-        value += weights.defense * f64::from(context.incoming.min(GARBAGE_CAP)) * risk;
+        value += weights.defense * f64::from(context.arrived.min(GARBAGE_CAP)) * risk;
     }
     if context.pieces_placed < OPENER_PIECES && clear.lines > 0 {
         value += weights.opener_clear;
@@ -596,6 +607,7 @@ pub fn apply_placement(
         attack.total
     };
     let next_context = EvalContext {
+        arrived: context.arrived,
         sent_total: context.sent_total,
         received_total: context.received_total,
         b2b_streak: attack.b2b_streak_after,
@@ -628,7 +640,7 @@ pub fn leaf_value(
     // (safe: 13 <= 20) -- it threw away attack while still alive.
     // One appearance inserts at most `GARBAGE_CAP` rows, so the height that
     // matters is `height + min(pending, 8)`, not `height + pending`.
-    let projected = board.height() as u32 + context.incoming.min(GARBAGE_CAP);
+    let projected = board.height() as u32 + context.arrived.min(GARBAGE_CAP);
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     // `wait_pieces = 21 - height - pending`: how many pieces can be spent on
     // preparation before a zero-line placement kills. No budget, no
@@ -683,7 +695,7 @@ pub fn leaf_value(
     // unconditionally invites singles.
     // `19` rather than `21`: at exactly 21 there is no guaranteed turn left to
     // clear, so two rows of slack are needed to build the clear.
-    let capped = features.max_height + f64::from(context.incoming.min(GARBAGE_CAP));
+    let capped = features.max_height + f64::from(context.arrived.min(GARBAGE_CAP));
     if capped >= f64::from(SURVIVAL_PROJECTED - 2) {
         value += weights.combo_potential * features.combo_potential;
     }
