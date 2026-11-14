@@ -52,12 +52,10 @@ def classify(audit, turns, result, loser):
     if result["reason"] == "TurnCap":
         return "attrition (turn cap, received more garbage)"
     if result["reason"] == "Forfeit":
+        cause = result.get("forfeit_cause")
         if result["winner"] == 0:
-            attax = audit.get("attax") or {}
-            if attax.get("cells_above_row20"):
-                return "attax forfeit (20-row vision: visible field full)"
-            return "attax forfeit (other)"
-        return "intetrigence forfeit"
+            return f"attax forfeit ({cause or 'unknown'})"
+        return f"intetrigence forfeit ({cause or 'unknown'})"
     # Top-out: look at the loser's last 8 placements.
     last = turns[-8:]
     lines = sum(
@@ -94,12 +92,18 @@ def main():
     draws = summary["draws"]
     forfeits = summary["forfeits"]
     low, high = wilson(wins, len(games))
-    topout_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "TopOut")
-    turncap_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "TurnCap")
-    forfeit_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "Forfeit")
-    bot_forfeits = sum(1 for game in games if game["winner"] == 1 and game["reason"] == "Forfeit")
-    decided = len(games) - forfeit_wins
-    decided_low, decided_high = wilson(topout_wins + turncap_wins, decided)
+    topout_wins = summary["wins_topout"]
+    vision_forfeits = summary["wins_forfeit_vision"]
+    other_forfeits = summary["wins_forfeit_other"]
+    forfeit_wins = vision_forfeits + other_forfeits
+    bot_forfeits = summary["losses_forfeit"]
+    # Non-forfeit games: TopOut + TurnCap. The bot's record there is the
+    # "full 40-row" sample.
+    clean = [game for game in games if game["reason"] != "Forfeit"]
+    clean_wins = sum(1 for game in clean if game["winner"] == 0)
+    clean_losses = sum(1 for game in clean if game["winner"] == 1)
+    decided = len(clean)
+    decided_low, decided_high = wilson(clean_wins, decided)
 
     # Per-sheet split.
     sheet_rows = []
@@ -166,24 +170,15 @@ def main():
     lines.append(
         f"- win rate: **{wins / len(games) * 100:.1f}%** (Wilson 95% CI {low * 100:.1f}%..{high * 100:.1f}%)"
     )
-    vision_forfeits = sum(
-        1
-        for game in games
-        if game["winner"] == 0
-        and game["reason"] == "Forfeit"
-        and (audits[(game["seed"], game["sheet"])].get("attax") or {}).get(
-            "cells_above_row20", False
-        )
+    lines.append(
+        f"- win composition: TopOut {topout_wins}, forfeit-vision {vision_forfeits}, "
+        f"forfeit-other {other_forfeits}; losses: TopOut {summary['losses_topout']}, "
+        f"forfeit {summary['losses_forfeit']}; turn-cap games {summary['turncap']}"
     )
     lines.append(
-        f"- win composition: TopOut {topout_wins}, TurnCap {turncap_wins}, "
-        f"attax forfeit {forfeit_wins} (all: attax's 20-row view cannot place the piece; "
-        f"{vision_forfeits} of them also had cells above row 19)"
-    )
-    lines.append(
-        f"- **40-row top-out / turn-cap games only** (n={decided}): "
-        f"{topout_wins + turncap_wins}/{decided} = "
-        f"**{(topout_wins + turncap_wins) / decided * 100 if decided else 0:.1f}%** "
+        f"- **non-forfeit games (40-row TopOut / TurnCap, n={decided})**: "
+        f"{clean_wins} wins / {clean_losses} losses = "
+        f"**{clean_wins / decided * 100 if decided else 0:.1f}%** "
         f"(Wilson 95% CI {decided_low * 100:.1f}%..{decided_high * 100:.1f}%)"
     )
     lines.append(f"- replay verified: **{verified}/{len(games)}**")

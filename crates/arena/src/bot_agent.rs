@@ -195,6 +195,7 @@ impl Agent for BotAgent {
             version: Some(self.config.version.clone()),
             commit: self.config.commit.clone(),
             args: self.config.args.clone(),
+            visible_rows: 40,
         }
     }
 

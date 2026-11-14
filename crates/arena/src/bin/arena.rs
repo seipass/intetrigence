@@ -132,6 +132,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--threads: {error}"))?;
                 index += 2;
             }
+            "--note" => {
+                config.notes.push(value(1)?);
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -260,7 +264,10 @@ fn cmd_report(args: &[String]) -> Result<(), String> {
     if audits.is_empty() {
         return Err(format!("no audits under {}", dir.join("audit").display()));
     }
-    let summary = summarize(&audits);
+    let summary = summarize(
+        &audits,
+        vec!["The intetrigence side is the bot recorded in each replay header.".into()],
+    );
     summary
         .write(dir)
         .map_err(|error| format!("write summary: {error}"))?;
