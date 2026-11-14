@@ -367,10 +367,22 @@ impl Searcher {
         // budget; a move that hits it returns the last completed level and is
         // recorded as `aborted`, which is a normal time-respecting result.
         let deadline = start + DETERMINISTIC_DEADLINE;
-        // Always sequential: the parallel path is not thread-invariant
-        // (harness-dev measured threads=1 reproducible, threads=2 not), and a
-        // reproducible round is the whole point of this mode.
-        let outcome = self.run_sequential(root, &sequence, depth, width, deadline);
+        // Parallel, but with the workers' clock check disabled: that check is
+        // the only time-dependent branch in the beam, and removing it is what
+        // makes the merge thread-invariant. The real cap stays at the level
+        // boundary, so a level that does not fit the budget is detected there.
+        let outcome = if self.config.threads <= 1 {
+            self.run_sequential(root, &sequence, depth, width, deadline)
+        } else {
+            self.run_parallel_with(
+                root,
+                &sequence,
+                depth,
+                width,
+                deadline,
+                start + Duration::from_secs(3600),
+            )
+        };
         let Some((nodes, candidates, line, completed)) = outcome else {
             return self.greedy(root, start).map(|mut result| {
                 result.fallback = true;
@@ -508,6 +520,24 @@ impl Searcher {
         width: usize,
         deadline: Instant,
     ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
+        self.run_parallel_with(root, sequence, depth, width, deadline, deadline)
+    }
+
+    /// [`Searcher::run_parallel`] with a separate deadline for the workers.
+    ///
+    /// The workers' `Instant::now()` check is the only time-dependent branch in
+    /// the beam, so a deterministic search passes a far-future worker deadline
+    /// and keeps the real cap at the level boundary. That costs the ability to
+    /// stop mid-level, which is why the per-level time has to fit the budget.
+    fn run_parallel_with(
+        &mut self,
+        root: &RootState,
+        sequence: &PieceSequence,
+        depth: usize,
+        width: usize,
+        deadline: Instant,
+        worker_deadline: Instant,
+    ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
         let threads = self.config.threads.clamp(1, MAX_THREADS);
         let weights = &self.config.weights;
         let mut arena = vec![root_record(root)];
@@ -568,7 +598,7 @@ impl Searcher {
                     let job = Job {
                         chunk,
                         level,
-                        deadline,
+                        deadline: worker_deadline,
                         nodes,
                     };
                     if job_txs[chunk].send(job).is_err() {
