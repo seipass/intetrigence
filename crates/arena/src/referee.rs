@@ -116,7 +116,8 @@ enum End {
         loser: usize,
     },
     /// No legal placement with the current piece or hold (protocol v1.6 §7).
-    /// Recorded as a top-out with an explanatory detail.
+    /// Recorded as `Stuck`; `winner = None` (unresolved, protocol v1.27
+    /// §7.1.3.1).
     Stuck {
         loser: usize,
     },
@@ -352,9 +353,9 @@ pub fn run_round(
     let (winner, reason, detail, forfeit_cause) = match &end {
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
         End::Stuck { loser } => (
-            Some(1 - loser),
+            None,
             "Stuck".to_string(),
-            Some("no legal placement".to_string()),
+            Some(format!("no legal placement (slot {loser})")),
             None,
         ),
         End::TurnCap => (None, "TurnCap".to_string(), None, None),

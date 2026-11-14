@@ -170,9 +170,10 @@ pub struct HashRecord {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResultRecord {
-    /// Slot of the winner; `null` is a draw.
+    /// Slot of the winner; `null` for TurnCap/Forfeit/Stuck (no contest or
+    /// unresolved).
     pub winner: Option<u8>,
-    /// `TopOut` | `TurnCap` | `Forfeit`.
+    /// `TopOut` | `Stuck` | `TurnCap` | `Forfeit`.
     pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
@@ -600,12 +601,9 @@ fn verify_result(
         // A forfeit is a no-contest: no winner is recorded.
         (result.winner, result.reason.clone())
     } else if result.reason == "Stuck" {
-        // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
-        // placement even though the game is not block-out.
-        match result.winner.map(|winner| 1 - winner as usize) {
-            Some(loser) if !engine.has_legal_move(loser) => (result.winner, "Stuck".to_string()),
-            _ => (None, "Stuck".to_string()),
-        }
+        // Stuck (protocol v1.6 §7) is unresolved: no winner is recorded
+        // (protocol v1.27 §7.1.3.1).
+        (None, "Stuck".to_string())
     } else if let Some(&loser) = over.first() {
         (Some(1 - loser as u8), "TopOut".to_string())
     } else if result.reason == "TopOut" {
