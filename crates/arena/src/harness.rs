@@ -376,6 +376,15 @@ pub struct GameSummary {
     /// Per-slot search statistics (protocol v1.31 §8.4.1).
     #[serde(default)]
     pub search: [SearchGameSummary; 2],
+    /// `sent_total - received_total` per slot (net damage).
+    #[serde(default)]
+    pub net_damage: [i64; 2],
+    /// Final board height per slot.
+    #[serde(default)]
+    pub final_height: [u32; 2],
+    /// Lines cleared in the opener phase (first 14 placements) per slot.
+    #[serde(default)]
+    pub opener_lines: [u32; 2],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -435,6 +444,18 @@ pub struct BotAggregate {
     pub nodes_p95: Option<f64>,
     #[serde(default)]
     pub nodes_max: Option<u64>,
+    /// Mean `sent_total - received_total` per game.
+    #[serde(default)]
+    pub net_damage_per_game: f64,
+    /// Games with negative net damage.
+    #[serde(default)]
+    pub negative_net_games: u32,
+    /// Games that ended before turn 100 with a final height >= 14.
+    #[serde(default)]
+    pub collapses: u32,
+    /// Mean opener-phase lines (first 14 placements) per game.
+    #[serde(default)]
+    pub opener_lines_per_game: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -674,6 +695,12 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
             search_game_summary(&audit.search[0]),
             search_game_summary(&audit.search[1]),
         ],
+        net_damage: [
+            i64::from(audit.totals[0].sent_total) - i64::from(audit.totals[0].received_total),
+            i64::from(audit.totals[1].sent_total) - i64::from(audit.totals[1].received_total),
+        ],
+        final_height: [audit.heights[0].final_height, audit.heights[1].final_height],
+        opener_lines: audit.opener_lines,
     }
 }
 
@@ -854,6 +881,32 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             nodes_median: search.nodes_median,
             nodes_p95: search.nodes_p95,
             nodes_max: search.nodes_max,
+            net_damage_per_game: if games.is_empty() {
+                0.0
+            } else {
+                games
+                    .iter()
+                    .map(|game| game.net_damage[slot] as f64)
+                    .sum::<f64>()
+                    / games.len() as f64
+            },
+            negative_net_games: games
+                .iter()
+                .filter(|game| game.net_damage[slot] < 0)
+                .count() as u32,
+            collapses: games
+                .iter()
+                .filter(|game| game.final_height[slot] >= 14 && game.turns < 100)
+                .count() as u32,
+            opener_lines_per_game: if games.is_empty() {
+                0.0
+            } else {
+                games
+                    .iter()
+                    .map(|game| f64::from(game.opener_lines[slot]))
+                    .sum::<f64>()
+                    / games.len() as f64
+            },
         }
     });
     MatchSummary {

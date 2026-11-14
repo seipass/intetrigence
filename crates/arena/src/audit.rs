@@ -301,6 +301,9 @@ pub struct GameAudit {
     /// TBP opponents and for the baseline.
     #[serde(default)]
     pub search: [Vec<SearchTurn>; 2],
+    /// Lines cleared in the opener phase (the first 14 placements per slot).
+    #[serde(default)]
+    pub opener_lines: [u32; 2],
 }
 
 impl GameAudit {
