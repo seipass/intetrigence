@@ -613,12 +613,11 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
     }
     files.sort();
     let mut games = 0u32;
-    let mut wins = 0u32;
-    let mut losses = 0u32;
-    let mut draws = 0u32;
     let mut topout_wins = 0u32;
-    let mut turncap_wins = 0u32;
     let mut topout_losses = 0u32;
+    let mut stuck = 0u32;
+    let mut unresolved = 0u32;
+    let mut no_contest = 0u32;
     let mut forfeit_vision = 0u32;
     let mut forfeit_other = 0u32;
     let mut forfeit_unknown = 0u32;
@@ -641,11 +640,6 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         )
         .map_err(|error| format!("verify {}: {error}", file.display()))?;
         games += 1;
-        match result.winner {
-            Some(0) => wins += 1,
-            Some(1) => losses += 1,
-            _ => draws += 1,
-        }
         let non_cause = report
             .mismatches
             .iter()
@@ -675,12 +669,19 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
                 Some((h1, h0))
             })
             .unwrap_or((0, 0));
+        let winner_effective = if result.reason == "TopOut" {
+            result.winner
+        } else {
+            None
+        };
         game_rows.push(serde_json::json!({
             "seed": report.seed,
             "sheet": report.sheet,
             "winner": result.winner,
+            "winner_effective": winner_effective,
             "reason": result.reason,
             "forfeit_cause": report.forfeit_cause.map(|cause| cause.as_str()),
+            "forfeit_slot": result.forfeit_slot,
             "turns": result.turns,
             "attax_max_height": attax_max,
             "intetrigence_max_height": intetrigence_max,
@@ -693,33 +694,33 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
                     topout_losses += 1;
                 }
             }
-            "TurnCap" => {
-                if result.winner == Some(0) {
-                    turncap_wins += 1;
+            "Stuck" => stuck += 1,
+            "TurnCap" => unresolved += 1,
+            "Forfeit" => {
+                no_contest += 1;
+                match report.forfeit_cause {
+                    Some(intetrigence_arena::replay::ForfeitCause::Vision) => forfeit_vision += 1,
+                    Some(intetrigence_arena::replay::ForfeitCause::Other) => forfeit_other += 1,
+                    _ => forfeit_unknown += 1,
                 }
             }
-            "Forfeit" => match report.forfeit_cause {
-                Some(intetrigence_arena::replay::ForfeitCause::Vision) => forfeit_vision += 1,
-                Some(intetrigence_arena::replay::ForfeitCause::Other) => forfeit_other += 1,
-                _ => forfeit_unknown += 1,
-            },
             _ => {}
         }
     }
-    let gate_wins = topout_wins + turncap_wins;
     let summary = serde_json::json!({
         "dir": path.display().to_string(),
         "games": games,
-        "wins": wins,
-        "losses": losses,
-        "draws": draws,
+        "wins": topout_wins,
+        "losses": topout_losses,
+        "unresolved": unresolved,
+        "no_contest": no_contest,
+        "stuck": stuck,
         "topout_wins": topout_wins,
-        "turncap_wins": turncap_wins,
         "topout_losses": topout_losses,
         "forfeit_vision": forfeit_vision,
         "forfeit_other": forfeit_other,
         "forfeit_unknown": forfeit_unknown,
-        "gate_wins": gate_wins,
+        "gate_wins": topout_wins,
         "verified": verified,
         "cause_mismatches": cause_mismatches,
         "game_rows": game_rows,
