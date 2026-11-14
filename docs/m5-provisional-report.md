@@ -33,6 +33,14 @@
 - attax: median 31.0 ms, p95 39.7 ms, p99 46.3 ms, max 421.7 ms
 - placements over the 200 ms budget: intetrigence 1, attax 2
 - first-choice acceptance (mean over games): intetrigence 1.00, attax 1.00
+- **CPU contention caveat**: this 100-game run overlapped with bot-dev's
+  8-thread A/B experiment on the same 8-core machine. In `11008-A` **both**
+  bots' think times spiked in the same game (intetrigence 297.0 ms, attax
+  274.1 ms), which is a machine-wide event rather than a bot-side regression.
+  The think-time numbers and search quality here are therefore a **lower bound
+  under contention**; an idle re-run is needed before using them as a final
+  basis. The over-budget placements are `11008-A` (both bots) and `11033-B`
+  (attax only, 421.7 ms).
 
 ## Attack and garbage
 
@@ -108,6 +116,9 @@
 - attax at this commit is guideline-scored and has a 20-row vision limit; the S2 version is not released upstream (7b38f51 vs upstream 57a5a6a: docs/page-generation only, no scoring/search/vision changes). This match is a **reference value**; the official 90% claim will be made against the attax S2 version with the reserved seeds 20001-20050.
 - spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; intetrigence's labels are backed by rotation-ending input sequences, so the leniency only helps a cell-only client.
 - seeds 11001-11050 are a fresh range unused by either project; the reserved final seeds 20001-20050 were **not** used.
+- the run overlapped with bot-dev's 8-thread A/B experiment (same 8-core
+  machine). The 200 ms spike in `11008-A` hit **both** bots at once, so it is
+  a machine-wide contention event; the strength numbers are a lower bound.
 
 ## Reproduction
 
