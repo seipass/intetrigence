@@ -393,6 +393,9 @@ pub struct AttaxSummary {
 pub struct BotAggregate {
     pub slot: u8,
     pub name: String,
+    /// Build commit recorded in the replay header (captured once per match).
+    #[serde(default)]
+    pub commit: Option<String>,
     pub placements: u32,
     pub spin_checked: u32,
     pub spin_mismatches: u32,
@@ -758,6 +761,9 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .first()
                 .map(|audit| audit.bots[slot].name.clone())
                 .unwrap_or_default(),
+            commit: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].commit.clone()),
             placements: audits
                 .iter()
                 .map(|audit| audit.scoring[slot].placements)
