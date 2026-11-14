@@ -67,6 +67,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut pressure_rows = 4u32;
     let mut from_turn = 200u32;
     let mut self_play = false;
+    let mut resume = false;
     let mut tbp_program: Option<String> = None;
     let mut tbp_args: Vec<String> = Vec::new();
     let mut tbp_cwd: Option<PathBuf> = None;
@@ -190,6 +191,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
             }
             "--self-play" => {
                 self_play = true;
+                index += 1;
+            }
+            "--resume" => {
+                resume = true;
                 index += 1;
             }
             "--tbp-program" => {
@@ -322,6 +327,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         }
     };
     config.self_play = self_play;
+    config.resume = resume;
     config.bot = match bot.as_str() {
         "baseline" => BotChoice::Baseline,
         "search" => {
