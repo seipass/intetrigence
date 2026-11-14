@@ -423,21 +423,10 @@ pub struct EvalContext {
     pub combo: u32,
     /// Pieces placed before the next placement.
     pub pieces_placed: u32,
-<<<<<<< HEAD
     /// Pending garbage rows, including packets still in flight.
     pub incoming: u32,
     /// Arrived garbage rows: the rows a clear on this placement would actually
     /// block (`docs/s2-burst-defense.md` §6.7).
-=======
-    /// Pending garbage rows, including packets that have not arrived yet.
-    pub incoming: u32,
-    /// Pending rows that have **arrived** and can be inserted on this lock.
-    ///
-    /// `incoming` counts packets still in flight; only arrived rows can
-    /// actually appear (`arrival_frame + GARBAGE_SPEED_FRAMES <= frame`), so
-    /// pricing `incoming` as defence pays for garbage that cannot land this
-    /// turn -- which is exactly the single bias `clear[None] = 0` removed.
->>>>>>> 2ae563c (fix(bot): price defence on arrived garbage, not on the whole queue)
     pub arrived: u32,
     /// Attack lines sent so far in this game.
     pub sent_total: u32,
@@ -607,7 +596,6 @@ pub fn apply_placement(
         attack.total
     };
     let next_context = EvalContext {
-        arrived: context.arrived,
         sent_total: context.sent_total,
         received_total: context.received_total,
         b2b_streak: attack.b2b_streak_after,
