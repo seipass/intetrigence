@@ -26,6 +26,8 @@ pub struct AttaxConfig {
     pub bun: String,
     pub commit: Option<String>,
     pub bun_version: Option<String>,
+    /// attax's TBP grid is 40 rows (`src/ai/bot/movegen.ts` ROWS = 40).
+    pub visible_rows: u32,
     pub timeout: Duration,
 }
 
@@ -36,6 +38,7 @@ impl AttaxConfig {
             bun: "bun".into(),
             commit: None,
             bun_version: None,
+            visible_rows: 40,
             timeout: Duration::from_secs(30),
         }
     }
@@ -777,6 +780,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         let mut tbp_config = TbpAgentConfig::new(host);
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();
+                        tbp_config.visible_rows = attax.visible_rows;
                         tbp_config.decision_log = Some(log_path.clone());
                         tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                         Box::new(TbpAgent::new(tbp_config))

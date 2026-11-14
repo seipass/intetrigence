@@ -319,6 +319,17 @@ impl std::error::Error for VerifyError {}
 
 /// Re-runs a replay file and compares every recomputed value with the record.
 pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
+    verify_replay_with_visible_rows(path, None)
+}
+
+/// Like [`verify_replay`], but overrides the bots' declared visible rows.
+///
+/// Used for reclassification: older replays recorded attax's `visible_rows`
+/// as 20, but its TBP grid is 40 rows (`src/ai/bot/movegen.ts`).
+pub fn verify_replay_with_visible_rows(
+    path: &Path,
+    override_rows: Option<[u32; 2]>,
+) -> Result<VerifyReport, VerifyError> {
     let records = read_replay(path)?;
     let header = match records.first() {
         Some(ReplayRecord::Header(header)) => header.clone(),
@@ -330,18 +341,20 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     };
     Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
-    let visible_rows = [
-        header
-            .bots
-            .get("0")
-            .map(|bot| bot.visible_rows)
-            .unwrap_or(0),
-        header
-            .bots
-            .get("1")
-            .map(|bot| bot.visible_rows)
-            .unwrap_or(0),
-    ];
+    let visible_rows = override_rows.unwrap_or_else(|| {
+        [
+            header
+                .bots
+                .get("0")
+                .map(|bot| bot.visible_rows)
+                .unwrap_or(0),
+            header
+                .bots
+                .get("1")
+                .map(|bot| bot.visible_rows)
+                .unwrap_or(0),
+        ]
+    });
     let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
     let mut engine = engine_from_header(&header);
     let mut report = VerifyReport {

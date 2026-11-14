@@ -81,6 +81,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut attax_bun = "bun".to_string();
     let mut attax_commit: Option<String> = None;
     let mut attax_patch: Option<String> = None;
+    let mut attax_visible_rows = 40u32;
     let mut cc2_program: Option<String> = None;
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
@@ -159,6 +160,12 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             }
             "--attax-patch-note" => {
                 attax_patch = Some(value(1)?);
+                index += 2;
+            }
+            "--attax-visible-rows" => {
+                attax_visible_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--attax-visible-rows: {error}"))?;
                 index += 2;
             }
             "--cc2-program" => {
@@ -376,6 +383,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 dir,
                 bun: attax_bun,
                 commit: attax_commit,
+                visible_rows: attax_visible_rows,
             },
         },
         None => OpponentSpec {

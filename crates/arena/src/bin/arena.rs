@@ -74,6 +74,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_suggest_delay_ms = 0u64;
     let mut tbp_retry_empty_ms = 0u64;
     let mut tbp_name = "tbp-bot".to_string();
+    let mut attax_visible_rows = 40u32;
 
     let mut index = 0;
     while index < args.len() {
@@ -225,6 +226,12 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 tbp_name = value(1)?;
                 index += 2;
             }
+            "--attax-visible-rows" => {
+                attax_visible_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--attax-visible-rows: {error}"))?;
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -254,6 +261,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.bun = bun;
         attax_config.commit = commit;
         attax_config.bun_version = bun_version;
+        attax_config.visible_rows = attax_visible_rows;
         attax_config.timeout = Duration::from_secs(timeout);
         config.attax = Some(attax_config);
     }
@@ -543,10 +551,32 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_reclassify(args: &[String]) -> Result<(), String> {
-    let path = args
-        .first()
-        .ok_or_else(|| "reclassify needs a match directory or replay file".to_string())?;
-    let path = Path::new(path);
+    let mut path: Option<PathBuf> = None;
+    let mut visible_rows = 40u32;
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].clone();
+        let value = |offset: usize| -> Result<String, String> {
+            args.get(index + offset)
+                .cloned()
+                .ok_or_else(|| format!("{flag} needs a value"))
+        };
+        match flag.as_str() {
+            "--visible-rows" => {
+                visible_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--visible-rows: {error}"))?;
+                index += 2;
+            }
+            other => {
+                path = Some(PathBuf::from(other));
+                index += 1;
+            }
+        }
+    }
+    let path =
+        path.ok_or_else(|| "reclassify needs a match directory or replay file".to_string())?;
+    let path = path.as_path();
     let mut files = Vec::new();
     if path.is_dir() {
         let replays = path.join("replays");
@@ -586,8 +616,11 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         let Some(result) = result else {
             continue;
         };
-        let report = intetrigence_arena::replay::verify_replay(file)
-            .map_err(|error| format!("verify {}: {error}", file.display()))?;
+        let report = intetrigence_arena::replay::verify_replay_with_visible_rows(
+            file,
+            Some([visible_rows, visible_rows]),
+        )
+        .map_err(|error| format!("verify {}: {error}", file.display()))?;
         games += 1;
         match result.winner {
             Some(0) => wins += 1,

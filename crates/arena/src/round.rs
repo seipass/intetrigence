@@ -30,6 +30,7 @@ pub enum OpponentKind {
         dir: PathBuf,
         bun: String,
         commit: Option<String>,
+        visible_rows: u32,
     },
     Tbp(TbpOpponentConfig),
     /// Not configured for this run (the stage fails if it is reached).
@@ -477,10 +478,16 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.notes = spec.notes.clone();
             config.resume = spec.resume;
             match &opponent.kind {
-                OpponentKind::Attax { dir, bun, commit } => {
+                OpponentKind::Attax {
+                    dir,
+                    bun,
+                    commit,
+                    visible_rows,
+                } => {
                     let mut attax = AttaxConfig::new(dir.clone());
                     attax.bun = bun.clone();
                     attax.commit = commit.clone();
+                    attax.visible_rows = *visible_rows;
                     config.attax = Some(attax);
                 }
                 OpponentKind::Tbp(tbp) => {

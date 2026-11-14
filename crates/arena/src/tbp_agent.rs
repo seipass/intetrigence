@@ -51,7 +51,7 @@ impl TbpAgentConfig {
             bun_version: None,
             decision_log: None,
             name: None,
-            visible_rows: 20,
+            visible_rows: 40,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             transcript: None,
