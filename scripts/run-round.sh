@@ -75,4 +75,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
 fi
 
 cd "$ROOT"
+# Rebuild both binaries explicitly: a stale `arena` binary was once mistaken
+# for a source gap (the `--tbp-*` flags were present but the binary was old).
+echo "building arena + round (release)..."
+cargo build --offline --release -p intetrigence-arena --bin round --bin arena
 cargo run --offline --release -p intetrigence-arena --bin round -- "${ARGS[@]}"

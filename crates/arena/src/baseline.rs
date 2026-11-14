@@ -207,6 +207,9 @@ impl Agent for BaselineBot {
             think_ms,
             nodes: None,
             extra_ms: None,
+            depth: None,
+            width: None,
+            fallback: false,
         })
     }
 

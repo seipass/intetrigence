@@ -58,6 +58,13 @@ pub struct Suggestion {
     /// Search statistics reported by the bot (attax `move_info`).
     pub nodes: Option<u64>,
     pub extra_ms: Option<f64>,
+    /// Completed search depth of the winning iteration (protocol v1.31
+    /// §8.4.1). `None` when the bot does not report it (TBP opponents).
+    pub depth: Option<u32>,
+    /// Beam width of the winning iteration (protocol v1.31 §8.4.1).
+    pub width: Option<u32>,
+    /// True when the move came from the 1-ply greedy fallback.
+    pub fallback: bool,
 }
 
 /// Initial state passed to [`Agent::begin_round`].

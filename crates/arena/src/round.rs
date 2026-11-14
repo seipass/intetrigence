@@ -512,6 +512,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.notes = spec.notes.clone();
             config.resume = spec.resume;
             config.weights_note = spec.weights_note.clone();
+            config.build_commit = spec.build_commit.clone();
             match &opponent.kind {
                 OpponentKind::Attax {
                     dir,
@@ -626,6 +627,18 @@ fn mean(values: impl Iterator<Item = f64>) -> f64 {
     } else {
         total / count as f64
     }
+}
+
+fn opt_f64(value: Option<f64>) -> String {
+    value
+        .map(|value| format!("{value:.1}"))
+        .unwrap_or_else(|| "n/a".into())
+}
+
+fn opt_u32(value: Option<u32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "n/a".into())
 }
 
 fn stage_section(
@@ -752,6 +765,22 @@ fn stage_section(
         think(1, |game| game.think_p99_ms),
         think_max(1)
     )?;
+    {
+        let bot = &summary.bots[0];
+        writeln!(
+            out,
+            "- search (intetrigence): depth median / p95 / max **{} / {} / {}**, width **{} / {} / {}**, fallback **{}/{} ({:.1}%)**",
+            opt_f64(bot.depth_median),
+            opt_f64(bot.depth_p95),
+            opt_u32(bot.depth_max),
+            opt_f64(bot.width_median),
+            opt_f64(bot.width_p95),
+            opt_u32(bot.width_max),
+            bot.fallback_turns,
+            bot.search_turns,
+            bot.fallback_rate * 100.0
+        )?;
+    }
     writeln!(
         out,
         "- think over 200 ms: {} vs {}",
