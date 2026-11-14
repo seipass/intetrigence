@@ -369,12 +369,14 @@ impl Default for Weights {
             // double 0.50, triple 0.67, quad 1.25, TSS 3.00, TSD 2.50. A TSD
             // is therefore worth twice a quad, and the measured spin line
             // ratio is 16% against the 23% that attack/line 1.73 needs.
-            // A single must be *better* than clearing nothing: the old
-            // `-14` made the bot prefer stacking over clearing, which is what
-            // produced the nine- and ten-turn zero-line runs in the 9007-B
-            // collapse.
+            // No bonus for a plain clear: `weights.attack * attack.total`
+            // already prices it exactly, and `compute_attack` returns 0 for a
+            // single, 1 for a double, 5 for a quad or a TSD, 11 for a mini
+            // quad. The old `-14` for a single made clearing *worse* than
+            // stacking, which is what produced the nine- and ten-turn
+            // zero-line runs in the 9007-B collapse.
             clear: [
-                [0.0, -2.0, 2.0, 8.0, 20.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
                 [0.0, -5.0, 2.0, 8.0, 30.0],
                 [0.0, 20.0, 40.0, 40.0, 50.0],
             ],
@@ -601,10 +603,16 @@ pub fn leaf_value(
     // (safe: 13 <= 20) -- it threw away attack while still alive.
     let projected = board.height() as u32 + context.incoming;
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
+    // `wait_pieces = 21 - height - pending`: how many pieces can be spent on
+    // preparation before a zero-line placement kills. No budget, no
+    // preparation.
+    let wait_pieces =
+        (SURVIVAL_PROJECTED as i32 - board.height() as i32 - context.incoming as i32).max(0);
+    let readiness_scale = (f64::from(wait_pieces) / 4.0).min(1.0);
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.danger_height * features.danger_height
-        + weights.quad_ready * features.quad_ready
+        + readiness_scale * weights.quad_ready * features.quad_ready
         + weights.holes * features.holes
         + weights.hole_cover * features.hole_cover
         + weights.hole_rows * features.hole_rows
@@ -643,11 +651,16 @@ pub fn leaf_value(
     // combo 5+ therefore pushes the bot to trade TSDs and quads for singles.
     let combo = f64::from(context.combo.min(COMBO_CAP));
     value += weights.combo_state * (1.25 * combo + 1.0).ln();
-    value += weights.combo_potential * features.combo_potential;
+    // Only worth something when the next clear can stop a garbage packet from
+    // appearing: a "one cell short" row is also a single, so pricing it
+    // unconditionally invites singles.
+    if projected >= f64::from(SURVIVAL_PROJECTED) {
+        value += weights.combo_potential * features.combo_potential;
+    }
     value -= weights.incoming * f64::from(context.incoming);
     let race = i64::from(context.sent_total) - i64::from(context.received_total);
     value += weights.race * race as f64;
-    value += t_slot_cutout_with_heights(board, &heights, t_available, weights);
+    value += readiness_scale * t_slot_cutout_with_heights(board, &heights, t_available, weights);
     value
 }
 
