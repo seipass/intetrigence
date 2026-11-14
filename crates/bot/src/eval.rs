@@ -30,6 +30,9 @@ pub const COLUMNS: usize = 10;
 /// bursts are absorbed by a bot sitting at height 3-5.
 pub const SURGE_LETHAL: u32 = 8;
 
+/// Pieces in the S2 opener phase.
+pub const OPENER_PIECES: u32 = 14;
+
 /// Combo value above which the state term stops growing. Attack/piece peaks at
 /// combo 3-4 and declines after that.
 pub const COMBO_CAP: u32 = 4;
@@ -231,6 +234,13 @@ pub struct Weights {
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
     pub danger_height: f64,
+    /// Bonus for clearing at least one line during the opener phase.
+    /// S2 doubles the cancellation while the opener is active, but the extra
+    /// budget equals the *attack*, not the lines, so a single (attack 0)
+    /// cancels nothing. Measured on the 9007-B collapse: 23 lines for 15
+    /// attack (attack/line 0.65) against the opponent's 16 lines for 28
+    /// (1.75), with a nine-turn zero-line run at the start.
+    pub opener_clear: f64,
     /// Value of the combo state itself: `combo_state * ln(1.25*combo + 1)`.
     /// S2 pays `base * (1 + 0.25*combo)` and lifts `base` to
     /// `ln(1.25*combo + 1)` once combo >= 2, so a live combo is a *state* with
@@ -322,6 +332,7 @@ impl Default for Weights {
             height_sq: 0.0,
             danger_height: -12.0,
             race: 1.0,
+            opener_clear: 20.0,
             combo_state: 40.0,
             combo_potential: 6.0,
             holes: -30.0,
@@ -488,6 +499,9 @@ pub fn apply_placement(
     } else {
         weights.clear[placement.spin.index()][clear.lines as usize]
     };
+    if context.pieces_placed < OPENER_PIECES && clear.lines > 0 {
+        value += weights.opener_clear;
+    }
     if placement.spin == SpinType::Full && clear.lines == 2 {
         value += weights.tsd_bonus;
     }
@@ -1019,7 +1033,8 @@ mod tests {
         let (_, opener_reward, _) = apply_placement(&board, tsd, &opener, &weights);
         let (_, late_reward, _) = apply_placement(&board, tsd, &late, &weights);
         assert_eq!(opener_reward.attack, late_reward.attack);
-        let expected = weights.opener_attack * f64::from(opener_reward.attack);
+        let expected =
+            weights.opener_attack * f64::from(opener_reward.attack) + weights.opener_clear;
         assert!((opener_reward.value - late_reward.value - expected).abs() < 1e-9);
     }
 
