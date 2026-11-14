@@ -1097,6 +1097,28 @@ impl MatchSummary {
 /// The opponent does not play the last turn when it wins (the game ends on the
 /// loser's turn), so the caller passes the opponent's turn count, not the
 /// replay's total turns.
+/// Recompute the opener-phase lines (first 14 placements per slot) from a
+/// replay. Used when a verified game is resumed: the audit may predate the
+/// `opener_lines` field.
+fn opener_lines_from_replay(path: &std::path::Path) -> [u32; 2] {
+    let mut lines = [0u32; 2];
+    let mut placements = [0u32; 2];
+    if let Ok(records) = crate::replay::read_replay(path) {
+        for record in &records {
+            if let crate::replay::ReplayRecord::Turn(turn) = record {
+                for placement in &turn.placements {
+                    let slot = placement.slot as usize;
+                    if slot < 2 && placements[slot] < 14 {
+                        lines[slot] += u32::from(placement.lines);
+                        placements[slot] += 1;
+                    }
+                }
+            }
+        }
+    }
+    lines
+}
+
 fn check_opponent_log(
     path: &std::path::Path,
     expected_suggestions: u32,
@@ -1208,6 +1230,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         if let Ok(text) = std::fs::read_to_string(&audit_path) {
                             if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
                                 audit.verify = verify;
+                                audit.opener_lines = opener_lines_from_replay(&replay_path);
                                 println!("{name}: resumed (verified)");
                                 audits.push(audit);
                                 resumed_games += 1;

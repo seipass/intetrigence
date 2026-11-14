@@ -38,6 +38,10 @@
   144 / 144 / 216, fallback **19/4432 = 0.4%**; clys **5 / 8 / 8**, width
   144 / 144 / 216, fallback **4/1816 = 0.2%**.
 - think median: intetrigence 97.4–98.0 ms; CC2 ~100.1 ms; clys ~110 ms.
+- **net damage** (`sent_total - received_total`): CC2 **+34.15/game**, 2
+  negative games; clys **+17.3/game**, 3 negative games.
+- **collapses** (final height >= 14 and turn < 100): CC2 **1**; clys **3**.
+- **opener lines** (first 14 placements): CC2 **3.65/game**; clys **4.3/game**.
 
 ### CC2 per game
 
@@ -106,6 +110,9 @@ normally a forfeit.
 - **The attack targets are not met**: attack/piece 0.719 (target ≥1.10),
   combo 0 59.9% (target ≤45%), combo 3–4 10.4% (target ≥15%), received/game
   69.05 (target ≤55). The search is working; the evaluation is the gap.
+- **The CC2 collapse/negative-net targets are close**: 1 collapse and 2
+  negative-net games in 20 (the manager's target is 0). The clys stage is far
+  on both (3 collapses, 3 negative-net games in 10).
 - **clys is the hard stage**: 1/9 TopOut (11.1%), and the process exit is a
   separate blocker. The clys bot is deeper (its think ~110 ms with a native
   search); the current evaluation loses the attack race.

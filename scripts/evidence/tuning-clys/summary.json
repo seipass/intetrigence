@@ -115,6 +115,18 @@
           "nodes_p95": 1119790.0,
           "nodes_max": 1183937
         }
+      ],
+      "net_damage": [
+        21,
+        98
+      ],
+      "final_height": [
+        17,
+        3
+      ],
+      "opener_lines": [
+        5,
+        2
       ]
     },
     {
@@ -229,6 +241,18 @@
           "nodes_p95": 1151104.0,
           "nodes_max": 1191863
         }
+      ],
+      "net_damage": [
+        23,
+        16
+      ],
+      "final_height": [
+        8,
+        21
+      ],
+      "opener_lines": [
+        6,
+        4
       ]
     },
     {
@@ -343,6 +367,18 @@
           "nodes_p95": 434602.0,
           "nodes_max": 1179855
         }
+      ],
+      "net_damage": [
+        -17,
+        76
+      ],
+      "final_height": [
+        17,
+        6
+      ],
+      "opener_lines": [
+        5,
+        2
       ]
     },
     {
@@ -457,6 +493,18 @@
           "nodes_p95": 509895.0,
           "nodes_max": 1188951
         }
+      ],
+      "net_damage": [
+        99,
+        260
+      ],
+      "final_height": [
+        9,
+        18
+      ],
+      "opener_lines": [
+        4,
+        4
       ]
     },
     {
@@ -571,6 +619,18 @@
           "nodes_p95": 505790.0,
           "nodes_max": 1194758
         }
+      ],
+      "net_damage": [
+        32,
+        161
+      ],
+      "final_height": [
+        19,
+        4
+      ],
+      "opener_lines": [
+        4,
+        4
       ]
     },
     {
@@ -685,6 +745,18 @@
           "nodes_p95": 524211.0,
           "nodes_max": 1189423
         }
+      ],
+      "net_damage": [
+        6,
+        33
+      ],
+      "final_height": [
+        19,
+        10
+      ],
+      "opener_lines": [
+        4,
+        2
       ]
     },
     {
@@ -799,6 +871,18 @@
           "nodes_p95": 492101.0,
           "nodes_max": 1184416
         }
+      ],
+      "net_damage": [
+        9,
+        74
+      ],
+      "final_height": [
+        16,
+        8
+      ],
+      "opener_lines": [
+        4,
+        2
       ]
     },
     {
@@ -913,6 +997,18 @@
           "nodes_p95": 507978.0,
           "nodes_max": 1197987
         }
+      ],
+      "net_damage": [
+        -9,
+        28
+      ],
+      "final_height": [
+        22,
+        6
+      ],
+      "opener_lines": [
+        3,
+        4
       ]
     },
     {
@@ -1027,6 +1123,18 @@
           "nodes_p95": 498201.0,
           "nodes_max": 1177448
         }
+      ],
+      "net_damage": [
+        -8,
+        47
+      ],
+      "final_height": [
+        19,
+        6
+      ],
+      "opener_lines": [
+        5,
+        2
       ]
     },
     {
@@ -1141,6 +1249,18 @@
           "nodes_p95": 1147352.0,
           "nodes_max": 1186942
         }
+      ],
+      "net_damage": [
+        17,
+        30
+      ],
+      "final_height": [
+        19,
+        9
+      ],
+      "opener_lines": [
+        3,
+        2
       ]
     }
   ],
@@ -1178,14 +1298,15 @@
   "wilson_high": 0.4042,
   "verified": 10,
   "verify_failures": 0,
-  "resumed_games": 0,
-  "measurement_complete": false,
+  "resumed_games": 10,
+  "measurement_complete": true,
   "attax_patch_sha256": null,
   "attax": null,
   "bots": [
     {
       "slot": 0,
       "name": "intetrigence",
+      "commit": "121a8cf",
       "placements": 1816,
       "spin_checked": 1816,
       "spin_mismatches": 0,
@@ -1209,11 +1330,16 @@
       "width_max": 216,
       "nodes_median": 459.0,
       "nodes_p95": 772.0,
-      "nodes_max": 942
+      "nodes_max": 942,
+      "net_damage_per_game": 17.3,
+      "negative_net_games": 3,
+      "collapses": 3,
+      "opener_lines_per_game": 4.3
     },
     {
       "slot": 1,
       "name": "clys",
+      "commit": null,
       "placements": 1807,
       "spin_checked": 1807,
       "spin_mismatches": 1670,
@@ -1237,7 +1363,11 @@
       "width_max": null,
       "nodes_median": 393181.0,
       "nodes_p95": 579531.0,
-      "nodes_max": 1197987
+      "nodes_max": 1197987,
+      "net_damage_per_game": 82.3,
+      "negative_net_games": 0,
+      "collapses": 1,
+      "opener_lines_per_game": 2.8
     }
   ],
   "notes": [
