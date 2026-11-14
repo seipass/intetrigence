@@ -88,6 +88,8 @@ pub struct View {
     pub can_hold: bool,
     /// Five preview pieces (`docs/s2-spec.md` §2.6).
     pub preview: Vec<PieceKind>,
+    /// Pieces left in the current 7-bag (TBP `start.randomizer`).
+    pub bag_state: Vec<PieceKind>,
     /// Combo before this placement (0 = no chain).
     pub combo: u32,
     /// Consecutive difficult clears `N` before this placement.
@@ -440,6 +442,36 @@ impl Profile {
     }
 }
 
+/// Bag state at the tail of the six-entry TBP queue (active + 5 preview).
+///
+/// TBP `start.randomizer.bag_state` is the bag at the **end of the queue**, not
+/// the bag the active piece came from: the five preview pieces may cross a bag
+/// boundary. `Game::bag_state()` gives the current bag after the active piece;
+/// `preview(5 + tail_len)` then yields the tail bag's remaining pieces.
+pub fn tail_bag_state(game: &mut intetrigence_core::Game) -> Vec<PieceKind> {
+    use intetrigence_core::ALL_PIECES;
+    let mut current = game.bag_state().remaining;
+    let queue = game.preview(5);
+    let mut next: Option<Vec<PieceKind>> = None;
+    for piece in queue {
+        if let Some(position) = current.iter().position(|&candidate| candidate == piece) {
+            current.remove(position);
+        } else {
+            let next_bag = next.get_or_insert_with(|| ALL_PIECES.to_vec());
+            if let Some(position) = next_bag.iter().position(|&candidate| candidate == piece) {
+                next_bag.remove(position);
+            }
+            current = next_bag.clone();
+        }
+    }
+    if current.is_empty() {
+        // The queue ends exactly at a bag boundary: the tail bag is the next
+        // (full) bag.
+        current = ALL_PIECES.to_vec();
+    }
+    current
+}
+
 /// The referee's round state for both players.
 #[derive(Clone, Debug)]
 pub struct Engine {
@@ -522,6 +554,7 @@ impl Engine {
             hold: player.game.held_piece(),
             can_hold: player.game.can_hold(),
             preview: player.game.preview(5),
+            bag_state: tail_bag_state(&mut player.game),
             combo: player.scoring.state.combo,
             b2b_streak: player.scoring.state.b2b_streak,
             pending_garbage: player.garbage.queue_total(),

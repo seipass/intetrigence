@@ -26,6 +26,12 @@ pub struct AttaxConfig {
     pub bun: String,
     pub commit: Option<String>,
     pub bun_version: Option<String>,
+    /// attax's TBP grid rows. `0` auto-detects from
+    /// `<dir>/src/ai/bot/movegen.ts` (`ROWS = N`); upstream `7b38f51` is 20,
+    /// the vision patch sets 40.
+    pub visible_rows: u32,
+    /// SHA-256 of the compatibility patch applied to attax (if any).
+    pub patch_sha256: Option<String>,
     pub timeout: Duration,
 }
 
@@ -36,12 +42,50 @@ impl AttaxConfig {
             bun: "bun".into(),
             commit: None,
             bun_version: None,
+            visible_rows: 0,
+            patch_sha256: None,
             timeout: Duration::from_secs(30),
         }
     }
 
     pub fn entry_point(&self) -> PathBuf {
         self.dir.join("tbp").join("attax-tbp.ts")
+    }
+}
+
+/// A generic TBP opponent (CC2, clys through a TBP adapter, ...).
+#[derive(Clone, Debug)]
+pub struct TbpOpponentConfig {
+    /// Display name recorded in the replay header and audit.
+    pub name: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub cwd: Option<PathBuf>,
+    pub env: Vec<(String, String)>,
+    pub commit: Option<String>,
+    /// Rows the bot can see (20 for attax, 40 for full-board bots).
+    pub visible_rows: u32,
+    /// Delay before each `suggest` (budget for continuously-searching bots).
+    pub suggest_delay_ms: u64,
+    /// Retry an empty `suggest` for this long (CC2 race).
+    pub retry_empty_suggest_ms: u64,
+    pub timeout: Duration,
+}
+
+impl TbpOpponentConfig {
+    pub fn new(name: impl Into<String>, program: impl Into<String>, args: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            program: program.into(),
+            args,
+            cwd: None,
+            env: Vec::new(),
+            commit: None,
+            visible_rows: 40,
+            suggest_delay_ms: 0,
+            retry_empty_suggest_ms: 0,
+            timeout: Duration::from_secs(30),
+        }
     }
 }
 
@@ -62,6 +106,8 @@ pub struct MatchConfig {
     pub frames_per_turn: u64,
     pub out_dir: PathBuf,
     pub attax: Option<AttaxConfig>,
+    /// Generic TBP opponent (takes precedence over `attax` when set).
+    pub tbp_opponent: Option<TbpOpponentConfig>,
     pub started_at: String,
     /// Provenance string recorded in every replay header.
     pub rules: String,
@@ -73,9 +119,14 @@ pub struct MatchConfig {
     pub profile: Profile,
     /// Run both slots with the in-process search (self-play diagnostic).
     pub self_play: bool,
+    /// Reuse already verified `(seed, sheet)` games in `out_dir` (protocol
+    /// v1.18 §1.4). Only valid with the same build and seeds.
+    pub resume: bool,
     /// Notes written into the summary. Set per match so the M0 plumbing run and
     /// the M2 real-bot run cannot inherit each other's wording.
     pub notes: Vec<String>,
+    /// Weight overrides applied to the search, recorded in the replay header.
+    pub weights_note: Vec<String>,
 }
 
 impl MatchConfig {
@@ -87,15 +138,104 @@ impl MatchConfig {
             frames_per_turn: 12,
             out_dir: out_dir.into(),
             attax: None,
+            tbp_opponent: None,
             started_at: now_stamp(),
             rules: version_string("docs/s2-spec.md", "v1.3.11"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
             profile: Profile::Official,
             self_play: false,
+            resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
+            weights_note: Vec::new(),
         }
     }
+}
+
+/// Parses `key=value[,key=value]` weight overrides.
+pub fn parse_weight_overrides(text: &str) -> Result<Vec<(String, String)>, String> {
+    let mut overrides = Vec::new();
+    for part in text.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (key, value) = part
+            .split_once('=')
+            .ok_or_else(|| format!("weight override `{part}` needs key=value"))?;
+        overrides.push((key.trim().to_string(), value.trim().to_string()));
+    }
+    Ok(overrides)
+}
+
+/// Applies weight overrides to `Weights`. Unknown keys are rejected; the
+/// defaults are untouched when the list is empty (bit-identical behaviour).
+pub fn apply_weight_overrides(
+    weights: &mut intetrigence_bot::Weights,
+    overrides: &[(String, String)],
+) -> Result<(), String> {
+    for (key, value) in overrides {
+        let number = |value: &str| -> Result<f64, String> {
+            value
+                .parse::<f64>()
+                .map_err(|error| format!("weight `{key}`: {error}"))
+        };
+        match key.as_str() {
+            "max_height" => weights.max_height = number(value)?,
+            "height_sq" => weights.height_sq = number(value)?,
+            "holes" => weights.holes = number(value)?,
+            "hole_cover" => weights.hole_cover = number(value)?,
+            "hole_rows" => weights.hole_rows = number(value)?,
+            "bumpiness" => weights.bumpiness = number(value)?,
+            "bumpiness_sq" => weights.bumpiness_sq = number(value)?,
+            "row_transitions" => weights.row_transitions = number(value)?,
+            "well_depth" => weights.well_depth = number(value)?,
+            "extra_wells" => weights.extra_wells = number(value)?,
+            "danger_projected" => weights.danger_projected = number(value)?,
+            "garbage_rows" => weights.garbage_rows = number(value)?,
+            "attack" => weights.attack = number(value)?,
+            "perfect_clear" => weights.perfect_clear = number(value)?,
+            "b2b_break" => weights.b2b_break = number(value)?,
+            "wasted_t" => weights.wasted_t = number(value)?,
+            "surge_charge" => weights.surge_charge = number(value)?,
+            "combo" => weights.combo = number(value)?,
+            "opener_attack" => weights.opener_attack = number(value)?,
+            "garbage_clear" => weights.garbage_clear = number(value)?,
+            "incoming" => weights.incoming = number(value)?,
+            "softdrop" => weights.softdrop = number(value)?,
+            "discount" => weights.discount = number(value)?,
+            "surge_exponent" => weights.surge_exponent = number(value)?,
+            "surge_hold_penalty" => weights.surge_hold_penalty = number(value)?,
+            "survival_line" => weights.survival_line = number(value)?,
+            "survival" => {
+                weights.survival = match value.as_str() {
+                    "1" | "true" | "yes" => true,
+                    "0" | "false" | "no" => false,
+                    other => return Err(format!("weight `survival`: bad bool `{other}`")),
+                }
+            }
+            other => return Err(format!("unknown weight `{other}`")),
+        }
+    }
+    Ok(())
+}
+
+/// Reads attax's board rows from its movegen source. Falls back to 20 (the
+/// upstream `7b38f51` value) when the file is missing or unparseable.
+pub fn detect_attax_visible_rows(dir: &Path) -> u32 {
+    let path = dir.join("src").join("ai").join("bot").join("movegen.ts");
+    if let Ok(text) = std::fs::read_to_string(path) {
+        for line in text.lines() {
+            let line = line.trim();
+            if let Some(rest) = line.strip_prefix("export const ROWS =") {
+                let value = rest.trim().trim_end_matches(';').trim();
+                if let Ok(rows) = value.parse::<u32>() {
+                    return rows;
+                }
+            }
+        }
+    }
+    20
 }
 
 /// Repository root (the arena crate lives at `<root>/crates/arena`).
@@ -162,10 +302,20 @@ pub struct GameSummary {
     /// `vision` | `other` | `unknown` for Forfeit results.
     pub forfeit_cause: Option<String>,
     pub turns: u32,
+    #[serde(default)]
+    pub surge_released: [u32; 2],
+    #[serde(default)]
+    pub max_b2b_streak: [u32; 2],
+    #[serde(default)]
+    pub turns_with_b2b_ge_4: [u32; 2],
     pub verified: bool,
     pub verify_mismatches: usize,
     pub think_median_ms: [f64; 2],
     pub think_p95_ms: [f64; 2],
+    #[serde(default)]
+    pub think_p99_ms: [f64; 2],
+    #[serde(default)]
+    pub think_max_ms: [f64; 2],
     pub first_choice_rate: [f64; 2],
     pub spin_match_rate: [f64; 2],
     pub attack_match_rate: [f64; 2],
@@ -224,20 +374,53 @@ pub struct MatchSummary {
     pub games: Vec<GameSummary>,
     pub wins: u32,
     pub losses: u32,
-    pub draws: u32,
+    /// TurnCap games (no winner decided).
+    #[serde(default)]
+    pub unresolved: u32,
+    /// Forfeit games (no contest; no winner recorded).
+    #[serde(default)]
+    pub no_contest: u32,
+    /// Stuck top-outs (no legal placement, not block-out).
+    #[serde(default)]
+    pub stuck: u32,
     pub forfeits: u32,
     /// Win/loss breakdown (protocol v1.8 §7.1).
     pub wins_topout: u32,
+    #[serde(default)]
+    pub wins_turncap: u32,
+    #[serde(default)]
+    pub losses_turncap: u32,
     pub wins_forfeit_vision: u32,
     pub wins_forfeit_other: u32,
+    #[serde(default)]
+    pub forfeit_vision: u32,
+    #[serde(default)]
+    pub forfeit_other: u32,
+    #[serde(default)]
+    pub forfeit_unknown: u32,
     pub losses_topout: u32,
     pub losses_forfeit: u32,
     pub turncap: u32,
+    #[serde(default)]
+    pub surge_released: [u32; 2],
+    #[serde(default)]
+    pub max_b2b_streak: [u32; 2],
+    #[serde(default)]
+    pub turns_with_b2b_ge_4: [u32; 2],
     pub win_rate: f64,
     pub wilson_low: f64,
     pub wilson_high: f64,
     pub verified: u32,
     pub verify_failures: u32,
+    /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
+    #[serde(default)]
+    pub resumed_games: u32,
+    /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
+    #[serde(default)]
+    pub measurement_complete: bool,
+    /// SHA-256 of the attax compatibility patch applied for this match.
+    #[serde(default)]
+    pub attax_patch_sha256: Option<String>,
     pub attax: Option<AttaxSummary>,
     pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
@@ -277,10 +460,15 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         reason: audit.reason.clone(),
         forfeit_cause: audit.forfeit_cause.map(|cause| cause.as_str().to_string()),
         turns: audit.turns,
+        surge_released: audit.surge_released,
+        max_b2b_streak: audit.max_b2b_streak,
+        turns_with_b2b_ge_4: audit.turns_with_b2b_ge_4,
         verified: audit.verify.ok,
         verify_mismatches: audit.verify.mismatches.len(),
         think_median_ms: [audit.think[0].median_ms, audit.think[1].median_ms],
         think_p95_ms: [audit.think[0].p95_ms, audit.think[1].p95_ms],
+        think_p99_ms: [audit.think[0].p99_ms, audit.think[1].p99_ms],
+        think_max_ms: [audit.think[0].max_ms, audit.think[1].max_ms],
         first_choice_rate: [audit.first_choice[0].rate, audit.first_choice[1].rate],
         spin_match_rate: [spin_rate(audit, 0), spin_rate(audit, 1)],
         attack_match_rate: [attack_rate(audit, 0), attack_rate(audit, 1)],
@@ -320,11 +508,21 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
     let games: Vec<GameSummary> = audits.iter().map(game_summary).collect();
     let wins = games.iter().filter(|game| game.winner == Some(0)).count() as u32;
     let losses = games.iter().filter(|game| game.winner == Some(1)).count() as u32;
-    let draws = games.iter().filter(|game| game.winner.is_none()).count() as u32;
+    let unresolved = games.iter().filter(|game| game.reason == "TurnCap").count() as u32;
+    let no_contest = games.iter().filter(|game| game.reason == "Forfeit").count() as u32;
+    let stuck = games.iter().filter(|game| game.reason == "Stuck").count() as u32;
     let forfeits = games.iter().filter(|game| game.reason == "Forfeit").count() as u32;
     let wins_topout = games
         .iter()
         .filter(|game| game.winner == Some(0) && game.reason == "TopOut")
+        .count() as u32;
+    let wins_turncap = games
+        .iter()
+        .filter(|game| game.winner == Some(0) && game.reason == "TurnCap")
+        .count() as u32;
+    let losses_turncap = games
+        .iter()
+        .filter(|game| game.winner == Some(1) && game.reason == "TurnCap")
         .count() as u32;
     let wins_forfeit_vision = games
         .iter()
@@ -339,7 +537,25 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         .filter(|game| {
             game.winner == Some(0)
                 && game.reason == "Forfeit"
-                && game.forfeit_cause.as_deref() != Some("vision")
+                && game.forfeit_cause.as_deref() == Some("other")
+        })
+        .count() as u32;
+    let forfeit_vision = games
+        .iter()
+        .filter(|game| game.reason == "Forfeit" && game.forfeit_cause.as_deref() == Some("vision"))
+        .count() as u32;
+    let forfeit_other = games
+        .iter()
+        .filter(|game| game.reason == "Forfeit" && game.forfeit_cause.as_deref() == Some("other"))
+        .count() as u32;
+    let forfeit_unknown = games
+        .iter()
+        .filter(|game| {
+            game.reason == "Forfeit"
+                && !matches!(
+                    game.forfeit_cause.as_deref(),
+                    Some("vision") | Some("other")
+                )
         })
         .count() as u32;
     let losses_topout = games
@@ -461,19 +677,49 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         games: games.clone(),
         wins,
         losses,
-        draws,
+        unresolved,
+        no_contest,
+        stuck,
         forfeits,
         wins_topout,
+        wins_turncap,
+        losses_turncap,
         wins_forfeit_vision,
         wins_forfeit_other,
+        forfeit_vision,
+        forfeit_other,
+        forfeit_unknown,
         losses_topout,
         losses_forfeit,
         turncap,
+        surge_released: [
+            games.iter().map(|game| game.surge_released[0]).sum(),
+            games.iter().map(|game| game.surge_released[1]).sum(),
+        ],
+        max_b2b_streak: [
+            games
+                .iter()
+                .map(|game| game.max_b2b_streak[0])
+                .max()
+                .unwrap_or(0),
+            games
+                .iter()
+                .map(|game| game.max_b2b_streak[1])
+                .max()
+                .unwrap_or(0),
+        ],
+        turns_with_b2b_ge_4: [
+            games.iter().map(|game| game.turns_with_b2b_ge_4[0]).sum(),
+            games.iter().map(|game| game.turns_with_b2b_ge_4[1]).sum(),
+        ],
         win_rate: rate(wins, games.len() as u32),
         wilson_low: (wilson_low * 10000.0).round() / 10000.0,
         wilson_high: (wilson_high * 10000.0).round() / 10000.0,
         verified,
         verify_failures: games.len() as u32 - verified,
+        resumed_games: 0,
+        measurement_complete: false,
+        attax_patch_sha256: None,
         attax,
         bots,
         notes,
@@ -495,8 +741,8 @@ impl MatchSummary {
         text.push_str("# S2 match summary\n\n");
         text.push_str(&format!("- games: {}\n", self.games.len()));
         text.push_str(&format!(
-            "- intetrigence wins / losses / draws / forfeits: {} / {} / {} / {}\n",
-            self.wins, self.losses, self.draws, self.forfeits
+            "- intetrigence wins / losses / unresolved / no-contest: {} / {} / {} / {}\n",
+            self.wins, self.losses, self.unresolved, self.no_contest
         ));
         text.push_str(&format!(
             "- win rate: {:.1}% (Wilson 95% CI {:.1}%..{:.1}%)\n",
@@ -603,6 +849,8 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     }
 
     let mut audits = Vec::new();
+    let mut resumed_games = 0u32;
+    let mut measurement_incomplete = 0u32;
     for &seed in &config.seeds {
         for &sheet in &config.sheets {
             let name = format!("seed-{seed}-sheet-{}", sheet.as_str());
@@ -611,12 +859,29 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
             let log_path = logs.join(format!("{name}-attax.jsonl"));
             let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
 
+            if config.resume && replay_path.exists() && audit_path.exists() {
+                if let Ok(verify) = verify_replay(&replay_path) {
+                    if verify.ok {
+                        if let Ok(text) = std::fs::read_to_string(&audit_path) {
+                            if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
+                                audit.verify = verify;
+                                println!("{name}: resumed (verified)");
+                                audits.push(audit);
+                                resumed_games += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
             let mut bot: Box<dyn Agent> = match &config.bot {
                 BotChoice::Baseline => Box::new(BaselineBot::new()),
                 BotChoice::Search(search) => {
                     let mut bot_config =
                         crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
                     bot_config.commit = git_short_head();
+                    bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
                 }
             };
@@ -626,7 +891,22 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 };
                 let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
                 bot_config.commit = git_short_head();
+                bot_config.args.extend(config.weights_note.clone());
                 Box::new(crate::bot_agent::BotAgent::new(bot_config))
+            } else if let Some(tbp) = &config.tbp_opponent {
+                let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
+                host.cwd = tbp.cwd.clone();
+                host.env = tbp.env.clone();
+                host.timeout = tbp.timeout;
+                host.stderr_path = Some(stderr_path.clone());
+                let mut tbp_config = TbpAgentConfig::new(host);
+                tbp_config.commit = tbp.commit.clone();
+                tbp_config.name = Some(tbp.name.clone());
+                tbp_config.visible_rows = tbp.visible_rows;
+                tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
+                tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
+                tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
+                Box::new(TbpAgent::new(tbp_config))
             } else {
                 match &config.attax {
                     Some(attax) => {
@@ -639,7 +919,13 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         let mut tbp_config = TbpAgentConfig::new(host);
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();
+                        tbp_config.visible_rows = if attax.visible_rows == 0 {
+                            detect_attax_visible_rows(&attax.dir)
+                        } else {
+                            attax.visible_rows
+                        };
                         tbp_config.decision_log = Some(log_path.clone());
+                        tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                         Box::new(TbpAgent::new(tbp_config))
                     }
                     // No external bot: run the harness against itself offline.
@@ -678,6 +964,20 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 .write(&audit_path)
                 .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
+            let opponent_log = if config.tbp_opponent.is_some() {
+                logs.join(format!("{name}-opponent.jsonl"))
+            } else {
+                log_path.clone()
+            };
+            if !replay_path.exists() || !audit_path.exists() || !opponent_log.exists() {
+                measurement_incomplete += 1;
+                eprintln!(
+                    "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
+                    replay_path.exists(),
+                    audit_path.exists(),
+                    opponent_log.exists()
+                );
+            }
             println!(
                 "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
                 audit.winner,
@@ -690,7 +990,16 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         }
     }
 
-    let summary = summarize(&audits, config.notes.clone());
+    let mut summary = summarize(&audits, config.notes.clone());
+    summary.resumed_games = resumed_games;
+    summary.measurement_complete = measurement_incomplete == 0;
+    summary.attax_patch_sha256 = config
+        .attax
+        .as_ref()
+        .and_then(|attax| attax.patch_sha256.clone());
+    if resumed_games > 0 {
+        println!("resume: {resumed_games} verified game(s) reused");
+    }
     summary
         .write(&config.out_dir)
         .map_err(|error| format!("write summary: {error}"))?;
@@ -761,19 +1070,32 @@ mod tests {
             games: vec![],
             wins: 0,
             losses: 0,
-            draws: 0,
+            unresolved: 0,
+            no_contest: 0,
+            stuck: 0,
             forfeits: 0,
             wins_topout: 0,
+            wins_turncap: 0,
+            losses_turncap: 0,
             wins_forfeit_vision: 0,
             wins_forfeit_other: 0,
+            forfeit_vision: 0,
+            forfeit_other: 0,
+            forfeit_unknown: 0,
             losses_topout: 0,
             losses_forfeit: 0,
             turncap: 0,
+            surge_released: [0, 0],
+            max_b2b_streak: [0, 0],
+            turns_with_b2b_ge_4: [0, 0],
             win_rate: 0.0,
             wilson_low: 0.0,
             wilson_high: 1.0,
             verified: 0,
             verify_failures: 0,
+            resumed_games: 0,
+            measurement_complete: true,
+            attax_patch_sha256: None,
             attax: None,
             bots: [
                 BotAggregate {

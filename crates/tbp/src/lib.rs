@@ -27,6 +27,6 @@ pub use geometry::{
 pub use host::{Host, HostConfig, HostError, StartResend, ThinkTimeStats};
 pub use message::{
     BotMessage, HostMessage, InfoPayload, Location, MessageError, Move, MoveInfo, NewPiecePayload,
-    Orientation, Piece, PlayPayload, SpinLabel, StartPayload, SuggestionPayload,
+    Orientation, Piece, PlayPayload, Randomizer, SpinLabel, StartPayload, SuggestionPayload,
 };
 pub use mirror::Mirror;

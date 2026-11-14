@@ -5,11 +5,12 @@
 //! refills to a six-entry queue, `start` resend after garbage, hold inference,
 //! think-time recording and the `ATTAX_TBP_LOG` cross-check.
 
+use std::io::Write as _;
 use std::path::PathBuf;
 
 use intetrigence_core::PieceKind;
 use intetrigence_tbp::{
-    Host, HostConfig, Mirror, Move, Piece, SpinLabel, StartPayload, location_cells,
+    Host, HostConfig, Mirror, Move, Piece, Randomizer, SpinLabel, StartPayload, location_cells,
     location_of_core,
 };
 
@@ -26,6 +27,20 @@ pub struct TbpAgentConfig {
     pub bun_version: Option<String>,
     /// `ATTAX_TBP_LOG` output path for this game.
     pub decision_log: Option<PathBuf>,
+    /// Display name for the bot (default `tbp-bot`).
+    pub name: Option<String>,
+    /// Rows the bot can see (default 20). Used for forfeit classification.
+    pub visible_rows: u32,
+    /// Delay before each `suggest`, giving a continuously-searching bot a
+    /// budget (CC2/clys have no think-time option). Included in `think_ms`.
+    pub suggest_delay_ms: u64,
+    /// Retry an empty `suggest` for this long (CC2 can answer before its
+    /// worker has expanded the root). Zero disables retries, which is required
+    /// for bots whose empty suggestion is a real forfeit (attax).
+    pub retry_empty_suggest_ms: u64,
+    /// JSONL transcript of every host message and suggestion (measurement
+    /// completeness, protocol v1.21 §8.3.1).
+    pub transcript: Option<PathBuf>,
 }
 
 impl TbpAgentConfig {
@@ -35,6 +50,11 @@ impl TbpAgentConfig {
             commit: None,
             bun_version: None,
             decision_log: None,
+            name: None,
+            visible_rows: 40,
+            suggest_delay_ms: 0,
+            retry_empty_suggest_ms: 0,
+            transcript: None,
         }
     }
 }
@@ -56,15 +76,17 @@ pub struct TbpAgent {
     decisions_logged: u64,
     cells_above_row20: bool,
     queue_invariant_violations: u64,
+    transcript: Option<PathBuf>,
 }
 
 impl TbpAgent {
     pub fn new(config: TbpAgentConfig) -> Self {
+        let transcript = config.transcript.clone();
         let descriptor = BotDescriptor {
-            name: "tbp-bot".into(),
+            name: config.name.clone().unwrap_or_else(|| "tbp-bot".into()),
             version: None,
             commit: config.commit.clone(),
-            visible_rows: 20,
+            visible_rows: config.visible_rows,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());
@@ -88,7 +110,12 @@ impl TbpAgent {
             decisions_logged: 0,
             cells_above_row20: false,
             queue_invariant_violations: 0,
+            transcript,
         }
+    }
+
+    fn transcript_log(&self, value: serde_json::Value) {
+        transcript_log(self.transcript.as_deref(), value);
     }
 
     pub fn queue_invariant_violations(&self) -> u64 {
@@ -98,6 +125,7 @@ impl TbpAgent {
     fn start_payload(
         board: &intetrigence_core::Board,
         queue: &[PieceKind],
+        bag_state: &[PieceKind],
         hold: Option<PieceKind>,
         combo: u32,
         b2b_streak: u32,
@@ -108,6 +136,13 @@ impl TbpAgent {
             hold: hold.map(Piece::from_core),
             combo,
             back_to_back: b2b_streak >= 1,
+            randomizer: if bag_state.is_empty() {
+                None
+            } else {
+                Some(Randomizer::SevenBag {
+                    bag_state: bag_state.iter().copied().map(Piece::from_core).collect(),
+                })
+            },
         }
     }
 }
@@ -126,12 +161,28 @@ pub fn refill_pieces(queue: &[PieceKind], current_len: usize) -> Vec<Piece> {
         .collect()
 }
 
-fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<u8>>> {
+fn transcript_log(path: Option<&std::path::Path>, value: serde_json::Value) {
+    let Some(path) = path else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(file, "{value}");
+    }
+}
+
+fn board_to_payload(board: &intetrigence_core::Board) -> Vec<Vec<Option<char>>> {
     (0..intetrigence_core::Board::HEIGHT)
         .map(|y| {
             let row = board.row(y);
             (0..intetrigence_core::Board::WIDTH)
-                .map(|x| (row & (1u16 << x) != 0).then_some(8))
+                .map(|x| (row & (1u16 << x) != 0).then_some('G'))
                 .collect()
         })
         .collect()
@@ -165,10 +216,12 @@ impl Agent for TbpAgent {
         let payload = Self::start_payload(
             &context.initial.board,
             &queue,
+            &context.initial.bag_state,
             context.initial.hold,
             context.initial.combo,
             context.initial.b2b_streak,
         );
+        self.transcript_log(serde_json::json!({"type": "start", "payload": &payload}));
         host.start(&payload, "initial", board_hash(&context.initial.board), 0);
         self.mirror = Mirror::from_start(&payload);
         self.host = Some(host);
@@ -176,14 +229,32 @@ impl Agent for TbpAgent {
     }
 
     fn suggest(&mut self, _view: &View) -> Result<Suggestion, AgentError> {
-        let host = self
-            .host
-            .as_mut()
-            .ok_or_else(|| AgentError::Protocol("suggest before begin_round".into()))?;
-        let payload = host
-            .suggest()
-            .map_err(|error| AgentError::Io(error.to_string()))?;
-        let think_ms = host.think_ms.last().copied().unwrap_or(0.0);
+        let delay = self.config.suggest_delay_ms;
+        if delay > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+        }
+        let retry_ms = self.config.retry_empty_suggest_ms;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(retry_ms);
+        let mut total_think = 0.0;
+        let payload = loop {
+            let host = self
+                .host
+                .as_mut()
+                .ok_or_else(|| AgentError::Protocol("suggest before begin_round".into()))?;
+            let payload = host
+                .suggest()
+                .map_err(|error| AgentError::Io(error.to_string()))?;
+            total_think += host.think_ms.last().copied().unwrap_or(0.0);
+            if !payload.moves.is_empty() || retry_ms == 0 || std::time::Instant::now() >= deadline {
+                break payload;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        transcript_log(
+            self.transcript.as_deref(),
+            serde_json::json!({"type": "suggestion", "payload": &payload}),
+        );
+        let think_ms = delay as f64 + total_think;
         let (nodes, extra_ms) = match &payload.move_info {
             Some(info) => {
                 self.suggestions_with_stats += 1;
@@ -223,6 +294,10 @@ impl Agent for TbpAgent {
             location: location_of_core(commit.piece, commit.rotation, commit.x, commit.y),
             spin: SpinLabel::from_core(commit.spin),
         };
+        transcript_log(
+            self.transcript.as_deref(),
+            serde_json::json!({"type": "play", "move": &mv}),
+        );
         host.play(mv)
             .map_err(|error| AgentError::Io(error.to_string()))?;
         let inferred_hold = self.mirror.apply_play(&mv);
@@ -240,9 +315,14 @@ impl Agent for TbpAgent {
             let payload = Self::start_payload(
                 &commit.board,
                 &commit.queue,
+                &commit.bag_state,
                 commit.hold_piece,
                 commit.combo,
                 commit.b2b_streak,
+            );
+            transcript_log(
+                self.transcript.as_deref(),
+                serde_json::json!({"type": "start", "reason": "garbage", "payload": &payload}),
             );
             host.start(&payload, "garbage", commit.board_hash, commit.turn);
             self.mirror = Mirror::from_start(&payload);
@@ -251,6 +331,10 @@ impl Agent for TbpAgent {
             // A hold with an empty slot makes the adapter consume two entries,
             // so this sends two `new_piece` messages in that case.
             for piece in refill_pieces(&commit.queue, self.mirror.queue.len()) {
+                transcript_log(
+                    self.transcript.as_deref(),
+                    serde_json::json!({"type": "new_piece", "piece": piece}),
+                );
                 host.new_piece(piece)
                     .map_err(|error| AgentError::Io(error.to_string()))?;
                 self.mirror.push(piece);
@@ -268,6 +352,7 @@ impl Agent for TbpAgent {
     }
 
     fn end_round(&mut self) -> Result<(), AgentError> {
+        self.transcript_log(serde_json::json!({"type": "quit"}));
         if let Some(mut host) = self.host.take() {
             self.start_resends = host
                 .start_resends

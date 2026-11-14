@@ -25,6 +25,10 @@ use crate::engine::{Engine, PlacementTarget, Profile, Sheet, board_hash};
 
 pub const SCHEMA: &str = "intetrigence/s2-replay/1";
 
+fn default_profile() -> String {
+    "official".into()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ReplayRecord {
@@ -52,6 +56,8 @@ pub struct Header {
     pub frames_per_turn: u64,
     pub preview: usize,
     /// Match profile (protocol v1.11 §1.3): `official` or `defense-stress:N`.
+    /// Older replays predate the field; they were all `official`.
+    #[serde(default = "default_profile")]
     pub profile: String,
     /// Start garbage holes in insertion order; empty for `official`. The
     /// verifier rebuilds the same initial boards from this.
@@ -173,6 +179,9 @@ pub struct ResultRecord {
     /// Set only for `Forfeit` (protocol v1.8 §7.1).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forfeit_cause: Option<ForfeitCause>,
+    /// Slot that forfeited (no-contest; the winner is `None`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forfeit_slot: Option<u8>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: Vec<PlayerRecord>,
@@ -286,6 +295,10 @@ pub struct VerifyReport {
     pub turns: u32,
     pub placements: u32,
     pub mismatches: Vec<String>,
+    /// Forfeit cause recomputed by the current classifier (reclassification
+    /// support; `None` for non-forfeit games).
+    #[serde(default)]
+    pub forfeit_cause: Option<ForfeitCause>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -309,6 +322,17 @@ impl std::error::Error for VerifyError {}
 
 /// Re-runs a replay file and compares every recomputed value with the record.
 pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
+    verify_replay_with_visible_rows(path, None)
+}
+
+/// Like [`verify_replay`], but overrides the bots' declared visible rows.
+///
+/// Used for reclassification: older replays recorded attax's `visible_rows`
+/// as 20, but its TBP grid is 40 rows (`src/ai/bot/movegen.ts`).
+pub fn verify_replay_with_visible_rows(
+    path: &Path,
+    override_rows: Option<[u32; 2]>,
+) -> Result<VerifyReport, VerifyError> {
     let records = read_replay(path)?;
     let header = match records.first() {
         Some(ReplayRecord::Header(header)) => header.clone(),
@@ -320,18 +344,20 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
     };
     Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
-    let visible_rows = [
-        header
-            .bots
-            .get("0")
-            .map(|bot| bot.visible_rows)
-            .unwrap_or(0),
-        header
-            .bots
-            .get("1")
-            .map(|bot| bot.visible_rows)
-            .unwrap_or(0),
-    ];
+    let visible_rows = override_rows.unwrap_or_else(|| {
+        [
+            header
+                .bots
+                .get("0")
+                .map(|bot| bot.visible_rows)
+                .unwrap_or(0),
+            header
+                .bots
+                .get("1")
+                .map(|bot| bot.visible_rows)
+                .unwrap_or(0),
+        ]
+    });
     let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
     let mut engine = engine_from_header(&header);
     let mut report = VerifyReport {
@@ -571,8 +597,15 @@ fn verify_result(
         .filter(|&slot| engine.players[slot].game.is_over())
         .collect();
     let (winner, reason) = if result.reason == "Forfeit" {
-        // A forfeit ends the round early; the engine state is not the result.
+        // A forfeit is a no-contest: no winner is recorded.
         (result.winner, result.reason.clone())
+    } else if result.reason == "Stuck" {
+        // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
+        // placement even though the game is not block-out.
+        match result.winner.map(|winner| 1 - winner as usize) {
+            Some(loser) if !engine.has_legal_move(loser) => (result.winner, "Stuck".to_string()),
+            _ => (None, "Stuck".to_string()),
+        }
     } else if let Some(&loser) = over.first() {
         (Some(1 - loser as u8), "TopOut".to_string())
     } else if result.reason == "TopOut" {
@@ -612,19 +645,21 @@ fn verify_result(
             .as_deref()
             .unwrap_or("")
             .contains("candidates is reachable");
+        let loser = result
+            .forfeit_slot
+            .map(usize::from)
+            .or_else(|| result.winner.map(|winner| 1 - winner as usize));
         if candidate_failure {
-            if let Some(recorded) = result.forfeit_cause {
-                if recorded != ForfeitCause::Unknown {
-                    if let Some(loser) = result.winner.map(|winner| 1 - winner as usize) {
-                        let actual =
-                            crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
-                        if actual != recorded {
-                            report.mismatches.push(format!(
-                                "result forfeit_cause: recorded {}, recomputed {}",
-                                recorded.as_str(),
-                                actual.as_str()
-                            ));
-                        }
+            if let Some(loser) = loser {
+                let actual = crate::referee::classify_forfeit(engine, loser, visible_rows[loser]);
+                report.forfeit_cause = Some(actual);
+                if let Some(recorded) = result.forfeit_cause {
+                    if recorded != ForfeitCause::Unknown && actual != recorded {
+                        report.mismatches.push(format!(
+                            "result forfeit_cause: recorded {}, recomputed {}",
+                            recorded.as_str(),
+                            actual.as_str()
+                        ));
                     }
                 }
             }

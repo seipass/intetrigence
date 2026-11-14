@@ -79,6 +79,8 @@ pub struct RoundOutcome {
     pub reason: String,
     pub detail: Option<String>,
     pub forfeit_cause: Option<ForfeitCause>,
+    /// Slot that forfeited (no-contest); `None` otherwise.
+    pub forfeit_slot: Option<u8>,
     pub turns: u32,
     pub final_frame: u64,
     pub per_player: [PlayerSummary; 2],
@@ -163,6 +165,7 @@ pub fn run_round(
     let mut scoring: [ScoringAudit; 2] = [ScoringAudit::default(), ScoringAudit::default()];
     let mut reachability_rejections = 0u32;
     let mut heights: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
+    let mut b2b_turns = [0u32; 2];
 
     let mut end: Option<End> = None;
     let mut turns_played = 0u32;
@@ -246,6 +249,9 @@ pub fn run_round(
                 }
             };
 
+            if applied.b2b_after >= 4 {
+                b2b_turns[slot] += 1;
+            }
             scoring[slot].record(
                 t,
                 slot as u8,
@@ -315,6 +321,7 @@ pub fn run_round(
                 board: engine.players[slot].game.board().clone(),
                 board_hash: applied.board_hash,
                 queue,
+                bag_state: crate::engine::tail_bag_state(&mut engine.players[slot].game),
                 hold_piece: engine.players[slot].game.held_piece(),
                 combo: applied.combo_after,
                 b2b_streak: applied.b2b_after,
@@ -346,7 +353,7 @@ pub fn run_round(
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
         End::Stuck { loser } => (
             Some(1 - loser),
-            "TopOut".to_string(),
+            "Stuck".to_string(),
             Some("no legal placement".to_string()),
             None,
         ),
@@ -362,15 +369,19 @@ pub fn run_round(
             None,
         ),
         End::Forfeit {
-            slot,
+            slot: _,
             detail,
             cause,
         } => (
-            Some(1 - slot),
+            None,
             "Forfeit".to_string(),
             Some(detail.clone()),
             Some(*cause),
         ),
+    };
+    let forfeit_slot = match &end {
+        End::Forfeit { slot, .. } => Some(*slot as u8),
+        _ => None,
     };
 
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
@@ -379,6 +390,7 @@ pub fn run_round(
         reason: reason.clone(),
         detail: detail.clone(),
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.clone(),
@@ -389,6 +401,7 @@ pub fn run_round(
         reason,
         detail,
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
         final_frame: engine.frame,
         per_player: per_player.iter().map(player_record).collect(),
@@ -423,7 +436,11 @@ pub fn run_round(
         reason: outcome.reason.clone(),
         detail: outcome.detail.clone(),
         forfeit_cause,
+        forfeit_slot,
         turns: turns_played,
+        surge_released: [per_player[0].surge_released, per_player[1].surge_released],
+        max_b2b_streak: [per_player[0].max_b2b, per_player[1].max_b2b],
+        turns_with_b2b_ge_4: b2b_turns,
         heights: [
             crate::audit::HeightStats::from_samples(&heights[0]),
             crate::audit::HeightStats::from_samples(&heights[1]),
@@ -570,7 +587,7 @@ fn forfeit_report(
         BotRecord::from(&agents[1].descriptor()),
     ];
     let per_player = [summarize(&engine, 0), summarize(&engine, 1)];
-    let winner = Some(1 - slot);
+    let winner: Option<usize> = None;
     let records = vec![
         ReplayRecord::Header(header(config, &bots, &start_garbage)),
         ReplayRecord::Result(ResultRecord {
@@ -578,6 +595,7 @@ fn forfeit_report(
             reason: "Forfeit".to_string(),
             detail: Some(detail.clone()),
             forfeit_cause: Some(ForfeitCause::Unknown),
+            forfeit_slot: Some(slot as u8),
             turns: 0,
             final_frame: 0,
             per_player: per_player.iter().map(player_record).collect(),
@@ -588,6 +606,7 @@ fn forfeit_report(
         reason: "Forfeit".to_string(),
         detail: Some(detail.clone()),
         forfeit_cause: Some(ForfeitCause::Unknown),
+        forfeit_slot: Some(slot as u8),
         turns: 0,
         final_frame: 0,
         per_player: per_player.clone(),
@@ -601,7 +620,11 @@ fn forfeit_report(
         reason: "Forfeit".to_string(),
         detail: Some(detail),
         forfeit_cause: Some(ForfeitCause::Unknown),
+        forfeit_slot: Some(slot as u8),
         turns: 0,
+        surge_released: [0, 0],
+        max_b2b_streak: [0, 0],
+        turns_with_b2b_ge_4: [0, 0],
         totals: [crate::audit::PlayerTotals::default(); 2],
         heights: [crate::audit::HeightStats::default(); 2],
         think: [ThinkStats::default(), ThinkStats::default()],
@@ -643,20 +666,12 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
     let Some(active) = player.game.active() else {
         return ForfeitCause::Other;
     };
-    // The active piece at the S2 spawn is always above the visible 20 rows
-    // (bottom cell row 21), so "active above the view" is not a forfeit cause:
-    // a TBP adapter places the active at the top of its own grid and can still
-    // play. The real vision cause is a board whose stack reaches the hidden
-    // buffer (checked below), or a move set that only exists above the view.
+    // The only criterion is whether the referee has a legal placement that fits
+    // entirely inside the bot's visible rows. The S2 spawn is in the hidden
+    // buffer (row 21), so "the active is above row 20" says nothing about the
+    // stack: a low board still has visible placements. (The old check returned
+    // Vision for every spawn, which misclassified 194 attax games.)
     let board = player.game.board();
-    let stack_top = (0..intetrigence_core::Board::HEIGHT)
-        .rev()
-        .find(|&y| board.row(y) != 0);
-    if let Some(top) = stack_top {
-        if top as u32 >= visible_rows {
-            return ForfeitCause::Vision;
-        }
-    }
     let moves = crate::movegen::generate(board, active, false);
     if moves.is_empty() {
         return ForfeitCause::Other;
@@ -676,4 +691,40 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
 
 fn round3(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use intetrigence_core::{ActivePiece, Board, FULL_ROW, Game, PieceKind, Rotation};
+
+    #[test]
+    fn low_board_with_hidden_spawn_is_not_vision() {
+        let engine = Engine::new(1, Sheet::A, 12);
+        // The active piece spawns at row 21 (hidden), but the board is empty:
+        // the referee has visible placements, so the bot's empty suggestion is
+        // its own failure, not a vision limitation.
+        assert!(engine.players[0].game.active().is_some());
+        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Other);
+    }
+
+    #[test]
+    fn full_visible_rows_are_vision() {
+        // A tall stack with a diagonal hole per row: no piece fits entirely in
+        // rows 0..19, and no row is full (so `from_position` accepts it).
+        let mut board = Board::new();
+        for y in 0..20 {
+            board.set_row(y, FULL_ROW & !(1u16 << (y % 10)));
+        }
+        let active = ActivePiece {
+            kind: PieceKind::T,
+            rotation: Rotation::Zero,
+            x: 3,
+            y: 20,
+        };
+        let game = Game::from_position(1, board, active).expect("legal test position");
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.players[0].game = game;
+        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Vision);
+    }
 }

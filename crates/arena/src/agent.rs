@@ -86,6 +86,8 @@ pub struct Commit {
     pub board_hash: u64,
     /// Current piece + five preview pieces (six entries).
     pub queue: Vec<PieceKind>,
+    /// Pieces left in the current 7-bag at this point (TBP start.randomizer).
+    pub bag_state: Vec<PieceKind>,
     pub hold_piece: Option<PieceKind>,
     pub combo: u32,
     pub b2b_streak: u32,

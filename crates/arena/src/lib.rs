@@ -31,6 +31,7 @@ pub mod movegen;
 pub mod referee;
 pub mod render;
 pub mod replay;
+pub mod round;
 pub mod tbp_agent;
 
 pub use agent::{Agent, AgentAudit, AgentError, BotDescriptor, Candidate, Commit, Suggestion};
