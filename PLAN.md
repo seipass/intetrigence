@@ -849,3 +849,37 @@ pub fn take_insertable(&mut self, lines_cleared: u8, current_frame: u64) -> Vec<
 
 - **A/B は決定論モードで行う**。非決定なまま回すと結果を信じられない
 - harness-dev の pre-fix 40 ゲーム測定は**中止**(bot-dev の 13/40 が比較基準)
+
+## 20. 決定論モードの実装と公式ラウンドの方針(2026-11-16)
+
+### 実装(`a99c135`)
+
+```rust
+pub struct SearchConfig { ..., pub deterministic: bool }   // 既定 false
+```
+
+- `true`: **deadline チェックなし**、`(depth, width)` を 1 回だけ実行
+- ビームは決定的(子はチャンク順マージ、`commit` は value ソート)なので**スレッド数に依存しない**
+- テスト `deterministic_mode_repeats_exactly`: 同一局面の 2 回探索で完全一致、**同一 seed のゲームが `actions`/`turns`/`lines` まで一致**
+
+### 方針: 公式ラウンドは決定論モード
+
+**非決定な 50/50 は「運が良かった」と言われうる。決定論モードなら 50 ゲームが完全に再現可能で、監査可能性が段違い。**
+
+**決定論モードが anytime より数ポイント弱くても、再現可能性を優先する。**
+
+| 用途 | モード |
+|---|---|
+| **A/B 比較** | **決定論** |
+| **公式ラウンド** | **決定論** |
+| 強さの上限確認 | anytime(参考) |
+
+### 未解決: 決定論モードの思考時間
+
+決定論モードは deadline チェックをしないので、**盤面によっては 100ms を大きく超える可能性**がある。**最悪ケースを必ず記録**し、超えるなら:
+- スケジュールを下げる、または
+- **`min(スケジュール, deadline)` のハイブリッド**(deadline に当たったら打ち切る。決定論は壊れるが時間は守る)
+
+### テストの前提修正
+
+`plays_a_legal_game` の `assert!(attack >= lines / 4)` は **S2 に存在しない前提**(single 0 / quad 1.25 / TSD 2.5 per line)。**上限の不変条件** `attack <= lines + surge` に変更した。
