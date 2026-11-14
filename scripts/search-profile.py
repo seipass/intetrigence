@@ -8,6 +8,9 @@ Reads `audit/*.json` and prints, for each game, the intetrigence search
 statistics (protocol v1.31 §8.4.1) and a compact depth progression in
 50-turn buckets. TBP opponents have no search statistics, so only slot 0
 (intetrigence) is shown.
+
+`nodes` is the number of expanded beam nodes, not evaluated leaves: one node
+expands to about 34 placements, so leaves ≈ nodes × 34 (bot-dev's definition).
 """
 
 from __future__ import annotations

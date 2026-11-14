@@ -56,6 +56,24 @@ transparent-shim run did not write the transcript and produced
   attax. The search fix is in progress; this smoke is the pre-fix baseline.
 - This is a diagnostic; no claim is made from tuning seeds.
 
+## Search profile (post-fix format)
+
+After the search fix, the same smoke is reported with the search instrument
+(protocol v1.31 §8.4.1). `PROFILE=1 bash scripts/tuning-smoke.sh` prints, and
+the round report records, this shape:
+
+| game | turns | depth med / p95 / max | width med / p95 / max | fallback |
+|---|---|---|---|---|
+| `<seed>-<sheet>` | `<n>` | `<a> / <b> / <c>` | `<a> / <b> / <c>` | `<n>/<n>` |
+
+- `depth` is the completed depth of the winning anytime iteration (not the
+  configured maximum); `fallback` means no iteration completed (1-ply greedy).
+- `nodes` is expanded beam nodes, not leaves (≈34 placements per node).
+- Depth by turn bucket (50 turns) is printed per game, so a late-game depth
+  collapse is visible.
+- Every table is recorded with the build commit, the weights and the bot's
+  search configuration; numbers from different builds are not compared.
+
 ## Reproduction
 
 ```
