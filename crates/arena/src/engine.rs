@@ -313,6 +313,51 @@ impl std::fmt::Display for AdoptError {
 
 impl std::error::Error for AdoptError {}
 
+/// Match profile (protocol v1.11 §1.3).
+/// Match profile (protocol v1.11 §1.3).
+///
+/// `Official` is the empty start board and the only profile usable for final
+/// claims. `DefenseStress` starts both players with deterministic garbage rows
+/// so M3 can measure downstacking; it is diagnostic only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Profile {
+    Official,
+    DefenseStress { rows: u8 },
+}
+
+impl Profile {
+    pub const fn official() -> Self {
+        Profile::Official
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim() {
+            "official" => Some(Profile::Official),
+            "defense-stress" => Some(Profile::DefenseStress { rows: 12 }),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> String {
+        match self {
+            Profile::Official => "official".into(),
+            Profile::DefenseStress { rows } => format!("defense-stress:{rows}"),
+        }
+    }
+
+    /// Deterministic start garbage, in insertion order (`holes[0]` ends up on
+    /// top). `Official` has none.
+    pub fn start_garbage(self, seed: u64) -> Vec<u8> {
+        match self {
+            Profile::Official => Vec::new(),
+            Profile::DefenseStress { rows } => {
+                let mut rng = intetrigence_core::SplitMix64::new(seed ^ 0x5EED_5EED_5EED_5EED);
+                (0..rows).map(|_| rng.below(10) as u8).collect()
+            }
+        }
+    }
+}
+
 /// The referee's round state for both players.
 #[derive(Clone, Debug)]
 pub struct Engine {
@@ -328,11 +373,33 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(seed: u64, sheet: Sheet, frames_per_turn: u64) -> Self {
+        Self::with_start_garbage(seed, sheet, frames_per_turn, &[])
+    }
+
+    /// Builds an engine and inserts `start_garbage` into both players' boards.
+    ///
+    /// The rows are ordinary garbage rows (one hole each), so the active piece
+    /// is pushed up and `received_total` includes them. Both players get the
+    /// same rows, so the turn-cap tiebreak stays symmetric.
+    pub fn with_start_garbage(
+        seed: u64,
+        sheet: Sheet,
+        frames_per_turn: u64,
+        start_garbage: &[u8],
+    ) -> Self {
         let derivation = derive_seeds(seed);
-        let players = [
+        let mut players = [
             Player::new(0, derivation.piece_seed, derivation.garbage_seeds[0]),
             Player::new(1, derivation.piece_seed, derivation.garbage_seeds[1]),
         ];
+        if !start_garbage.is_empty() {
+            for player in &mut players {
+                player
+                    .game
+                    .insert_garbage(start_garbage)
+                    .expect("start garbage must be valid");
+            }
+        }
         Self {
             players,
             seed,

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use intetrigence_arena::engine::Sheet;
+use intetrigence_arena::engine::{Profile, Sheet};
 use intetrigence_arena::harness::{
     AttaxConfig, BotChoice, MatchConfig, load_audits, now_stamp, run_match, summarize, verify_all,
 };
@@ -56,6 +56,8 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut bot = "baseline".to_string();
     let mut ms = 100u64;
     let mut threads = 8usize;
+    let mut profile = "official".to_string();
+    let mut start_rows = 12u8;
 
     let mut index = 0;
     while index < args.len() {
@@ -136,6 +138,16 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 config.notes.push(value(1)?);
                 index += 2;
             }
+            "--profile" => {
+                profile = value(1)?;
+                index += 2;
+            }
+            "--start-rows" => {
+                start_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--start-rows: {error}"))?;
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -161,6 +173,15 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.timeout = Duration::from_secs(timeout);
         config.attax = Some(attax_config);
     }
+    config.profile = match profile.as_str() {
+        "official" => Profile::Official,
+        "defense-stress" => Profile::DefenseStress { rows: start_rows },
+        other => {
+            return Err(format!(
+                "unknown --profile `{other}` (official|defense-stress)"
+            ));
+        }
+    };
     config.bot = match bot.as_str() {
         "baseline" => BotChoice::Baseline,
         "search" => BotChoice::Search(Box::new(SearchConfig {

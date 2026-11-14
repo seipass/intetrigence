@@ -51,6 +51,12 @@ pub struct Header {
     pub turn_cap: u32,
     pub frames_per_turn: u64,
     pub preview: usize,
+    /// Match profile (protocol v1.11 §1.3): `official` or `defense-stress:N`.
+    pub profile: String,
+    /// Start garbage holes in insertion order; empty for `official`. The
+    /// verifier rebuilds the same initial boards from this.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub start_garbage: Vec<u8>,
 }
 
 /// Why a bot forfeited (protocol v1.8 §7.1).
@@ -313,7 +319,12 @@ pub fn verify_replay(path: &Path) -> Result<VerifyReport, VerifyError> {
             .map(|bot| bot.visible_rows)
             .unwrap_or(0),
     ];
-    let mut engine = Engine::new(header.seed, sheet, header.frames_per_turn);
+    let mut engine = Engine::with_start_garbage(
+        header.seed,
+        sheet,
+        header.frames_per_turn,
+        &header.start_garbage,
+    );
     let mut report = VerifyReport {
         seed: header.seed,
         sheet: header.sheet.clone(),

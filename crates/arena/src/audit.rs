@@ -216,6 +216,8 @@ pub struct GameAudit {
     pub seed: u64,
     pub sheet: String,
     pub started_at: String,
+    /// Match profile (protocol v1.11 §1.3).
+    pub profile: String,
     pub winner: Option<u8>,
     pub reason: String,
     pub detail: Option<String>,

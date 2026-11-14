@@ -14,8 +14,11 @@ import platform
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EVIDENCE = os.path.join(ROOT, "scripts", "evidence", "m2-tuning")
-REPORT = os.path.join(ROOT, "docs", "m2-tuning-report.md")
+EVIDENCE = os.environ.get(
+    "EVIDENCE", os.path.join(ROOT, "scripts", "evidence", "m2-tuning")
+)
+REPORT = os.environ.get("REPORT", os.path.join(ROOT, "docs", "m2-tuning-report.md"))
+TITLE = os.environ.get("TITLE", "M2 tuning match report (intetrigence vs attax)")
 
 
 def wilson(wins, games, z=1.959964):
@@ -162,7 +165,15 @@ def main():
     lines = []
     lines.append("# M2 tuning match report (intetrigence vs attax)\n")
     lines.append(f"- evidence: `{os.path.relpath(EVIDENCE, ROOT).replace(os.sep, '/')}`")
-    lines.append("- profile: **official** (empty start board; the only profile usable for final claims)")
+    profile = header.get("profile", "official")
+    if profile == "official":
+        lines.append(
+            "- profile: **official** (empty start board; the only profile usable for final claims)"
+        )
+    else:
+        lines.append(
+            f"- profile: **{profile}** (diagnostic; **not** usable for final claims, protocol v1.11 §1.3)"
+        )
     lines.append(f"- games: {len(games)} (tuning seeds 9001-9010 x sheets A/B)")
     lines.append("- held-out: seeds 10001+ were **not** used (tuning seeds only)")
     lines.append(

@@ -208,6 +208,17 @@ sleep を足すだけで、状態には影響しない。
   到達可能な最初の候補を採用するので、検索の best が押し上げ後の active から到達不能でも
   次の候補・フォールバックで合法手が残る。
 
+### D11. プロファイル(protocol v1.11 §1.3)
+
+| profile | 開始盤面 | 用途 | 最終主張 |
+|---|---|---|---|
+| `official` | 空盤面 | M0 / M2 / 最終マッチ | **使える(これのみ)** |
+| `defense-stress:N` | 両者に決定論的な N 行のゴミ(穴は seed から決定論的) | M3 の防御・downstack 診断 | 使えない(診断専用) |
+
+- replay header に `profile` と `start_garbage`(挿入順の穴列)を記録し、verify は同じ初期盤面から再実行する。
+- 開始ゴミは `received_total` に含まれる(両者同数なので turn-cap の比較は対称)。
+- `--profile defense-stress --start-rows 12` で選択。診断値は `official` の勝率と混ぜない。
+
 ### D10. ベースライン bot は M0 の暫定
 
 `crates/bot` はまだ骨組みなので、M0 の intetrigence 側は `BaselineBot`
