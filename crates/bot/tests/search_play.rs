@@ -160,6 +160,25 @@ fn deterministic_mode_repeats_exactly() {
         hold: Some(intetrigence_core::PieceKind::L),
         context: intetrigence_bot::EvalContext::default(),
     };
+    // Same answer at every thread count: the beam merge is a total order on
+    // content, so the workers' completion order cannot leak into the result.
+    let mut reference = None;
+    for threads in [1usize, 2, 8] {
+        let config = SearchConfig {
+            threads,
+            ..config.clone()
+        };
+        let mut searcher = intetrigence_bot::Searcher::new(config);
+        let result = searcher.search(&root).expect("placements");
+        match &reference {
+            None => reference = Some(result.clone()),
+            Some(expected) => {
+                assert_eq!(result.best, expected.best, "threads {threads}");
+                assert_eq!(result.nodes, expected.nodes, "threads {threads}");
+                assert_eq!(result.line, expected.line, "threads {threads}");
+            }
+        }
+    }
     let mut first = intetrigence_bot::Searcher::new(config.clone());
     let a = first.search(&root).expect("placements");
     let mut second = intetrigence_bot::Searcher::new(config.clone());
