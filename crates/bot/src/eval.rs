@@ -58,7 +58,12 @@ pub struct Features {
     pub max_height: f64,
     /// `max(0, max_height - DANGER_BASE)^2`.
     pub height_sq: f64,
-    /// Column-wise non-linear danger (`Features.danger_height`).
+    /// Value of a ready 4-deep well (`Features.quad_ready`).
+    ///
+    /// This is the "preparation" the depth-4 search cannot see: building a quad
+    /// takes four pieces of holding a well open, and at four plies clearing a
+    /// single always looks better.
+    pub quad_ready: f64,
     /// Rows that are one cell short of full, with the hole at the top of its
     /// column (so one piece clears it), capped at 2. This is the "combo
     /// groove": a combo only continues if a clear is available every piece.
@@ -151,6 +156,14 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
     let over = (max_height - DANGER_BASE).max(0);
     features.max_height = max_height as f64;
     features.height_sq = (over * over) as f64;
+    features.quad_ready = (1..COLUMNS - 1)
+        .filter(|&x| {
+            heights[x] + 4 <= heights[x - 1]
+                && heights[x] + 4 <= heights[x + 1]
+                && (0..heights[x] as usize).all(|row| board.row(row) & (1 << x) != 0)
+        })
+        .count()
+        .min(1) as f64;
     features.combo_potential = (0..Board::HEIGHT)
         .filter(|&row| {
             let mask = board.row(row);
@@ -234,6 +247,8 @@ pub struct Weights {
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
     pub danger_height: f64,
+    /// Value of a ready 4-deep well (`Features.quad_ready`).
+    pub quad_ready: f64,
     /// Bonus for clearing at least one line during the opener phase.
     /// S2 doubles the cancellation while the opener is active, but the extra
     /// budget equals the *attack*, not the lines, so a single (attack 0)
@@ -332,6 +347,7 @@ impl Default for Weights {
             height_sq: 0.0,
             danger_height: -12.0,
             race: 1.0,
+            quad_ready: 30.0,
             opener_clear: 20.0,
             combo_state: 40.0,
             combo_potential: 6.0,
@@ -343,7 +359,7 @@ impl Default for Weights {
             row_transitions: -3.0,
             well_depth: 8.0,
             extra_wells: -14.0,
-            t_slot: [0.0, 20.0, 45.0],
+            t_slot: [0.0, 20.0, 80.0],
             danger_projected: -12.0,
             garbage_rows: -6.0,
 
@@ -353,8 +369,14 @@ impl Default for Weights {
             // double 0.50, triple 0.67, quad 1.25, TSS 3.00, TSD 2.50. A TSD
             // is therefore worth twice a quad, and the measured spin line
             // ratio is 16% against the 23% that attack/line 1.73 needs.
+            // No bonus for a plain clear: `weights.attack * attack.total`
+            // already prices it exactly, and `compute_attack` returns 0 for a
+            // single, 1 for a double, 5 for a quad or a TSD, 11 for a mini
+            // quad. The old `-14` for a single made clearing *worse* than
+            // stacking, which is what produced the nine- and ten-turn
+            // zero-line runs in the 9007-B collapse.
             clear: [
-                [0.0, -14.0, -6.0, 2.0, 20.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
                 [0.0, -5.0, 2.0, 8.0, 30.0],
                 [0.0, 20.0, 40.0, 40.0, 50.0],
             ],
@@ -581,9 +603,16 @@ pub fn leaf_value(
     // (safe: 13 <= 20) -- it threw away attack while still alive.
     let projected = board.height() as u32 + context.incoming;
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
+    // `wait_pieces = 21 - height - pending`: how many pieces can be spent on
+    // preparation before a zero-line placement kills. No budget, no
+    // preparation.
+    let wait_pieces =
+        (SURVIVAL_PROJECTED as i32 - board.height() as i32 - context.incoming as i32).max(0);
+    let readiness_scale = (f64::from(wait_pieces) / 4.0).min(1.0);
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
         + weights.danger_height * features.danger_height
+        + readiness_scale * weights.quad_ready * features.quad_ready
         + weights.holes * features.holes
         + weights.hole_cover * features.hole_cover
         + weights.hole_rows * features.hole_rows
@@ -622,11 +651,16 @@ pub fn leaf_value(
     // combo 5+ therefore pushes the bot to trade TSDs and quads for singles.
     let combo = f64::from(context.combo.min(COMBO_CAP));
     value += weights.combo_state * (1.25 * combo + 1.0).ln();
-    value += weights.combo_potential * features.combo_potential;
+    // Only worth something when the next clear can stop a garbage packet from
+    // appearing: a "one cell short" row is also a single, so pricing it
+    // unconditionally invites singles.
+    if projected >= f64::from(SURVIVAL_PROJECTED) {
+        value += weights.combo_potential * features.combo_potential;
+    }
     value -= weights.incoming * f64::from(context.incoming);
     let race = i64::from(context.sent_total) - i64::from(context.received_total);
     value += weights.race * race as f64;
-    value += t_slot_cutout_with_heights(board, &heights, t_available, weights);
+    value += readiness_scale * t_slot_cutout_with_heights(board, &heights, t_available, weights);
     value
 }
 
@@ -788,6 +822,7 @@ mod tests {
                 // tallest column contributes 64 and the rest 409.
                 danger_height: 473.0,
                 combo_potential: 0.0,
+                quad_ready: 0.0,
                 holes: 6.0,
                 hole_cover: 23.0,
                 hole_rows: 6.0,
