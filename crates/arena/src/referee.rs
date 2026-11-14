@@ -522,6 +522,7 @@ pub fn run_round(
         search,
         opener_lines,
         spin_placements,
+        repeat: 0,
     };
 
     Ok(RoundReport {
@@ -704,6 +705,7 @@ fn forfeit_report(
         search: [Vec::new(), Vec::new()],
         opener_lines: [0, 0],
         spin_placements: [0, 0],
+        repeat: 0,
     };
     for agent in agents.iter_mut() {
         let _ = agent.end_round();

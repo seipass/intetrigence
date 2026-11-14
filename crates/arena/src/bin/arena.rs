@@ -68,6 +68,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut from_turn = 200u32;
     let mut self_play = false;
     let mut resume = false;
+    let mut repeat = 1u32;
     let mut tbp_program: Option<String> = None;
     let mut tbp_args: Vec<String> = Vec::new();
     let mut tbp_cwd: Option<PathBuf> = None;
@@ -196,6 +197,12 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
             "--resume" => {
                 resume = true;
                 index += 1;
+            }
+            "--repeat" => {
+                repeat = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--repeat: {error}"))?;
+                index += 2;
             }
             "--tbp-program" => {
                 tbp_program = Some(value(1)?);
@@ -328,6 +335,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     };
     config.self_play = self_play;
     config.resume = resume;
+    config.repeat = repeat;
     config.bot = match bot.as_str() {
         "baseline" => BotChoice::Baseline,
         "search" => {

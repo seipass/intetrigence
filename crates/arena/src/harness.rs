@@ -138,6 +138,10 @@ pub struct MatchConfig {
     pub notes: Vec<String>,
     /// Weight overrides applied to the search, recorded in the replay header.
     pub weights_note: Vec<String>,
+    /// Run each `(seed, sheet)` this many times (`--repeat`). The repeat index
+    /// is recorded in the audit and the game summary; used to measure the
+    /// anytime search's non-determinism.
+    pub repeat: u32,
     /// Build commit recorded in every replay header. Captured once at the
     /// start of the match: the repository HEAD can move while a long match is
     /// running, and the recorded commit must be the binary's build, not the
@@ -164,6 +168,7 @@ impl MatchConfig {
             resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
             weights_note: Vec::new(),
+            repeat: 1,
             build_commit: None,
         }
     }
@@ -398,6 +403,9 @@ pub struct GameSummary {
     /// `pending` (net damage <= -20) or `race` (otherwise).
     #[serde(default)]
     pub loss_type: Option<String>,
+    /// Repeat index (`--repeat`; 0 for a single run).
+    #[serde(default)]
+    pub repeat: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -739,6 +747,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         lines_cleared: [audit.totals[0].lines_cleared, audit.totals[1].lines_cleared],
         spin_placements: audit.spin_placements,
         burst: audit.verify.burst.clone(),
+        repeat: audit.repeat,
         loss_type: if audit.winner == Some(1) {
             let final_height = audit.heights[0].final_height;
             let net =
@@ -1322,188 +1331,204 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let mut audits = Vec::new();
     let mut resumed_games = 0u32;
     let mut measurement_incomplete = 0u32;
-    for &seed in &config.seeds {
-        for &sheet in &config.sheets {
-            let name = format!("seed-{seed}-sheet-{}", sheet.as_str());
-            let replay_path = replays.join(format!("{name}.jsonl"));
-            let audit_path = audits_dir.join(format!("{name}.json"));
-            let log_path = logs.join(format!("{name}-attax.jsonl"));
-            let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
+    for repeat in 0..config.repeat.max(1) {
+        for &seed in &config.seeds {
+            for &sheet in &config.sheets {
+                let name = if repeat == 0 {
+                    format!("seed-{seed}-sheet-{}", sheet.as_str())
+                } else {
+                    format!("seed-{seed}-sheet-{}-r{repeat}", sheet.as_str())
+                };
+                let replay_path = replays.join(format!("{name}.jsonl"));
+                let audit_path = audits_dir.join(format!("{name}.json"));
+                let log_path = logs.join(format!("{name}-attax.jsonl"));
+                let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
 
-            if config.resume && replay_path.exists() && audit_path.exists() {
-                if let Ok(verify) = verify_replay(&replay_path) {
-                    if verify.ok {
-                        if let Ok(text) = std::fs::read_to_string(&audit_path) {
-                            if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
-                                audit.verify = verify;
-                                audit.opener_lines = opener_lines_from_replay(&replay_path);
-                                audit.spin_placements = spin_placements_from_replay(&replay_path);
-                                println!("{name}: resumed (verified)");
-                                audits.push(audit);
-                                resumed_games += 1;
-                                continue;
+                if config.resume && replay_path.exists() && audit_path.exists() {
+                    if let Ok(verify) = verify_replay(&replay_path) {
+                        if verify.ok {
+                            if let Ok(text) = std::fs::read_to_string(&audit_path) {
+                                if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
+                                    audit.verify = verify;
+                                    audit.opener_lines = opener_lines_from_replay(&replay_path);
+                                    audit.spin_placements =
+                                        spin_placements_from_replay(&replay_path);
+                                    println!("{name}: resumed (verified)");
+                                    audits.push(audit);
+                                    resumed_games += 1;
+                                    continue;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // A fresh game must not append to a previous run's logs: the TBP
-            // transcript and the attax decision log are opened in append mode.
-            // Resumed games are handled above and keep their logs.
-            let transcript_path = logs.join(format!("{name}-opponent.jsonl"));
-            for path in [&log_path, &stderr_path, &transcript_path] {
-                let _ = std::fs::remove_file(path);
-            }
+                // A fresh game must not append to a previous run's logs: the TBP
+                // transcript and the attax decision log are opened in append mode.
+                // Resumed games are handled above and keep their logs.
+                let transcript_path = logs.join(format!("{name}-opponent.jsonl"));
+                for path in [&log_path, &stderr_path, &transcript_path] {
+                    let _ = std::fs::remove_file(path);
+                }
 
-            let mut bot: Box<dyn Agent> = match &config.bot {
-                BotChoice::Baseline => Box::new(BaselineBot::new()),
-                BotChoice::Search(search) => {
+                let mut bot: Box<dyn Agent> = match &config.bot {
+                    BotChoice::Baseline => Box::new(BaselineBot::new()),
+                    BotChoice::Search(search) => {
+                        let mut bot_config =
+                            crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
+                        bot_config.commit = build_commit.clone();
+                        bot_config.args.extend(config.weights_note.clone());
+                        Box::new(crate::bot_agent::BotAgent::new(bot_config))
+                    }
+                };
+                let mut opponent: Box<dyn Agent> = if config.self_play {
+                    let BotChoice::Search(search) = &config.bot else {
+                        return Err("--self-play requires --bot search".into());
+                    };
                     let mut bot_config =
                         crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
-                    bot_config.commit = build_commit.clone();
+                    bot_config.commit = git_short_head();
                     bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
-                }
-            };
-            let mut opponent: Box<dyn Agent> = if config.self_play {
-                let BotChoice::Search(search) = &config.bot else {
-                    return Err("--self-play requires --bot search".into());
-                };
-                let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
-                bot_config.commit = git_short_head();
-                bot_config.args.extend(config.weights_note.clone());
-                Box::new(crate::bot_agent::BotAgent::new(bot_config))
-            } else if let Some(tbp) = &config.tbp_opponent {
-                let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
-                host.cwd = tbp.cwd.clone();
-                host.env = tbp.env.clone();
-                host.timeout = tbp.timeout;
-                host.stderr_path = Some(stderr_path.clone());
-                let mut tbp_config = TbpAgentConfig::new(host);
-                tbp_config.commit = tbp.commit.clone();
-                tbp_config.name = Some(tbp.name.clone());
-                tbp_config.visible_rows = tbp.visible_rows;
-                tbp_config.supports_180 = tbp.supports_180;
-                tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
-                tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
-                tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
-                Box::new(TbpAgent::new(tbp_config))
-            } else {
-                match &config.attax {
-                    Some(attax) => {
-                        let mut host = HostConfig::new(
-                            attax.bun.clone(),
-                            vec![attax.entry_point().to_string_lossy().to_string()],
-                        );
-                        host.timeout = attax.timeout;
-                        host.stderr_path = Some(stderr_path.clone());
-                        host.env = attax.env.clone();
-                        let mut tbp_config = TbpAgentConfig::new(host);
-                        tbp_config.commit = attax.commit.clone();
-                        tbp_config.bun_version = attax.bun_version.clone();
-                        tbp_config.visible_rows = if attax.visible_rows == 0 {
-                            detect_attax_visible_rows(&attax.dir)
-                        } else {
-                            attax.visible_rows
-                        };
-                        tbp_config.supports_180 = attax.supports_180;
-                        tbp_config.decision_log = Some(log_path.clone());
-                        tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
-                        Box::new(TbpAgent::new(tbp_config))
+                } else if let Some(tbp) = &config.tbp_opponent {
+                    let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
+                    host.cwd = tbp.cwd.clone();
+                    host.env = tbp.env.clone();
+                    host.timeout = tbp.timeout;
+                    host.stderr_path = Some(stderr_path.clone());
+                    let mut tbp_config = TbpAgentConfig::new(host);
+                    tbp_config.commit = tbp.commit.clone();
+                    tbp_config.name = Some(tbp.name.clone());
+                    tbp_config.visible_rows = tbp.visible_rows;
+                    tbp_config.supports_180 = tbp.supports_180;
+                    tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
+                    tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
+                    tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
+                    Box::new(TbpAgent::new(tbp_config))
+                } else {
+                    match &config.attax {
+                        Some(attax) => {
+                            let mut host = HostConfig::new(
+                                attax.bun.clone(),
+                                vec![attax.entry_point().to_string_lossy().to_string()],
+                            );
+                            host.timeout = attax.timeout;
+                            host.stderr_path = Some(stderr_path.clone());
+                            host.env = attax.env.clone();
+                            let mut tbp_config = TbpAgentConfig::new(host);
+                            tbp_config.commit = attax.commit.clone();
+                            tbp_config.bun_version = attax.bun_version.clone();
+                            tbp_config.visible_rows = if attax.visible_rows == 0 {
+                                detect_attax_visible_rows(&attax.dir)
+                            } else {
+                                attax.visible_rows
+                            };
+                            tbp_config.supports_180 = attax.supports_180;
+                            tbp_config.decision_log = Some(log_path.clone());
+                            tbp_config.transcript =
+                                Some(logs.join(format!("{name}-opponent.jsonl")));
+                            Box::new(TbpAgent::new(tbp_config))
+                        }
+                        // No external bot: run the harness against itself offline.
+                        None => Box::new(BaselineBot::with_name("baseline-opponent")),
                     }
-                    // No external bot: run the harness against itself offline.
-                    None => Box::new(BaselineBot::with_name("baseline-opponent")),
+                };
+
+                let round_config = RoundConfig {
+                    seed,
+                    sheet,
+                    turn_cap: config.turn_cap,
+                    frames_per_turn: config.frames_per_turn,
+                    rules: config.rules.clone(),
+                    protocol: config.protocol.clone(),
+                    started_at: config.started_at.clone(),
+                    profile: config.profile,
+                };
+
+                let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
+                let report = run_round(&round_config, &mut agents)
+                    .map_err(|error| format!("{name}: {error}"))?;
+
+                write_replay(&replay_path, &report.records)
+                    .map_err(|error| format!("write {}: {error}", replay_path.display()))?;
+                let verify = verify_replay(&replay_path)
+                    .map_err(|error| format!("verify {}: {error}", replay_path.display()))?;
+
+                let mut audit = report.audit;
+                if config.self_play || config.attax.is_none() {
+                    audit.attax = None;
                 }
-            };
+                audit.replay = format!("replays/{name}.jsonl");
+                audit.verify = verify;
+                audit.queue_invariant_violations =
+                    report.agent_audits[1].queue_invariant_violations;
+                audit
+                    .write(&audit_path)
+                    .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
-            let round_config = RoundConfig {
-                seed,
-                sheet,
-                turn_cap: config.turn_cap,
-                frames_per_turn: config.frames_per_turn,
-                rules: config.rules.clone(),
-                protocol: config.protocol.clone(),
-                started_at: config.started_at.clone(),
-                profile: config.profile,
-            };
-
-            let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
-            let report = run_round(&round_config, &mut agents)
-                .map_err(|error| format!("{name}: {error}"))?;
-
-            write_replay(&replay_path, &report.records)
-                .map_err(|error| format!("write {}: {error}", replay_path.display()))?;
-            let verify = verify_replay(&replay_path)
-                .map_err(|error| format!("verify {}: {error}", replay_path.display()))?;
-
-            let mut audit = report.audit;
-            if config.self_play || config.attax.is_none() {
-                audit.attax = None;
-            }
-            audit.replay = format!("replays/{name}.jsonl");
-            audit.verify = verify;
-            audit.queue_invariant_violations = report.agent_audits[1].queue_invariant_violations;
-            audit
-                .write(&audit_path)
-                .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
-
-            let tbp_opponent = config.tbp_opponent.is_some();
-            let opponent_log = if tbp_opponent {
-                logs.join(format!("{name}-opponent.jsonl"))
-            } else {
-                log_path.clone()
-            };
-            // `exists()` is not proof of completeness: a 0-byte file, a
-            // truncated final line, or a log that stops mid-game all exist.
-            // Count the opponent's actual placements from the replay; do not
-            // derive the count from the winner (the seat that dies first
-            // decides whether the opponent gets the last turn; protocol v1.33
-            // §8.3.1.2).
-            let opponent_plays = report
-                .records
-                .iter()
-                .filter(|record| {
-                    matches!(
-                        record,
-                        crate::replay::ReplayRecord::Turn(turn)
-                            if turn.placements.iter().any(|placement| placement.slot == 1)
-                    )
-                })
-                .count() as u32;
-            let forfeit_by_opponent = audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
-            // A forfeit by the opponent logs the forfeit turn's suggestion
-            // but no play; every other game has one suggestion per play.
-            let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
-            let log_check = check_opponent_log(
-                &opponent_log,
-                expected_suggestions,
-                opponent_plays,
-                forfeit_by_opponent,
-                tbp_opponent,
-            );
-            if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
-                measurement_incomplete += 1;
-                eprintln!(
-                    "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
-                    replay_path.exists(),
-                    audit_path.exists(),
-                    log_check.as_ref().err().map(String::as_str).unwrap_or("ok")
+                let tbp_opponent = config.tbp_opponent.is_some();
+                let opponent_log = if tbp_opponent {
+                    logs.join(format!("{name}-opponent.jsonl"))
+                } else {
+                    log_path.clone()
+                };
+                // `exists()` is not proof of completeness: a 0-byte file, a
+                // truncated final line, or a log that stops mid-game all exist.
+                // Count the opponent's actual placements from the replay; do not
+                // derive the count from the winner (the seat that dies first
+                // decides whether the opponent gets the last turn; protocol v1.33
+                // §8.3.1.2).
+                let opponent_plays = report
+                    .records
+                    .iter()
+                    .filter(|record| {
+                        matches!(
+                            record,
+                            crate::replay::ReplayRecord::Turn(turn)
+                                if turn.placements.iter().any(|placement| placement.slot == 1)
+                        )
+                    })
+                    .count() as u32;
+                let forfeit_by_opponent =
+                    audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
+                // A forfeit by the opponent logs the forfeit turn's suggestion
+                // but no play; every other game has one suggestion per play.
+                let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
+                let log_check = check_opponent_log(
+                    &opponent_log,
+                    expected_suggestions,
+                    opponent_plays,
+                    forfeit_by_opponent,
+                    tbp_opponent,
                 );
+                if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
+                    measurement_incomplete += 1;
+                    eprintln!(
+                        "{name}: measurement incomplete (replay={} audit={} opponent_log={})",
+                        replay_path.exists(),
+                        audit_path.exists(),
+                        log_check.as_ref().err().map(String::as_str).unwrap_or("ok")
+                    );
+                }
+                println!(
+                    "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
+                    audit.winner,
+                    audit.reason,
+                    audit.turns,
+                    audit.verify.ok,
+                    audit.verify.mismatches.len()
+                );
+                audits.push(audit);
             }
-            println!(
-                "{name}: winner={:?} reason={} turns={} verified={} mismatches={}",
-                audit.winner,
-                audit.reason,
-                audit.turns,
-                audit.verify.ok,
-                audit.verify.mismatches.len()
-            );
-            audits.push(audit);
         }
     }
 
-    let mut summary = summarize(&audits, config.notes.clone());
+    let mut notes = config.notes.clone();
+    notes.push(
+        "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
+            .into(),
+    );
+    let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
     summary.measurement_complete = measurement_incomplete == 0;
     summary.attax_patch_sha256 = config

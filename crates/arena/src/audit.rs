@@ -307,6 +307,9 @@ pub struct GameAudit {
     /// Placements with a non-none spin label per slot.
     #[serde(default)]
     pub spin_placements: [u32; 2],
+    /// Repeat index when the same seed is run multiple times (`--repeat`).
+    #[serde(default)]
+    pub repeat: u32,
 }
 
 impl GameAudit {
