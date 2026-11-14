@@ -65,6 +65,9 @@ pub struct Suggestion {
     pub width: Option<u32>,
     /// True when the move came from the 1-ply greedy fallback.
     pub fallback: bool,
+    /// True when the search hit its hard deadline and returned the best
+    /// completed iteration (the bot's `aborted` flag).
+    pub aborted: bool,
 }
 
 /// Initial state passed to [`Agent::begin_round`].

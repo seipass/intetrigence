@@ -268,6 +268,7 @@ impl Agent for BotAgent {
             depth,
             width,
             fallback,
+            aborted: false,
         })
     }
 

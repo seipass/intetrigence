@@ -324,6 +324,7 @@ impl Agent for TbpAgent {
             depth: None,
             width: None,
             fallback: false,
+            aborted: false,
         })
     }
 

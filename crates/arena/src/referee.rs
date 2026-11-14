@@ -41,6 +41,8 @@ pub struct RoundConfig {
     pub profile: Profile,
     /// Deterministic search (fixed schedule, no wall-clock deadline).
     pub deterministic: bool,
+    /// Worker threads requested for the search (recorded in the header).
+    pub threads: u32,
 }
 
 impl RoundConfig {
@@ -53,6 +55,7 @@ impl RoundConfig {
             rules: "docs/s2-spec.md@v1.3.11".into(),
             protocol: "docs/s2-referee-protocol.md@v1.9".into(),
             deterministic: false,
+            threads: 8,
             started_at: String::new(),
             profile: Profile::Official,
         }
@@ -230,6 +233,7 @@ pub fn run_round(
                 width: suggestion.width,
                 nodes: suggestion.nodes,
                 fallback: suggestion.fallback,
+                aborted: suggestion.aborted,
             });
 
             let adopted =
@@ -562,6 +566,7 @@ fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> 
         profile: config.profile.as_str(),
         start_garbage: start_garbage.to_vec(),
         deterministic: config.deterministic,
+        threads: config.threads,
     }
 }
 

@@ -18,6 +18,7 @@ fn config(seed: u64, sheet: Sheet, turn_cap: u32) -> RoundConfig {
         started_at: "test".into(),
         profile: Profile::Official,
         deterministic: false,
+        threads: 8,
     }
 }
 

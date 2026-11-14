@@ -814,11 +814,21 @@ fn stage_section(
             "- burst (intetrigence received): max 1-turn **{}**, max 5-turn **{}**, over capacity **{}** (overlapping 5-turn windows, not burst events)",
             bot.max_burst_1, bot.max_burst_5, bot.burst_over_capacity
         )?;
+        writeln!(
+            out,
+            "- aborted (hard deadline): **{}/{} ({:.1}%)**",
+            bot.aborted_turns,
+            bot.search_turns,
+            bot.aborted_rate * 100.0
+        )?;
     }
     writeln!(
         out,
-        "- think over 200 ms: {} vs {}",
-        summary.bots[0].think_over_budget, summary.bots[1].think_over_budget
+        "- think over 200 ms: {} vs {}; over 100 ms: {} vs {}",
+        summary.bots[0].think_over_budget,
+        summary.bots[1].think_over_budget,
+        summary.bots[0].think_over_100ms,
+        summary.bots[1].think_over_100ms
     )?;
     writeln!(
         out,

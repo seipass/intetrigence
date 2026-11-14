@@ -13,16 +13,12 @@ use intetrigence_arena::referee::{RoundConfig, run_round};
 use intetrigence_arena::replay::ReplayRecord;
 use intetrigence_bot::SearchConfig;
 
-fn run(seed: u64) -> Vec<ReplayRecord> {
+fn run(seed: u64, threads: usize) -> Vec<ReplayRecord> {
     let search = SearchConfig {
         depth: 3,
         width: 16,
         max_width: 16,
-        // The deterministic mode currently uses the sequential path only when
-        // threads == 1; the parallel merge is not thread-invariant yet (the
-        // bot-dev is fixing it). The arena-level check uses the sequential
-        // path, which is the pure function the mode promises.
-        threads: 1,
+        threads,
         budget: Duration::from_millis(20),
         deterministic: true,
         ..SearchConfig::default()
@@ -60,8 +56,12 @@ fn body(records: &[ReplayRecord]) -> Vec<serde_json::Value> {
 
 #[test]
 fn deterministic_search_repeats_the_same_game() {
-    let first = run(9001);
-    let second = run(9001);
-    assert!(first.len() > 1, "the round must produce turns");
-    assert_eq!(body(&first), body(&second));
+    // The deterministic mode forces the sequential path, so the requested
+    // thread count must not change the game (the official round uses 8).
+    for threads in [2, 8] {
+        let first = run(9001, threads);
+        let second = run(9001, threads);
+        assert!(first.len() > 1, "the round must produce turns");
+        assert_eq!(body(&first), body(&second), "threads={threads}");
+    }
 }

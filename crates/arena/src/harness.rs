@@ -325,6 +325,8 @@ pub struct SearchGameSummary {
     pub turns: u32,
     pub fallback_turns: u32,
     #[serde(default)]
+    pub aborted_turns: u32,
+    #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
     pub depth_p95: Option<f64>,
@@ -374,6 +376,8 @@ pub struct GameSummary {
     pub spin_mismatches: [u32; 2],
     pub attack_mismatches_same_spin: [u32; 2],
     pub think_over_budget: [u32; 2],
+    #[serde(default)]
+    pub think_over_100ms: [u32; 2],
     pub sent_total: [u32; 2],
     pub received_total: [u32; 2],
     pub attack_total: [u32; 2],
@@ -437,6 +441,8 @@ pub struct BotAggregate {
     pub attack_mismatches: u32,
     pub attack_mismatches_same_spin: u32,
     pub think_over_budget: u32,
+    #[serde(default)]
+    pub think_over_100ms: u32,
     pub attack_per_piece: f64,
     pub received_per_game: f64,
     pub visible_rows: u32,
@@ -451,6 +457,10 @@ pub struct BotAggregate {
     pub fallback_turns: u32,
     #[serde(default)]
     pub fallback_rate: f64,
+    #[serde(default)]
+    pub aborted_turns: u32,
+    #[serde(default)]
+    pub aborted_rate: f64,
     #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
@@ -556,6 +566,13 @@ pub struct MatchSummary {
     /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
     #[serde(default)]
     pub resumed_games: u32,
+    /// Search schedule recorded for the match (depth/width/threads).
+    #[serde(default)]
+    pub depth: u32,
+    #[serde(default)]
+    pub width: u32,
+    #[serde(default)]
+    pub threads: u32,
     /// Deterministic search mode (fixed schedule, no wall-clock deadline).
     #[serde(default)]
     pub deterministic: bool,
@@ -632,6 +649,7 @@ fn search_game_summary(turns: &[crate::audit::SearchTurn]) -> SearchGameSummary 
     SearchGameSummary {
         turns: turns.len() as u32,
         fallback_turns: turns.iter().filter(|turn| turn.fallback).count() as u32,
+        aborted_turns: turns.iter().filter(|turn| turn.aborted).count() as u32,
         depth_median: median(&depths),
         depth_p95: percentile(&depths, 95.0),
         depth_max: max_f64(&depths).map(|value| value as u32),
@@ -726,6 +744,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
             audit.scoring[1].attack_mismatches_same_spin,
         ],
         think_over_budget: [audit.think[0].over_budget, audit.think[1].over_budget],
+        think_over_100ms: [audit.think[0].over_100ms, audit.think[1].over_100ms],
         sent_total: [audit.totals[0].sent_total, audit.totals[1].sent_total],
         received_total: [
             audit.totals[0].received_total,
@@ -890,6 +909,10 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .iter()
                 .map(|audit| audit.think[slot].over_budget)
                 .sum(),
+            think_over_100ms: audits
+                .iter()
+                .map(|audit| audit.think[slot].over_100ms)
+                .sum(),
             attack_per_piece: ratio(
                 audits
                     .iter()
@@ -943,6 +966,17 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             search_turns: search.turns,
             fallback_turns: search.fallback_turns,
             fallback_rate: search.fallback_rate,
+            aborted_turns: games
+                .iter()
+                .map(|game| game.search[slot].aborted_turns)
+                .sum(),
+            aborted_rate: ratio(
+                games
+                    .iter()
+                    .map(|game| game.search[slot].aborted_turns)
+                    .sum(),
+                games.iter().map(|game| game.search[slot].turns).sum(),
+            ),
             depth_median: search.depth_median,
             depth_p95: search.depth_p95,
             depth_max: search.depth_max,
@@ -1068,6 +1102,9 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         verified,
         verify_failures: games.len() as u32 - verified,
         resumed_games: 0,
+        depth: 0,
+        width: 0,
+        threads: 0,
         deterministic: false,
         measurement_complete: false,
         attax_patch_sha256: None,
@@ -1328,6 +1365,14 @@ fn check_opponent_log(
 
 pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let build_commit = config.build_commit.clone().or_else(git_short_head);
+    let (search_depth, search_width, search_threads) = match &config.bot {
+        BotChoice::Search(search) => (
+            search.depth as u32,
+            search.width as u32,
+            search.threads as u32,
+        ),
+        BotChoice::Baseline => (0, 0, 0),
+    };
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
@@ -1452,6 +1497,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     started_at: config.started_at.clone(),
                     profile: config.profile,
                     deterministic: config.deterministic,
+                    threads: search_threads,
                 };
 
                 let mut agents: [&mut dyn Agent; 2] = [bot.as_mut(), opponent.as_mut()];
@@ -1540,6 +1586,9 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
     summary.deterministic = config.deterministic;
+    summary.depth = search_depth;
+    summary.width = search_width;
+    summary.threads = search_threads;
     summary.measurement_complete = measurement_incomplete == 0;
     summary.attax_patch_sha256 = config
         .attax
@@ -1694,6 +1743,9 @@ mod tests {
             no_contest: 0,
             stuck: 0,
             forfeits: 0,
+            depth: 0,
+            width: 0,
+            threads: 0,
             deterministic: false,
             wins_topout: 0,
             wins_turncap: 0,

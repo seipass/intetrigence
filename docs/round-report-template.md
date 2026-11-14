@@ -38,6 +38,8 @@
 - attack/piece: `<a>` vs `<b>`
 - attack/line: `<a>`, spin rate: `<a>%`
 - losses by type: collapse `<n>`, pending `<n>`, race `<n>`
+- aborted (hard deadline): `<n>/<n>` (`<a>%`)
+- search schedule: deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
 - think over 200 ms: `<n>` vs `<n>`
