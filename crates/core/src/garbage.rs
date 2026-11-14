@@ -63,6 +63,22 @@ impl GarbageQueue {
         self.queue_total()
     }
 
+    /// Pending rows that have already arrived, i.e. the rows that
+    /// [`Self::take_insertable`] could insert on the next lock.
+    ///
+    /// `queue_total` counts packets still in flight, which cannot be inserted
+    /// yet; using it to price defence would over-value a clear while a burst is
+    /// still travelling.
+    pub fn arrived_total(&self, current_frame: u64) -> u32 {
+        self.packets
+            .iter()
+            .filter(|packet| {
+                packet.arrival_frame.saturating_add(GARBAGE_SPEED_FRAMES) <= current_frame
+            })
+            .map(|packet| packet.amount)
+            .sum()
+    }
+
     pub fn last_column(&self) -> Option<u8> {
         self.last_column
     }

@@ -191,6 +191,7 @@ pub fn play_game_with_setup(
             combo: scoring.state.combo,
             pieces_placed: game.stats().pieces_placed,
             incoming: garbage.queue_total(),
+            arrived: garbage.arrived_total(frame),
             t_slot: 0,
         };
 

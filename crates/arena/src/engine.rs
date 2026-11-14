@@ -96,6 +96,10 @@ pub struct View {
     pub b2b_streak: u32,
     /// Rows in this player's own garbage queue (arrived or not).
     pub pending_garbage: u32,
+    /// Rows that have already arrived and could be inserted on the next lock.
+    /// `pending_garbage` also counts packets still in flight, which cannot be
+    /// inserted yet (`docs/s2-burst-defense.md` §6.7).
+    pub arrived_garbage: u32,
     pub pieces_placed: u32,
     pub sent_total: u32,
     pub received_total: u32,
@@ -558,6 +562,7 @@ impl Engine {
             combo: player.scoring.state.combo,
             b2b_streak: player.scoring.state.b2b_streak,
             pending_garbage: player.garbage.queue_total(),
+            arrived_garbage: player.garbage.arrived_total(self.frame),
             pieces_placed: player.opener.pieces_placed,
             sent_total: player.opener.sent_total,
             received_total: player.game.stats().garbage_lines_received,

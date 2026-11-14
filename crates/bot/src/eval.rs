@@ -410,8 +410,11 @@ pub struct EvalContext {
     pub combo: u32,
     /// Pieces placed before the next placement.
     pub pieces_placed: u32,
-    /// Pending garbage rows (versus term; 0 in single-player).
+    /// Pending garbage rows, including packets still in flight.
     pub incoming: u32,
+    /// Arrived garbage rows: the rows a clear on this placement would actually
+    /// block (`docs/s2-burst-defense.md` §6.7).
+    pub arrived: u32,
     /// Attack lines sent so far in this game.
     pub sent_total: u32,
     /// Garbage rows received so far in this game.
@@ -578,6 +581,7 @@ pub fn apply_placement(
         combo: attack.combo_after,
         pieces_placed: context.pieces_placed + 1,
         incoming: context.incoming.saturating_sub(cancel_budget),
+        arrived: context.arrived.saturating_sub(cancel_budget),
         t_slot: 0,
     };
     (next, reward, next_context)
@@ -1000,6 +1004,7 @@ mod tests {
         let calm = EvalContext::default();
         let pressured = EvalContext {
             incoming: 14,
+            arrived: 8,
             ..EvalContext::default()
         };
         let calm_value = leaf_value(&board, &calm, &weights, 0);
@@ -1092,6 +1097,7 @@ mod tests {
             combo: 0,
             pieces_placed: 20,
             incoming: 0,
+            arrived: 0,
             sent_total: 0,
             received_total: 0,
             t_slot: 0,
