@@ -773,7 +773,9 @@ fn commit(
     // happened to finish in. Sorting by the input index instead made the
     // parallel merge reproducible only when the workers were, which harness-dev
     // measured failing at `threads: 2` and under parallel test load.
-    let mut order: Vec<(f64, u64, (u8, i32, i32, bool), u32)> = children
+    /// `(value, transposition key, placement, arrival index)`.
+    type MergeKey = (f64, u64, (u8, i32, i32, bool), u32);
+    let mut order: Vec<MergeKey> = children
         .iter()
         .enumerate()
         .map(|(index, child)| {
