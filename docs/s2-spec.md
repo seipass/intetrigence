@@ -452,7 +452,7 @@ if lines > 0:                     # ← 0 ライン設置では combo 乗数を�
 
 - `combo` は §5 の 0-based。1 回目の消去は `combo = 0` なので**乗算なし**。
 - **`lines > 0` のときだけ適用する**。0 ライン設置では combo がリセットされる(S7 は乗算の**前**に `stats.combo = -1` にする)ので、**`combo = 0` として扱う**。このガードが無いと、直前の combo が残ったまま 0 ライン設置をすると `ln` 項が攻撃を作る(2026-11-15 修正)。
-- **テスト**: `crates/core` の `no_clear_resets_combo_but_keeps_b2b`(combo=5 / lines=0 で events 空・base 0 を固定)。`docs/s2-attack-examples.json` の 18 件は全て `lines > 0` なので、この経路は fixture では検出できない。
+- **テスト**: `crates/core` の `no_clear_resets_combo_but_keeps_b2b`、および fixture の `no-clear-stale-combo`(spin=full / combo=5 / lines=0 で events 空・base 0)。fixture は 19 件で、`lines = 0` の経路も 1 件含む。
 - **`ln` 項は「置き換え」ではなく `max`**。base > 0 のとき combo が小さいと ln 項が負けるので実質効かない。**base = 0(Single / TSM / 非 T mini single)のときだけ ln 項が攻撃を作る**。これが S1 の「If the base attack is 0, the function ln(1+1.25x) is used for 2-combo and above」の実装上の意味。
 - 出典: S1、S5、S7 `garbageCalcV2`
 - 浮動小数の注意: `1 + 0.25*combo` は combo < 2^50 で正確、`base ≤ 10` との積も正確。**乗算側は浮動小数誤差が出ない**。`ln` 側は `ln_1p` を使い、丸めは floor。
@@ -1456,3 +1456,4 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.13 | 2026-11-13 | §12.8 を追加。M3 ゲート(20–0、内訳 forfeit 19 / TurnCap 1 / TopOut 0)と、9006-A の生存 7.7 倍を記録。**TopOut 勝ちは 0 件**であること、`forfeit_cause` が M3 証拠に無いこと(要再生成)、レポートの「2/2 wins」行が誤解を招くことを指摘。 |
 | v1.3.14 | 2026-11-15 | **§6.3 / §6.8 のバグ修正**: combo 乗数と `ln` 項を `lines > 0` のときだけ適用する。0 ライン設置では combo がリセットされる(S7 は乗算前に `stats.combo = -1`)ので `combo = 0` として扱う。ガードが無いと、直前の combo が残ったまま 0 ライン設置すると `ln` 項が攻撃を作る(core-engine の監査 `docs/core-rule-audit.md` F1)。 |
 | v1.3.15 | 2026-11-15 | §2.4 に**袋の初期配列順** `[I, O, T, S, Z, J, L]` を明記(同じ seed でも初期順が違えば列が変わる)。§11-U7 に「袋順も同じプロトコル」と追記。core-engine の監査 F4 への対応。 |
+| v1.3.16 | 2026-11-15 | fixture `docs/s2-attack-examples.json` に `no-clear-stale-combo` を追加(19 件)。`lines = 0` の combo 乗数ガードを fixture でも固定。 |
