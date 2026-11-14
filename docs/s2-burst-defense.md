@@ -560,6 +560,106 @@ v1.6 で `height + pending >= 21` にゲートしたが、**`height + min(pendin
 
 ---
 
+## 6.7 `defense_value` の仕様(manager の 5 問への回答)
+
+### 6.7.1 問 1: `min(pending, 8)` は正しいか → **`min(arrived_pending, 8)` に直す**
+
+`GARBAGE_CAP = 8` は正しい。しかし **`pending` の定義が問題**:
+
+```rust
+// crates/core/src/garbage.rs
+pub fn queue_total(&self) -> u32 {
+    self.packets.iter().map(|packet| packet.amount).sum()   // ← 到着前も含む
+}
+```
+
+**`queue_total()` は「まだ到着していないパケット」も含む。** 一方、実際に出現するのは:
+
+```rust
+// take_insertable
+if packet.arrival_frame.saturating_add(GARBAGE_SPEED_FRAMES) > current_frame { break; }
+```
+
+**到着済み(`arrival + 20 <= frame`)のパケットだけ**。したがって:
+
+```
+正しい挿入行数 = min(arrived_pending, 8)
+arrived_pending = Σ packet.amount  where packet.arrival_frame + 20 <= current_frame
+```
+
+| 状況 | `queue_total()` | `arrived_pending` | 実際に出る |
+|---|---|---|---|
+| 到着済み 5 行 | 5 | 5 | **5** |
+| 到着前 10 行 | 10 | **0** | **0** |
+| 到着済み 3 + 到着前 10 | 13 | **3** | **3** |
+
+**`min(queue_total, 8)` は「到着前の分」を過大評価する。** 到着前 10 行・到着済み 0 行なら、**実際には何も出ないのに `min(10,8)=8` の価値を付ける**。
+
+**要求**: **`arrived_pending` を `Suggestion` の state に追加**してください。`queue_total()` では代用できません。
+
+**相殺との関係**: 相殺は**送信時にキューから引かれる**ので、`arrived_pending` は**相殺後**の値。したがって「8 行から相殺を引いた残り」ではなく、**`arrived_pending` がすでに相殺後**。**`min(arrived_pending, 8)` で正しい。**
+
+### 6.7.2 問 2: `pending = 3` のとき `min(3, 8) = 3` は正しいか → **正しい**
+
+到着済みが 3 行なら、出現するのは 3 行。**`min(3, 8) = 3`** ✓。
+
+### 6.7.3 問 3: `pending = 0` でも先読みして消す価値はあるか → **追加の項は不要**
+
+- **出現を止めるのは、出現する turn の消去だけ**。T で消しても T+2 の出現は止まらない
+- T で消す価値は **「高さが下がる」ことだけ**で、それは既に `height` 項が数えている
+- **先読みの追加項を作ると、二重計上になる**
+
+**ただし 1 つだけ**: T で消すと **T+2 の時点の高さが低い**ので、**T+2 の容量が増える**。これも `height` 項が数える。**追加項は不要**。
+
+### 6.7.4 問 4: `attack` と `defense` の重みは 1:1 か
+
+**基準は 1:1 でよい**(どちらも「行」)。ただし**真の比は状態依存**:
+
+| 状態 | 防御の相対価値 |
+|---|---|
+| 自分 H=8、相手 H=18 | **低い**(相手が先に死ぬ) |
+| 自分 H=18、相手 H=8 | **高い**(自分が先に死ぬ) |
+| 両方 H=12 | 1:1 |
+
+**推奨**:
+
+```
+defense_weight = W_attack × risk(H_self)
+risk(H) = clamp((H - 12) / 6, 0.0, 1.0)
+```
+
+- **H=12 で 0**(低い盤面では防御の価値なし → 攻撃に回る)
+- **H=18 で 1**(1:1)
+- **H > 18 で 1 のまま**(それ以上は上げない)
+
+**これで「低いときは攻撃、高いときは防御」が自動的に出る。** 相手の高さも入れたいが、**まず自分の高さだけで試すべき**(パラメータが増えると検証できない)。
+
+### 6.7.5 問 5: `defense_value` が入れば survival モードは不要か → **併用する**
+
+- **`defense_value` は滑らかな incentive**。「高い盤面では 1 ライン消しが得」という**相対評価**
+- **survival モードは hard override**。`H + min(arrived, 8) >= 21` では、**0 ライン設置が即死**なので、**評価の大小に関係なく 1 ライン消しを強制**する必要がある
+
+**両方必要**。ただし **survival の条件を訂正**:
+
+```
+H + min(arrived_pending, 8) >= 21        ← 正しい
+H + pending >= 21                        ← v1(誤り)
+```
+
+**理由**: `pending` が 8 を超えると、v1 は**安全なのに守備に入る**。
+
+### 6.7.6 まとめ(実装への要求)
+
+| # | 要求 |
+|---|---|
+| 1 | **`arrived_pending` を state に追加**(`queue_total` では代用不可) |
+| 2 | `defense_value = W_attack × risk(H) × min(arrived_pending, 8)`、**1 ライン以上消す設置のみ** |
+| 3 | `risk(H) = clamp((H - 12) / 6, 0, 1)` |
+| 4 | survival の条件を `H + min(arrived, 8) >= 21` に訂正 |
+| 5 | `combo_potential` のゲートを `H + min(arrived, 8) >= 19` に |
+
+---
+
 ## 7. 限界
 
 - **しきい値 17/21 は解析値**。実測で検証していない(bot-dev の測定で確認する)
@@ -582,3 +682,4 @@ v1.6 で `height + pending >= 21` にゲートしたが、**`height + min(pendin
 | v1.6 | 2026-11-16 | **§6.4.1 を訂正**。burst 3 指標の実測(intetrigence が受けた max1=8 / max5=17 / over-capacity **53**、clys が受けた 8 / 15 / **35**)により、**「clys の攻撃は塊で来る」は否定された**。burst プロファイルはほぼ同じで、差は **`burst_over_capacity`(53 対 35)** = **我々の盤面が高い**こと。**崩壊の原因は相手の burst の大きさではなく我々の高さ**。対策は「burst 耐性」ではなく「盤面を低く保つ」。 |
 | v1.7 | 2026-11-16 | **§6.5 を追加**。9010-B(75 turn、net −6、最終 y 13)を診断。**相手は t62〜72 で 23 行送り、我々は t64〜73 で 6 ライン(single のみ)消した**。**single は pending を減らさない**(攻撃 0 なので相殺できない)ため、pending が溜まったまま t74 で 0 ラインを置いて死んだ。**生存の十分条件は `sent >= received`** で、single 主体では満たせない。**「防御」と「攻撃」は別問題ではなく、`attack/line` が唯一の恒久的な生存策**。**崩壊の定義を修正**(`y >= 14` だけでは pending 押し切り型を見落とす)。 |
 | v1.8 | 2026-11-16 | **§6.6 を追加**。**死の条件を `H + min(pending, 8) >= 21` に訂正**(v1 の `H + pending` は pending > 8 で早すぎる)。**single の防御価値は「高さ −1」ではなく「最大 8 行の挿入を 1 turn 止めること」**なので、`block_bonus = W_block × min(pending, 8) × risk(H)`(`risk(H) = clamp((H-12)/6, 0, 1)`)を評価に入れるべき。これが無いと `clear[None] = 0` で「single を撃つ理由が高さ −1 だけ」になり、崩壊が再現する(実測: 9004-A が新 seeds で再崩壊)。`combo_potential` のゲートも `height + min(pending, 8) >= 19` に。 |
+| v1.9 | 2026-11-16 | **§6.7 を追加**(`defense_value` の仕様、manager の 5 問への回答)。**`min(pending, 8)` は誤り** — `queue_total()` は到着前を含むので、**`arrived_pending`(到着済みのみ)を state に追加**する必要がある。`min(arrived, 8)` が正しい。`pending=0` の先読み項は**不要**(二重計上)。重みは **`W_attack × risk(H)`**、`risk(H) = clamp((H-12)/6, 0, 1)`。**survival モードは併用**(hard override が要る)。survival と `combo_potential` の条件を `min(arrived, 8)` に訂正。 |
