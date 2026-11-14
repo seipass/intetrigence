@@ -41,6 +41,10 @@ pub struct GameReport {
     pub think_times: Vec<Duration>,
     /// Every input applied, in order, so the game can be replayed.
     pub actions: Vec<Action>,
+    /// Deepest garbage queue seen (rows). The failure mode the M5 provisional
+    /// losses share is the queue building to 8-12 rows and then landing in
+    /// two waves, so this is the diagnostic that matters.
+    pub max_pending: u32,
     /// Stack height after each placement. A checkpoint height (say turn 200)
     /// is a defence metric that does not saturate at the turn cap, unlike
     /// survival turns.
@@ -143,6 +147,7 @@ pub fn play_game_with_setup(
         clutch_fallbacks: 0,
         think_times: Vec::new(),
         actions: Vec::new(),
+        max_pending: 0,
         heights: Vec::new(),
     };
 
@@ -151,6 +156,7 @@ pub fn play_game_with_setup(
             break;
         };
         let frame = u64::from(report.turns) * 12;
+        report.max_pending = report.max_pending.max(garbage.queue_total());
         while next_injection < injections.len() && injections[next_injection].0 <= report.turns {
             garbage.receive(injections[next_injection].1, frame);
             next_injection += 1;
