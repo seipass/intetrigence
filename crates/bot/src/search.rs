@@ -61,6 +61,15 @@ pub struct SearchConfig {
     /// Wall-clock budget for one move.
     pub budget: Duration,
     pub weights: Weights,
+    /// Run one fixed iteration at `(depth, width)` with no deadline instead of
+    /// the anytime loop.
+    ///
+    /// The anytime loop stops on the wall clock, so the number of completed
+    /// iterations depends on machine load and thread timing. Measured: the
+    /// same seed produced a win in one run and a collapse in another (9004-A),
+    /// which makes an A/B on 20-40 games noise. In this mode the search is a
+    /// pure function of the position.
+    pub deterministic: bool,
 }
 
 impl Default for SearchConfig {
@@ -72,6 +81,7 @@ impl Default for SearchConfig {
             threads: MAX_THREADS,
             budget: Duration::from_millis(100),
             weights: Weights::default(),
+            deterministic: false,
         }
     }
 }
@@ -262,6 +272,9 @@ impl Searcher {
     /// (the spawn is blocked, i.e. the game is already over). A referee should
     /// check for top-out before asking, but the search never panics on it.
     pub fn search(&mut self, root: &RootState) -> Option<SearchResult> {
+        if self.config.deterministic {
+            return self.search_fixed(root);
+        }
         let start = Instant::now();
         // Leave a small margin for the final merge, which happens after the
         // last deadline check, so the wall-clock time stays inside the budget.
@@ -325,6 +338,47 @@ impl Searcher {
                 result.iterations = 0;
                 result
             })
+        })
+    }
+
+    /// One iteration at `(depth, width)` with no deadline.
+    ///
+    /// The beam is deterministic (children are merged in chunk order and
+    /// `commit` sorts by value), so the same position always yields the same
+    /// move regardless of thread timing.
+    fn search_fixed(&mut self, root: &RootState) -> Option<SearchResult> {
+        let start = Instant::now();
+        let depth = self.config.depth.max(1);
+        let width = self.config.width.max(1);
+        let sequence = PieceSequence::new(root.current, &root.preview, depth);
+        let deadline = start + Duration::from_secs(3600);
+        let outcome = if self.config.threads <= 1 {
+            self.run_sequential(root, &sequence, depth, width, deadline)
+        } else {
+            self.run_parallel(root, &sequence, depth, width, deadline)
+        };
+        let Some((nodes, candidates, line, completed)) = outcome else {
+            return self.greedy(root, start).map(|mut result| {
+                result.fallback = true;
+                result.iterations = 0;
+                result
+            });
+        };
+        if candidates.is_empty() {
+            return None;
+        }
+        let Candidate { first, value } = candidates[0];
+        Some(SearchResult {
+            best: first,
+            value,
+            depth: completed,
+            width,
+            nodes,
+            iterations: 1,
+            fallback: false,
+            elapsed: start.elapsed(),
+            candidates,
+            line,
         })
     }
 
@@ -807,6 +861,7 @@ mod tests {
             threads: 1,
             budget: Duration::from_secs(5),
             weights: Weights::default(),
+            deterministic: false,
         }
     }
 
@@ -884,6 +939,7 @@ mod tests {
             threads: 1,
             budget: Duration::from_secs(5),
             weights: Weights::default(),
+            deterministic: false,
         });
         let state = root(tsd_board(), PieceKind::T, &[PieceKind::I]);
         let result = searcher.search(&state).expect("a move exists");
@@ -905,6 +961,7 @@ mod tests {
             threads: 1,
             budget: Duration::from_secs(5),
             weights: Weights::default(),
+            deterministic: false,
         });
         let mut state = root(board, PieceKind::S, &[PieceKind::O]);
         state.hold = Some(PieceKind::I);
@@ -944,6 +1001,7 @@ mod tests {
             threads: 1,
             budget: Duration::from_micros(1),
             weights: Weights::default(),
+            deterministic: false,
         });
         let state = root(Board::new(), PieceKind::I, &[PieceKind::O]);
         let result = searcher.search(&state).expect("a move exists");

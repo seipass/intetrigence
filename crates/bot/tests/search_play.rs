@@ -132,6 +132,50 @@ fn a_tight_deadline_still_returns_a_move() {
     assert!(result.elapsed <= Duration::from_millis(200));
 }
 
+/// Deterministic mode: the same position always yields the same move.
+///
+/// The anytime loop stops on the wall clock, so the same seed produced a win
+/// in one run and a collapse in another (9004-A). An A/B on 20-40 games is
+/// noise in that regime, so the search has a fixed-schedule mode.
+#[test]
+fn deterministic_mode_repeats_exactly() {
+    let config = SearchConfig {
+        deterministic: true,
+        depth: 4,
+        width: 128,
+        threads: 8,
+        ..real_config()
+    };
+    let root = intetrigence_bot::RootState {
+        board: heavy_board(),
+        current: intetrigence_core::PieceKind::T,
+        preview: vec![
+            intetrigence_core::PieceKind::I,
+            intetrigence_core::PieceKind::O,
+            intetrigence_core::PieceKind::S,
+            intetrigence_core::PieceKind::Z,
+            intetrigence_core::PieceKind::L,
+            intetrigence_core::PieceKind::J,
+        ],
+        hold: Some(intetrigence_core::PieceKind::L),
+        context: intetrigence_bot::EvalContext::default(),
+    };
+    let mut first = intetrigence_bot::Searcher::new(config.clone());
+    let a = first.search(&root).expect("placements");
+    let mut second = intetrigence_bot::Searcher::new(config.clone());
+    let b = second.search(&root).expect("placements");
+    assert_eq!(a.best, b.best);
+    assert_eq!(a.nodes, b.nodes);
+    assert_eq!(a.candidates.len(), b.candidates.len());
+    assert_eq!(a.line, b.line);
+    // And a whole game replays identically from the same seed.
+    let one = play_game(0xD00D, &config, 12);
+    let two = play_game(0xD00D, &config, 12);
+    assert_eq!(one.actions, two.actions);
+    assert_eq!(one.turns, two.turns);
+    assert_eq!(one.lines, two.lines);
+}
+
 #[test]
 fn think_time_respects_the_budget() {
     let config = SearchConfig {
