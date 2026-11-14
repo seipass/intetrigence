@@ -220,3 +220,12 @@ intetrigence/
   - **条件の非対称**: 審判は自前 S2 実装、intetrigence は 40 行可視・ネイティブ 8 スレッド、attax は 20 行可視・TBP アダプタ経由。
   - **是正措置(全員に発注済み)**: ①attax-integration = 194 forfeit の根本原因特定(seed 11012 turn 32 を起点)+ attax の 40 行対応パッチ ②harness-dev = 分類バグ修正 + **ゲートを TopOut + TurnCap のみに変更** + 既存エビデンスの再分類 ③bot-dev = **TopOut 勝ち 0/220 の克服**(アダプタ修正後の実ベースライン測定から)④s2-spec-lead = protocol v1.17(ゲート定義・分類仕様・無効化された測定の記録)。
   - **新しい合格基準の方向性**: 勝数は TopOut + TurnCap のみで数える。forfeit はゲート外(別途報告)。既存の 194 forfeit を含む過去の数字は「無効化された測定」として docs に記録する。
+
+- **🔧 2026-11-15 測定基盤の修正完了(全エビデンスの再解釈)**:
+  - **attax の視野**: upstream `7b38f51` は **20 行**(`git show 7b38f51:src/ai/bot/movegen.ts` → `ROWS = 20`)。作業ツリーが 40 行に見えたのは attax-integration のパッチ適用済みだったため(3 名 + manager が独立確認)。**40 行互換パッチ + posY 修正を採用**。
+  - **posY バグ**: attax アダプタが active をグリッド最上段に置いていた(レフェリーの S2 spawn と 18 行ずれ)→ `nodes=0` で即 forfeit。**修正後 seed 11012 は 1000 turn 完走、forfeit 0**。
+  - **分類バグ**: `classify_forfeit` の `lowest_cell >= visible_rows` が常に真(S2 spawn row 21 / V=20)。削除済み。判定は「可視行に収まる合法手があるか」のみ。
+  - **旧エビデンス(V=20 で再分類)**: vision 32 / **other 162**(104 高スタック + 58 低スタック)/ TopOut 勝 0 / TurnCap 勝 13 / TopOut 負 13 → **ゲート勝数 13/220 = 5.9%**。**すべて無効**として seed-registry §5 に記録。
+  - **パッチ適用 attax のスモーク**: seed 11012 A/B = **attax の 2-0**(TopOut 464/246 turn)、forfeit 0、replay 2/2。**forfeit が消えた瞬間、attax が勝つ** — これが真の実力差。
+  - **計測基盤の整備完了**: `visible_rows` の自動検出(movegen.ts から)、`--weights key=value` による重み注入(replay header に記録)、ゲートは TopOut+TurnCap のみ、測定完全性チェック(replay+verify+audit+相手 decision log)、surge/B2B 指標。
+  - **次の焦点**: bot-dev の surge 改善。surge は放出されている(1,602 回/372 ゲーム)が **80% が 4–7 ライン**で attax に吸収される。効くのは 9–13 ライン。charge の非線形価値 + hold ペナルティを self-play で A/B 中。
