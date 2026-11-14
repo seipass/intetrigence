@@ -10,7 +10,7 @@
 //! and are marked `TODO(s2-spec)`. Direct garbage-row insertion is implemented
 //! here because it is a board operation, not a queue policy.
 
-use crate::bag::Bag;
+use crate::bag::{Bag, BagState};
 use crate::board::{Board, BoardInvariantError, ClearInfo, GarbageError};
 use crate::hold::Hold;
 use crate::kick::{self, Kick};
@@ -277,6 +277,12 @@ impl Game {
     /// Next `count` pieces without consuming them.
     pub fn preview(&mut self, count: usize) -> Vec<PieceKind> {
         self.bag.peek(count)
+    }
+
+    /// Read-only snapshot of the current 7-bag for the referee / TBP
+    /// `start.randomizer`. The active piece is already drawn and excluded.
+    pub fn bag_state(&self) -> BagState {
+        self.bag.state()
     }
 
     /// Lowest legal `y` for the active piece (ghost position).

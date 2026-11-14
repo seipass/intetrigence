@@ -41,7 +41,7 @@ pub mod piece;
 pub mod rng;
 pub mod scoring;
 
-pub use bag::Bag;
+pub use bag::{BAG_SIZE, Bag, BagState};
 pub use board::{
     Board, BoardInvariantError, Cell, ClearInfo, FULL_ROW, GarbageError, HEIGHT, PlacementError,
     VISIBLE_HEIGHT, WIDTH,

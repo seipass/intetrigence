@@ -16,6 +16,9 @@ use std::collections::VecDeque;
 use crate::piece::{ALL_PIECES, PieceKind};
 use crate::rng::MinStd;
 
+/// Number of pieces in one bag.
+pub const BAG_SIZE: usize = ALL_PIECES.len();
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bag {
     rng: MinStd,
@@ -60,8 +63,71 @@ impl Bag {
         self.queue.iter().take(count).copied().collect()
     }
 
+    /// Remaining pieces of the **current** bag, in draw order.
+    ///
+    /// The active piece (if any) has already been drawn and is not included.
+    /// `peek` may generate future bags ahead of time but does not change this
+    /// state. When the current bag is exhausted this is empty until the next
+    /// [`Self::next_piece`] refills it.
+    pub fn remaining(&self) -> Vec<PieceKind> {
+        let len = self.current_bag_len();
+        self.queue.iter().take(len).copied().collect()
+    }
+
+    /// Read-only snapshot for the referee / TBP `start.randomizer`
+    /// (`SevenBag.bag_state`).
+    pub fn state(&self) -> BagState {
+        BagState {
+            remaining: self.remaining(),
+        }
+    }
+
+    /// Number of pieces left in the current bag.
+    ///
+    /// Derived from the existing queue and bag counter, so the RNG/queue
+    /// representation and the generated sequence are unchanged.
+    fn current_bag_len(&self) -> usize {
+        if self.queue.is_empty() {
+            return 0;
+        }
+        let generated = self.bags_generated.saturating_mul(BAG_SIZE as u64);
+        let consumed = generated.saturating_sub(self.queue.len() as u64);
+        BAG_SIZE - (consumed % BAG_SIZE as u64) as usize
+    }
+
     pub fn bags_generated(&self) -> u64 {
         self.bags_generated
+    }
+}
+
+/// Read-only snapshot of the current 7-bag.
+///
+/// `remaining` is in draw order, matching TBP 3.0's
+/// `RandomizerState::SevenBag { bag_state: Vec<Piece> }`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BagState {
+    /// Remaining pieces of the current bag, in draw order.
+    pub remaining: Vec<PieceKind>,
+}
+
+impl BagState {
+    pub fn len(&self) -> usize {
+        self.remaining.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.remaining.is_empty()
+    }
+
+    /// Bitmask of the remaining piece kinds (`bit = PieceKind::index`).
+    pub fn mask(&self) -> u8 {
+        self.remaining
+            .iter()
+            .fold(0u8, |mask, &piece| mask | (1u8 << piece.index()))
+    }
+
+    pub fn contains(&self, piece: PieceKind) -> bool {
+        self.remaining.contains(&piece)
     }
 }
 
