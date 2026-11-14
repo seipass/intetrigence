@@ -121,28 +121,36 @@ Two consequences for this document:
 - the *win* side was never real, so "attack/piece 0.965 vs 0.862" has never
   converted into a kill. attax has not been topped out once in 220 games.
 
-### The bot never releases surge
+### Correction: surge *is* released, but it is small
 
-`compute_attack` pays a surge release as attack lines, and the reward follows:
-a single that breaks a B2B streak of 12 pays `attack 11 -> reward 188`
-(measured with `eval::apply_placement` on a synthetic board), against `-12`
-for the same single at B2B 0. So the evaluation *does* want to cash the charge.
+An earlier version of this document claimed the bot never releases surge. That
+was wrong: it generalised from the last twelve turns of the six losses. A tally
+over all 372 intetrigence-vs-attax replays in `scripts/evidence/` says the
+opposite.
 
-Yet the replay dumps show B2B streaks of 10-14 and per-turn attack values of
-0-5: the charge is never released. Every attack we have ever sent is the
-regular per-clear attack. That is the most likely reason attax never dies: it
-never has to absorb a burst larger than a quad, which its 20-row view handles.
+- 16,662 turns had `b2b_before >= 5` (charge >= 4).
+- **1,602 surge releases**, 9,679 surge lines in total, 7.9% of all attack
+  (122,987 lines).
+- 329 of 372 games contain at least one release.
+- Release sizes: 4 lines x503, 5 x352, 6 x251, 7 x171, 8 x103, 9 x83, 10 x56,
+  11 x30, 12 x16, 13 x10, 14 x11, 15 x6, 16 x3, 17 x3, 19 x2, 20 x2.
 
-This is the highest-value open question in the bot: **why does the search not
-find the release**, given the reward is large and positive? Candidates:
+So the S2 win condition is being used, just weakly: **most bursts are 4-7
+lines**, which a bot sitting at height 3-5 absorbs in one or two turns. Only
+325 releases (20%) reach 8+ lines.
 
-1. the streak is high only in positions where no non-difficult clear exists
-   (the bot keeps taking T-spins and quads, which are difficult clears and
-   therefore keep the streak alive);
-2. the release is 1 ply away but the beam prunes it before the leaf (the
-   reward is immediate, so this should not happen);
-3. `Weights.b2b_break = -20` plus the clear-table penalty plus the shape cost
-   of the clearing placement outweighs the burst in the actual positions.
+The open question is therefore not "why no release" but "why are the releases
+small": the bot cashes the charge as soon as a cheap non-difficult clear
+appears, instead of building the streak to 10-14 and releasing 9-13 lines at
+once. The reward does prefer the bigger burst (a single at B2B 12 pays 188
+against 48 at B2B 5), so the cause is positional: at B2B 12 the bot has
+usually already spent the cheap clears, and the search's 8-ply horizon cannot
+see the value of *holding* the charge for a later, bigger release.
+
+That points at a term the evaluation does not have: the **option value of the
+charge**. `surge_charge_from_streak` is priced linearly (1.5 per charged line),
+which is the same whether the charge is 4 or 14, while the realised burst grows
+super-linearly in practice (the bot must find a non-difficult clear).
 
 ## 5. Conclusion
 
