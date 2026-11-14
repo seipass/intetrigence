@@ -31,6 +31,8 @@ pub struct TbpAgentConfig {
     pub name: Option<String>,
     /// Rows the bot can see (default 20). Used for forfeit classification.
     pub visible_rows: u32,
+    /// Whether the bot's input set includes 180-degree rotations (attax: no).
+    pub supports_180: bool,
     /// Delay before each `suggest`, giving a continuously-searching bot a
     /// budget (CC2/clys have no think-time option). Included in `think_ms`.
     pub suggest_delay_ms: u64,
@@ -52,6 +54,7 @@ impl TbpAgentConfig {
             decision_log: None,
             name: None,
             visible_rows: 40,
+            supports_180: true,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             transcript: None,
@@ -87,6 +90,7 @@ impl TbpAgent {
             version: None,
             commit: config.commit.clone(),
             visible_rows: config.visible_rows,
+            supports_180: config.supports_180,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());
@@ -229,6 +233,7 @@ impl Agent for TbpAgent {
     }
 
     fn suggest(&mut self, view: &View) -> Result<Suggestion, AgentError> {
+<<<<<<< HEAD
         // Opt-in board dump for desync diagnosis: the referee's board at the
         // moment of `suggest`, in the same 40-row `|`-joined format as the
         // attax adapter's `ATTAX_TBP_BOARD_LOG`. Default off.
@@ -247,6 +252,31 @@ impl Agent for TbpAgent {
                 "board": rows.join("|"),
                 "hold": format!("{:?}", view.hold),
                 "active": format!("{:?}", view.active.kind),
+=======
+        // Opt-in referee board dump for adapter desync diagnosis. The attax
+        // adapter writes its own board with `ATTAX_TBP_BOARD_LOG`; both are
+        // one line per `suggest`, row 0 = bottom.
+        if let Some(path) = std::env::var_os("TBP_BOARD_LOG") {
+            let board = board_to_payload(&view.board)
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|cell| if cell.is_some() { '1' } else { '0' })
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>()
+                .join("|");
+            let line = serde_json::json!({
+                "turn": view.turn,
+                "board": board,
+                "hold": view.hold.map(|kind| format!("{kind:?}")),
+                "active": {
+                    "kind": format!("{:?}", view.active.kind),
+                    "rotation": format!("{:?}", view.active.rotation),
+                    "x": view.active.x,
+                    "y": view.active.y,
+                },
+>>>>>>> 7ac1499
                 "combo": view.combo,
                 "b2b": view.b2b_streak,
             });
@@ -255,6 +285,10 @@ impl Agent for TbpAgent {
                 .append(true)
                 .open(&path)
             {
+<<<<<<< HEAD
+=======
+                use std::io::Write;
+>>>>>>> 7ac1499
                 let _ = writeln!(file, "{line}");
             }
         }

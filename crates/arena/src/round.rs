@@ -31,6 +31,7 @@ pub enum OpponentKind {
         bun: String,
         commit: Option<String>,
         visible_rows: u32,
+        env: Vec<(String, String)>,
     },
     Tbp(TbpOpponentConfig),
     /// Not configured for this run (the stage fails if it is reached).
@@ -363,6 +364,7 @@ fn gate_check(
     topout_losses: u32,
     turncap: u32,
     no_contest: u32,
+    stuck: u32,
     measurement_complete: bool,
     verified: u32,
     games: u32,
@@ -386,16 +388,17 @@ fn gate_check(
     if turncap > 0 {
         return false;
     }
-    // Every game must be accounted for. `Stuck` is not one of the four
-    // outcomes, so a stuck game makes the total short and fails the gate.
-    if topout_wins + topout_losses + turncap + no_contest != games {
+    // Every game must be accounted for (five outcomes, including Stuck).
+    if topout_wins + topout_losses + turncap + no_contest + stuck != games {
         return false;
     }
-    if index == 0 {
-        // Stage 1 is a perfect record: 50 TopOut wins, no loss, no turn-cap,
-        // no forfeit (protocol v1.27 §1.4).
+    if index < 2 {
+        // Stages 1-2 (CC2, clys) are perfect records: 50 TopOut wins, no
+        // loss, no turn-cap, no forfeit (new staged goal).
         topout_wins == gate && topout_losses == 0 && no_contest == 0
     } else {
+        // Stage 3 (attax): 48+ TopOut wins, no turn-cap; no-contest is
+        // allowed only if the 50-game total still holds.
         topout_wins >= gate
     }
 }
@@ -407,6 +410,7 @@ fn stage_gate(index: usize, summary: &MatchSummary, gate: u32) -> bool {
         summary.losses_topout,
         summary.turncap,
         summary.no_contest,
+        summary.stuck,
         summary.measurement_complete,
         summary.verified,
         summary.games.len() as u32,
@@ -418,10 +422,11 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
     if passed {
         return "passed".into();
     }
-    if index == 0 && summary.no_contest > 0 {
+    if index < 2 && summary.no_contest > 0 {
         return format!(
-            "invalid: {} no-contest (forfeit) game(s) in stage 1 (protocol v1.27 §1.4)",
-            summary.no_contest
+            "invalid: {} no-contest (forfeit) game(s) in stage {} (perfect record required)",
+            summary.no_contest,
+            index + 1
         );
     }
     if !summary.measurement_complete {
@@ -436,7 +441,7 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
             summary.turncap
         );
     }
-    if index == 0 {
+    if index < 2 {
         format!(
             "gate failed: {} TopOut wins / {} games (needs {}; TopOut losses {})",
             summary.wins_topout,
@@ -513,12 +518,14 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                     bun,
                     commit,
                     visible_rows,
+                    env,
                 } => {
                     let mut attax = AttaxConfig::new(dir.clone());
                     attax.bun = bun.clone();
                     attax.commit = commit.clone();
                     attax.visible_rows = *visible_rows;
                     attax.patch_sha256 = opponent.patch_sha256.clone();
+                    attax.env = env.clone();
                     config.attax = Some(attax);
                 }
                 OpponentKind::Tbp(tbp) => {
@@ -1046,22 +1053,27 @@ mod tests {
     }
 
     #[test]
-    fn stage_gate_counts_only_topout_wins_and_rejects_turncap() {
-        // Stage 1: 50 TopOut wins, 0 TopOut losses, 0 turn-cap games.
-        assert!(gate_check(0, 50, 0, 0, 0, true, 50, 50, 50));
-        assert!(!gate_check(0, 49, 0, 0, 0, true, 50, 50, 50));
-        assert!(!gate_check(0, 50, 1, 0, 0, true, 50, 50, 50));
-        assert!(!gate_check(0, 50, 0, 1, 0, true, 50, 50, 50));
-        assert!(!gate_check(0, 50, 0, 0, 1, true, 50, 50, 50));
-        assert!(!gate_check(0, 50, 0, 0, 0, false, 50, 50, 50));
-        assert!(!gate_check(0, 50, 0, 0, 0, true, 49, 50, 50));
-        // Missing games must fail even when the TopOut count is 50.
-        assert!(!gate_check(0, 50, 0, 0, 0, true, 51, 51, 50));
-        assert!(!gate_check(0, 50, 0, 0, 0, true, 49, 49, 50));
-        // Stage 2/3: >= 48 TopOut wins, no turn-cap.
-        assert!(gate_check(1, 48, 2, 0, 0, true, 50, 50, 48));
-        assert!(!gate_check(1, 47, 3, 0, 0, true, 50, 50, 48));
-        assert!(!gate_check(1, 48, 2, 1, 0, true, 50, 50, 48));
-        assert!(!gate_check(1, 48, 1, 0, 0, true, 50, 50, 48));
+    fn stage_gate_cc2_clys_perfect_attax_48() {
+        // Stages 1-2 (CC2, clys): perfect record.
+        assert!(gate_check(0, 50, 0, 0, 0, 0, true, 50, 50, 50));
+        assert!(gate_check(1, 50, 0, 0, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 49, 0, 0, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 1, 0, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 1, 0, 0, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 1, 0, true, 50, 50, 50));
+        // A stuck game is not one of the five outcomes; the total fails.
+        assert!(!gate_check(0, 50, 0, 0, 0, 1, true, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, 0, false, 50, 50, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, 0, true, 49, 50, 50));
+        // Missing or extra games must fail even when the TopOut count is 50.
+        assert!(!gate_check(0, 50, 0, 0, 0, 0, true, 51, 51, 50));
+        assert!(!gate_check(0, 50, 0, 0, 0, 0, true, 49, 49, 50));
+        // Stage 3 (attax): >= 48 TopOut wins, no turn-cap; no-contest is
+        // allowed only when the 50-game total still holds.
+        assert!(gate_check(2, 48, 2, 0, 0, 0, true, 50, 50, 48));
+        assert!(gate_check(2, 48, 0, 0, 2, 0, true, 50, 50, 48));
+        assert!(!gate_check(2, 47, 3, 0, 0, 0, true, 50, 50, 48));
+        assert!(!gate_check(2, 48, 2, 1, 0, 0, true, 50, 50, 48));
+        assert!(!gate_check(2, 48, 1, 0, 0, 0, true, 50, 50, 48));
     }
 }

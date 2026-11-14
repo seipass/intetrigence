@@ -18,19 +18,19 @@
 
 | stage | opponent | gate (TopOut wins, no turn-cap) | games | W-L / U / NC | result |
 |---|---|---|---|---|---|
-| 1 | attax | 50 TopOut wins, 0 losses, 0 turn-cap, 0 no-contest | 50 | 50-0 / 0 / 0 | PASSED |
-| 2 | Cold Clear 2 | 48 TopOut wins, 0 turn-cap | 50 | 48-2 / 0 / 0 | PASSED |
-| 3 | clys | 48 TopOut wins, 0 turn-cap | 50 | 48-2 / 0 / 0 | PASSED |
+| 1 | Cold Clear 2 | 50 TopOut wins, 0 losses, 0 turn-cap, 0 no-contest | 50 | 50-0 / 0 / 0 | PASSED |
+| 2 | clys | 50 TopOut wins, 0 losses, 0 turn-cap, 0 no-contest | 50 | 50-0 / 0 / 0 | PASSED |
+| 3 | attax | 48 TopOut wins, 0 turn-cap | 50 | 48-2 / 0 / 0 | PASSED |
 
 - A failed gate stops the round; the remaining stages are not run.
-- A `forfeit-other` is an adapter failure recorded as no-contest; stage 1 fails on any no-contest (protocol v1.27 §1.4).
+- A `forfeit-other` is an adapter failure recorded as no-contest; stages 1-2 fail on any no-contest (perfect record).
 - A retry needs a new build and a new pre-committed seed set; partial reruns are not allowed.
 
-## Stage 1 — ATTAX
+## Stage 1 — Cold Clear 2
 
-- opponent commit: `<attax commit>`
+- opponent commit: `<opponent commit>`
 - games: 50 (25 seeds × sheets A/B)
-- opponent vision: `40` rows (patched; full board, TopOut / turn-cap)
+- opponent vision: `40` rows (CC2/clys: S2 scoring applied by the referee; attax: 40-row patch)
 - raw games: 50 W / 0 L; unresolved (TurnCap): 0; no-contest (forfeit): 0; stuck: 0
 - **gate record: 50 TopOut wins / 50 games** — 100.0% (Wilson 95% CI 92.9..100.0%)
 - win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
@@ -43,15 +43,16 @@
 - audit: spin mismatches `<n>` / `<n>`, same-spin attack mismatches `<n>` / `<n>`
 - per sheet: A `<w>/25`, B `<w>/25`
 
-## Stage 2 — Cold Clear 2
+## Stage 2 — clys
 
-(Same fields as stage 1. CC2 is not S2-native; the referee applies S2 scoring
-to both sides and records CC2's declared values as audit only — protocol
+(Same fields as stage 1. clys is not S2-native; the referee applies S2 scoring
+to both sides and records clys's declared values as audit only — protocol
 v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 
-## Stage 3 — clys
+## Stage 3 — ATTAX
 
-(Same fields as stage 1. clys is not S2-native; same interpretation as CC2.)
+(Same fields as stage 1. attax is the final stage: 48+ TopOut wins, no
+turn-cap; no-contest is allowed only if the 50-game total still holds.)
 
 ## Interruption and resume (protocol v1.18 §1.4)
 
@@ -78,8 +79,8 @@ v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 - Spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; intetrigence's labels are backed by rotation-ending input sequences.
 - This report does not claim a win rate against a full-vision opponent: no-contest games are reported separately and the TopOut-only record is stated per stage.
 - CC2 and clys are not S2-native. The referee applies S2 scoring to both sides and records the bots' declared values as audit only (protocol v1.13 §7.2); their stages are a generalization check, not an S2-vs-S2 claim.
-- A `forfeit-other` is an adapter failure recorded as no-contest (protocol v1.13 §7.1.3-4); stage 1 fails on any no-contest.
-- Stage 1 (attax, 40-row patched) and stages 2-3 (CC2/clys, 40-row vision) are real TopOut battles. The stage win rates are still not directly comparable across opponents; the TopOut-only record per stage is the honest strength signal.
+- A `forfeit-other` is an adapter failure recorded as no-contest (protocol v1.13 §7.1.3-4); stages 1-2 fail on any no-contest.
+- Stage 3 (attax, 40-row patched) and stages 1-2 (CC2/clys, 40-row vision) are real TopOut battles. The stage win rates are still not directly comparable across opponents; the TopOut-only record per stage is the honest strength signal.
 
 ## Reproduction
 

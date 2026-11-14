@@ -27,6 +27,9 @@ pub struct BotDescriptor {
     /// classify a forfeit as `vision` when the empty suggestion is explained by
     /// the hidden buffer (protocol v1.8 §7.1).
     pub visible_rows: u32,
+    /// Whether the bot's input set includes 180-degree rotations. Attax does
+    /// not; the referee's capability-aware forfeit check uses this.
+    pub supports_180: bool,
 }
 
 /// One candidate placement, identified by its absolute cell set.

@@ -116,8 +116,13 @@ enum End {
         loser: usize,
     },
     /// No legal placement with the current piece or hold (protocol v1.6 §7).
+<<<<<<< HEAD
     /// Not an S2 rule: a live active piece is reachable from its spawn, so this
     /// branch is defensive and unreachable. Recorded as unresolved (no winner).
+=======
+    /// Recorded as `Stuck`; `winner = None` (unresolved, protocol v1.27
+    /// §7.1.3.1).
+>>>>>>> 7ac1499
     Stuck {
         #[allow(dead_code)]
         loser: usize,
@@ -220,26 +225,31 @@ pub fn run_round(
             };
             think[slot].push(suggestion.think_ms);
 
-            let adopted = match engine.adopt(slot, &suggestion) {
-                Ok(adopted) => adopted,
-                Err(crate::engine::AdoptError::NoMoves) => {
-                    end = Some(End::Stuck { loser: slot });
-                    push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
-                    break 'turns;
-                }
-                Err(error) => {
-                    reachability_rejections += 1;
-                    let cause =
-                        classify_forfeit(&engine, slot, agents[slot].descriptor().visible_rows);
-                    end = Some(End::Forfeit {
-                        slot,
-                        detail: error.to_string(),
-                        cause,
-                    });
-                    push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
-                    break 'turns;
-                }
-            };
+            let adopted =
+                match engine.adopt(slot, &suggestion, agents[slot].descriptor().supports_180) {
+                    Ok(adopted) => adopted,
+                    Err(crate::engine::AdoptError::NoMoves) => {
+                        end = Some(End::Stuck { loser: slot });
+                        push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
+                        break 'turns;
+                    }
+                    Err(error) => {
+                        reachability_rejections += 1;
+                        let cause = classify_forfeit(
+                            &engine,
+                            slot,
+                            agents[slot].descriptor().visible_rows,
+                            agents[slot].descriptor().supports_180,
+                        );
+                        end = Some(End::Forfeit {
+                            slot,
+                            detail: error.to_string(),
+                            cause,
+                        });
+                        push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
+                        break 'turns;
+                    }
+                };
             indices[slot].push(adopted.candidate_index as u32);
 
             let applied = match engine.apply(slot, &adopted.target, adopted.claimed_spin) {
@@ -353,6 +363,7 @@ pub fn run_round(
     let end = end.unwrap_or(End::TurnCap);
     let (winner, reason, detail, forfeit_cause) = match &end {
         End::TopOut { loser } => (Some(1 - loser), "TopOut".to_string(), None, None),
+<<<<<<< HEAD
         // "No legal placement" is not an S2 rule: a live active piece is by
         // definition reachable from its spawn, so this branch is defensive and
         // unreachable. It is recorded as unresolved (no winner) rather than
@@ -373,6 +384,12 @@ pub fn run_round(
             None,
             "TurnCap".to_string(),
             Some("unresolved: turn cap reached".to_string()),
+=======
+        End::Stuck { loser } => (
+            None,
+            "Stuck".to_string(),
+            Some(format!("no legal placement (slot {loser})")),
+>>>>>>> 7ac1499
             None,
         ),
         End::Forfeit {
@@ -665,7 +682,12 @@ fn forfeit_report(
 /// the hidden buffer. `Other` when a legal placement exists entirely inside the
 /// bot's visible rows (its own movegen is broken). `Unknown` when the bot did
 /// not declare `visible_rows`.
-pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) -> ForfeitCause {
+pub(crate) fn classify_forfeit(
+    engine: &Engine,
+    slot: usize,
+    visible_rows: u32,
+    supports_180: bool,
+) -> ForfeitCause {
     if visible_rows == 0 {
         return ForfeitCause::Unknown;
     }
@@ -679,7 +701,7 @@ pub(crate) fn classify_forfeit(engine: &Engine, slot: usize, visible_rows: u32) 
     // stack: a low board still has visible placements. (The old check returned
     // Vision for every spawn, which misclassified 194 attax games.)
     let board = player.game.board();
-    let moves = crate::movegen::generate(board, active, false);
+    let moves = crate::movegen::generate_with_180(board, active, false, supports_180);
     if moves.is_empty() {
         return ForfeitCause::Other;
     }
@@ -712,7 +734,7 @@ mod tests {
         // the referee has visible placements, so the bot's empty suggestion is
         // its own failure, not a vision limitation.
         assert!(engine.players[0].game.active().is_some());
-        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Other);
+        assert_eq!(classify_forfeit(&engine, 0, 20, true), ForfeitCause::Other);
     }
 
     #[test]
@@ -732,6 +754,6 @@ mod tests {
         let game = Game::from_position(1, board, active).expect("legal test position");
         let mut engine = Engine::new(1, Sheet::A, 12);
         engine.players[0].game = game;
-        assert_eq!(classify_forfeit(&engine, 0, 20), ForfeitCause::Vision);
+        assert_eq!(classify_forfeit(&engine, 0, 20, true), ForfeitCause::Vision);
     }
 }

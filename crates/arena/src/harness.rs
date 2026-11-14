@@ -32,6 +32,12 @@ pub struct AttaxConfig {
     pub visible_rows: u32,
     /// SHA-256 of the compatibility patch applied to attax (if any).
     pub patch_sha256: Option<String>,
+    /// Attax's movegen has no 180-degree rotation; the referee must not
+    /// treat a 180-only placement as a legal move for it.
+    pub supports_180: bool,
+    /// Extra environment variables for the attax process (for example
+    /// `ATTAX_TBP_LOG` or `ATTAX_TBP_BOARD_LOG`).
+    pub env: Vec<(String, String)>,
     pub timeout: Duration,
 }
 
@@ -44,6 +50,8 @@ impl AttaxConfig {
             bun_version: None,
             visible_rows: 0,
             patch_sha256: None,
+            supports_180: false,
+            env: Vec::new(),
             timeout: Duration::from_secs(30),
         }
     }
@@ -65,6 +73,8 @@ pub struct TbpOpponentConfig {
     pub commit: Option<String>,
     /// Rows the bot can see (20 for attax, 40 for full-board bots).
     pub visible_rows: u32,
+    /// Whether the bot's input set includes 180-degree rotations.
+    pub supports_180: bool,
     /// Delay before each `suggest` (budget for continuously-searching bots).
     pub suggest_delay_ms: u64,
     /// Retry an empty `suggest` for this long (CC2 race).
@@ -82,6 +92,7 @@ impl TbpOpponentConfig {
             env: Vec::new(),
             commit: None,
             visible_rows: 40,
+            supports_180: true,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             timeout: Duration::from_secs(30),
@@ -903,6 +914,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 tbp_config.commit = tbp.commit.clone();
                 tbp_config.name = Some(tbp.name.clone());
                 tbp_config.visible_rows = tbp.visible_rows;
+                tbp_config.supports_180 = tbp.supports_180;
                 tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
                 tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
                 tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
@@ -916,6 +928,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         );
                         host.timeout = attax.timeout;
                         host.stderr_path = Some(stderr_path.clone());
+                        host.env = attax.env.clone();
                         let mut tbp_config = TbpAgentConfig::new(host);
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();
@@ -924,6 +937,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         } else {
                             attax.visible_rows
                         };
+                        tbp_config.supports_180 = attax.supports_180;
                         tbp_config.decision_log = Some(log_path.clone());
                         tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                         Box::new(TbpAgent::new(tbp_config))

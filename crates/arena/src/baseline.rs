@@ -179,6 +179,7 @@ impl Agent for BaselineBot {
             commit: None,
             args: vec!["--in-process".into(), "--baseline".into()],
             visible_rows: 40,
+            supports_180: true,
         }
     }
 
