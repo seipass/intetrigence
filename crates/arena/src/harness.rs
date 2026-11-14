@@ -1152,6 +1152,14 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 }
             }
 
+            // A fresh game must not append to a previous run's logs: the TBP
+            // transcript and the attax decision log are opened in append mode.
+            // Resumed games are handled above and keep their logs.
+            let transcript_path = logs.join(format!("{name}-opponent.jsonl"));
+            for path in [&log_path, &stderr_path, &transcript_path] {
+                let _ = std::fs::remove_file(path);
+            }
+
             let mut bot: Box<dyn Agent> = match &config.bot {
                 BotChoice::Baseline => Box::new(BaselineBot::new()),
                 BotChoice::Search(search) => {
