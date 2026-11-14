@@ -52,6 +52,8 @@ pub struct Features {
     pub well_depth: f64,
     /// Columns at least 3 lower than both neighbours, excluding the main well.
     pub extra_wells: f64,
+    /// Rows that still contain garbage. Versus-only: 0 in single play.
+    pub garbage_rows: f64,
 }
 
 /// Column heights, bottom-up.
@@ -151,9 +153,13 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
         }
     }
 
-    // Row transitions: walls count as filled, empty rows are skipped.
+    // Row transitions and the garbage rows: walls count as filled, empty rows
+    // are skipped.
     for y in 0..Board::HEIGHT {
         let row = board.row(y);
+        if board.garbage_row(y) != 0 {
+            features.garbage_rows += 1.0;
+        }
         if row == 0 {
             continue;
         }
@@ -185,6 +191,12 @@ pub struct Weights {
     pub extra_wells: f64,
     /// Value of a T-slot that would clear 0, 1 or 2 lines.
     pub t_slot: [f64; 3],
+    /// Danger of the *projected* height once pending garbage lands:
+    /// `max(0, max_height + incoming - DANGER_BASE)^2`. This is the versus
+    /// term that makes a spike visible to the search.
+    pub danger_projected: f64,
+    /// Penalty per row that still contains garbage (uncleared garbage).
+    pub garbage_rows: f64,
 
     // Placement rewards.
     /// Value per line of attack sent (before cancelling).
@@ -203,7 +215,10 @@ pub struct Weights {
     /// cancel budget is doubled for the first 14 placements
     /// (`docs/s2-spec.md` §7.4), so early attack is worth more.
     pub opener_attack: f64,
-    /// Penalty per row of pending garbage.
+    /// Reward per garbage row cleared (downstack efficiency).
+    pub garbage_clear: f64,
+    /// Penalty per row of pending garbage (linear, on top of the projected
+    /// danger).
     pub incoming: f64,
     /// Penalty per soft-dropped row (keeps the bot from over-dropping).
     pub softdrop: f64,
@@ -227,6 +242,8 @@ impl Default for Weights {
             well_depth: 8.0,
             extra_wells: -14.0,
             t_slot: [0.0, 20.0, 45.0],
+            danger_projected: -12.0,
+            garbage_rows: -6.0,
 
             attack: 14.0,
             clear: [
@@ -240,7 +257,8 @@ impl Default for Weights {
             surge_charge: 1.5,
             combo: 2.0,
             opener_attack: 6.0,
-            incoming: -3.0,
+            garbage_clear: 10.0,
+            incoming: -1.0,
             softdrop: -0.05,
 
             discount: 0.97,
@@ -286,6 +304,8 @@ pub struct Reward {
     pub surge_released: u32,
     /// Surge lines still charged afterwards.
     pub surge_charged: u32,
+    /// Garbage rows cleared by this placement.
+    pub garbage_cleared: u8,
     pub combo_after: u32,
     pub b2b_after: u32,
     /// Weighted immediate reward.
@@ -302,6 +322,7 @@ impl Default for Reward {
             broke_b2b: false,
             surge_released: 0,
             surge_charged: 0,
+            garbage_cleared: 0,
             combo_after: 0,
             b2b_after: 0,
             value: 0.0,
@@ -359,6 +380,7 @@ pub fn apply_placement(
     }
     value += weights.surge_charge * f64::from(surge_charged);
     value += weights.combo * f64::from(attack.combo_after);
+    value += weights.garbage_clear * f64::from(clear.garbage_lines);
     if context.opener() {
         value += weights.opener_attack * f64::from(attack.total);
     }
@@ -371,6 +393,7 @@ pub fn apply_placement(
         broke_b2b,
         surge_released: attack.surge_amount,
         surge_charged,
+        garbage_cleared: clear.garbage_lines,
         combo_after: attack.combo_after,
         b2b_after: attack.b2b_streak_after,
         value,
@@ -406,6 +429,12 @@ pub fn leaf_value(
         + weights.row_transitions * features.row_transitions
         + weights.well_depth * features.well_depth
         + weights.extra_wells * features.extra_wells;
+
+    // Versus: the height this stack will have once the pending garbage lands.
+    let projected = features.max_height + f64::from(context.incoming);
+    let over = (projected - f64::from(DANGER_BASE)).max(0.0);
+    value += weights.danger_projected * over * over;
+    value += weights.garbage_rows * features.garbage_rows;
 
     value += weights.surge_charge * f64::from(surge_charge_from_streak(context.b2b_streak));
     value += weights.combo * f64::from(context.combo);
@@ -544,6 +573,7 @@ mod tests {
                 row_transitions: 76.0,
                 well_depth: 4.0,
                 extra_wells: 0.0,
+                garbage_rows: 0.0,
             }
         );
         assert_eq!(analysis.heights, heights(&board));
@@ -616,6 +646,62 @@ mod tests {
         assert_eq!(next_context.pieces_placed, 1);
         // Two rows were removed, so the stack is two rows shorter.
         assert_eq!(next.height() + 2, board.height());
+    }
+
+    /// Pending garbage must make a tall stack more expensive: the projected
+    /// danger is the versus term the M2 losses needed.
+    #[test]
+    fn pending_garbage_raises_the_danger_of_a_tall_stack() {
+        let mut board = Board::new();
+        for y in 0..10 {
+            board.set_row(y, Board::FULL_ROW & !(1u16 << 9));
+        }
+        let weights = Weights::default();
+        let calm = EvalContext::default();
+        let pressured = EvalContext {
+            incoming: 14,
+            ..EvalContext::default()
+        };
+        let calm_value = leaf_value(&board, &calm, &weights, 0);
+        let pressured_value = leaf_value(&board, &pressured, &weights, 0);
+        assert!(
+            pressured_value < calm_value - 100.0,
+            "14 pending rows must dominate the leaf value: {calm_value} vs {pressured_value}"
+        );
+    }
+
+    /// Uncleared garbage rows are penalised and clearing them is rewarded.
+    #[test]
+    fn garbage_rows_and_garbage_clears_are_priced() {
+        let mut board = Board::new();
+        board.set_row(0, Board::FULL_ROW & !(1u16 << 4));
+        board.set_row(1, Board::FULL_ROW & !(1u16 << 4));
+        // Mark the two rows as garbage.
+        for y in 0..2 {
+            let mask = board.row(y);
+            board.set_garbage_row(y, mask);
+        }
+        let analysis = analyse(&board);
+        assert_eq!(analysis.features.garbage_rows, 2.0);
+
+        let weights = Weights::default();
+        let context = EvalContext::default();
+        let clean = Board::new();
+        assert!(
+            leaf_value(&board, &context, &weights, 0) < leaf_value(&clean, &context, &weights, 0)
+        );
+
+        // Clearing a garbage row pays the garbage-clear reward.
+        let mut movegen = crate::movegen::Movegen::new();
+        let placements = movegen.generate(&board, PieceKind::I);
+        let clear = placements
+            .iter()
+            .find(|placement| placement.piece.rotation == Rotation::R && placement.piece.x == 2)
+            .expect("the vertical I fills the hole");
+        let (_, reward, _) = apply_placement(&board, clear, &context, &weights);
+        assert_eq!(reward.lines, 2);
+        assert_eq!(reward.garbage_cleared, 2);
+        assert!(reward.value >= weights.garbage_clear * 2.0);
     }
 
     #[test]
