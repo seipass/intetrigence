@@ -1,8 +1,8 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.9
-**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.11
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.28
+**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.16
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
 
@@ -17,6 +17,7 @@ cargo run --release -p intetrigence-arena --bin arena -- match \
 
 cargo run --release -p intetrigence-arena --bin arena -- verify scripts/evidence/m0
 cargo run --release -p intetrigence-arena --bin arena -- report scripts/evidence/m0
+cargo run --release -p intetrigence-arena --bin arena -- reclassify scripts/evidence/m0 --visible-rows 40
 ```
 
 - `match`: seed × sheet の全組み合わせを実行し、1 ゲーム 1 ファイルの replay(JSONL)、
@@ -25,6 +26,10 @@ cargo run --release -p intetrigence-arena --bin arena -- report scripts/evidence
 - `verify`: replay を再実行して、spin / lines / events / sent / cancelled / 盤面ハッシュ /
   結果を記録と比較する。不一致があれば exit 1。
 - `report`: 監査 JSON から summary を再生成する(ゲームを再実行しない)。
+- `reclassify`: replay を再検証し、現行プロトコルの分類(TopOut / Stuck /
+  TurnCap / Forfeit)で `summary-reclassified.json` を書く。旧 replay の
+  TurnCap / Forfeit の winner は現行規則(`winner = None`)との差として扱い、
+  `game_rows` に `winner_effective` を出す。
 - `--no-attax`: 外部プロセスなしで baseline 同士を回す(オフラインの配管テスト)。
 
 `match` は既定で 5 PPS(`frame = turn * 12`)、1000 turn cap、preview 5 + hold。
@@ -159,14 +164,18 @@ lines / PC / ゴミ消しを使う)。attax は guideline 採点なので、All-
 
 ### D6. forfeit と中断
 
-- `suggest` / `adopt` / `commit` の失敗 → そのゲームは forfeit(相手の勝ち)。
+- `suggest` / `adopt` / `commit` の失敗 → そのゲームは forfeit。
+  **no-contest**(`winner = None`、protocol v1.27 §7.1.3.1)として記録し、
+  勝ちにも負けにも数えない。原因は `forfeit_cause`(vision / other / unknown)と
+  `forfeit_slot` に残す。
 - `adopt` を通ったのに `apply` が失敗 → **レフェリーバグ**としてマッチ中断。
 - 起動失敗(attax が spawn できない等)→ 0 turn の forfeit として記録し、replay も書く。
 
 ### D7. 同時トップアウト
 
 protocol §6.1 は「seat 1 が死んだら seat 2 は打たない」なので、同一 turn の同時トップアウトは
-**到達しない**。引き分けは turn cap の同点のみ。
+**到達しない**。S2 に引き分けは存在しない。turn cap は **未決着**(`winner = None`)で、
+`unresolved` として数える。
 
 ### D8. ペーシング(P5、protocol v1.3 で確定)
 
@@ -292,6 +301,13 @@ scripts/m0-match.sh
 
 ## 4.1 M2 チューニングゲート(2026-11-14)
 
+> **Historical note (protocol v1.27):** this M2 report predates the
+> no-contest rule. The 18 "wins" below were attax **vision forfeits**; under
+> the current rule they are `no_contest` (`winner = None`), not wins. The
+> current TopOut baseline against the 40-row patched attax is in
+> [`docs/attax-40-smoke-report.md`](attax-40-smoke-report.md) and
+> [`docs/tuning-attax-40-report.md`](tuning-attax-40-report.md).
+
 本物の `intetrigence_bot::Searcher`(`--ms 100`、8 スレッド)を接続し、tuning seeds
 **9001–9010 × A/B = 20 ゲーム**を attax `7b38f51` と実施した。詳細は
 [`docs/m2-tuning-report.md`](m2-tuning-report.md)、証拠は `scripts/evidence/m2-tuning/`。
@@ -324,7 +340,7 @@ scripts/m0-match.sh
    個数が食い違う)。spin を含めるのは、セルが同じでも回転由来かどうかで採点が変わるため。
    差し替え後もクロスチェックは残す(FRONT 表バグと同じ二重実装リスクの検出)。
 6. `verify-replay` は着手列の再実行であって探索の再現ではない(PLAN §3.3 のとおり)。
-7. forfeit は負けとして集計する(protocol §7 の P2 暫定)。
+7. forfeit は **no-contest** として集計する(`winner = None`、protocol v1.27 §7.1.3.1)。勝ちにも負けにも数えない。
 8. **スピン判定は TETR.IO より寛容**(protocol v1.7 §4.2.1)。セル集合に到達する経路のうち
    最大の spin ラベルを採るため、回転せずに置いた配置もスピンになり得る。両者に同じ規則なので
    強さの比較は公平だが、TETR.IO のリプレイ・スコアとは一致しない。intetrigence 側は spin を
