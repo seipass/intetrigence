@@ -1,5 +1,12 @@
 # CC2 / clys tuning smoke (diagnostic)
 
+> **All numbers below are the 1-ply greedy bot.** bot-dev found that the
+> anytime loop discarded its iteration on a deadline miss and the caller fell
+> back to `greedy` (1-ply); every setting (depth 8/12/16, width 2048, 1 thread)
+> produced the same 1-ply behaviour. These figures are **not** the bot's real
+> strength and must be re-measured after the search fix. They are recorded only
+> as the pre-fix baseline.
+
 > **Tuning smoke, not an evaluation round.** Seeds 9001–9010 (sheet A, 1000
 > turns) are tuning seeds; the evaluation seeds are untouched. The purpose is
 > to check the `--tbp-*` path, forfeit 0, and the current baseline.

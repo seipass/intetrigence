@@ -824,6 +824,9 @@ verify(replay) -> Result<(), Mismatch>:
 - **1 ゲームでも欠損があれば、そのラウンドは成立しない**。部分的な証拠で勝率を主張してはいけない。
 - 欠損は**再開で補える**(§1.4)。同一ビルド・同一 seeds なら、欠損ゲームだけを再実行して揃えられる。
 - 相手の decision log は**採点オーディットと first-choice 採用率の根拠**になる。無いと「相手が何を主張したか」を検証できない。
+- **相手ごとの decision log の実体**:
+  - **attax**: `logs/<game>-attax.jsonl`(`ATTAX_TBP_LOG`。`suggestion` の第 1 候補・申告 spin・申告攻撃)。
+  - **CC2 / clys**: `logs/<game>-opponent.jsonl`(TBP transcript。`start` / `suggest` / `suggestion` / `play` / `new_piece` の全メッセージと、`suggestion` の全候補・申告 spin・申告攻撃)。CC2 / clys はネイティブの decision log を持たないため、**TBP transcript を decision log とみなす**。`arena match` の `--tbp-*` 経路はこのファイルを常に書く(`measurement_complete` はこの存在で判定する)。
 
 #### 8.3.1.1 相手ごとの decision log の実体
 
