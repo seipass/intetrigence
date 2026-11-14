@@ -30,6 +30,8 @@ pub struct SearchStats {
     pub iterations: usize,
     /// True when the move came from the 1-ply `greedy` path.
     pub fallback: bool,
+    /// True when a deterministic search hit its 95 ms cap.
+    pub aborted: bool,
 }
 
 /// Per-game statistics.
@@ -216,6 +218,7 @@ pub fn play_game_with_setup(
                 nodes: result.nodes,
                 iterations: result.iterations,
                 fallback: result.fallback,
+                aborted: result.aborted,
             });
             (
                 result.best.hold,
