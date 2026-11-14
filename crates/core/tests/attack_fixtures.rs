@@ -24,7 +24,13 @@ fn attack_fixtures_match_18_of_18() {
     );
 
     let cases = root["cases"].as_array().expect("cases array");
-    assert_eq!(cases.len(), 18);
+    // The spec lead may append cases (e.g. the 0-line combo regression).
+    // Run every case; only require the original 18 to be present.
+    assert!(
+        cases.len() >= 18,
+        "expected at least the 18 reference cases, got {}",
+        cases.len()
+    );
 
     for case in cases {
         let id = case["id"].as_str().expect("case id");
