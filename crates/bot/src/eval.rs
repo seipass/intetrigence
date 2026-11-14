@@ -30,6 +30,9 @@ pub const COLUMNS: usize = 10;
 /// bursts are absorbed by a bot sitting at height 3-5.
 pub const SURGE_LETHAL: u32 = 8;
 
+/// Most garbage rows one appearance can insert (`GARBAGE_CAP`).
+pub const GARBAGE_CAP: u32 = 8;
+
 /// Pieces in the S2 opener phase.
 pub const OPENER_PIECES: u32 = 14;
 
@@ -249,6 +252,15 @@ pub struct Weights {
     pub danger_height: f64,
     /// Value of a ready 4-deep well (`Features.quad_ready`).
     pub quad_ready: f64,
+    /// Value per row of garbage a clear stops from appearing.
+    ///
+    /// `GarbageQueue::take_insertable` returns nothing when the lock cleared at
+    /// least one line, and one appearance is at most `GARBAGE_CAP = 8` rows, so
+    /// clearing a single while `pending` is high is worth up to 8 rows of
+    /// defence -- more than a quad's 5 attack. Without this term a single is
+    /// worth only "one row less height", so the bot stacks instead (the 9004-A
+    /// collapse: 26 attack sent, final y 21).
+    pub defense: f64,
     /// Bonus for clearing at least one line during the opener phase.
     /// S2 doubles the cancellation while the opener is active, but the extra
     /// budget equals the *attack*, not the lines, so a single (attack 0)
@@ -347,6 +359,7 @@ impl Default for Weights {
             height_sq: 0.0,
             danger_height: -12.0,
             race: 1.0,
+            defense: 28.0,
             quad_ready: 30.0,
             opener_clear: 20.0,
             combo_state: 40.0,
@@ -516,7 +529,9 @@ pub fn apply_placement(
     // OR (`incoming >= 8 || height >= 15`), which switched to defence at
     // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
     // (safe: 13 <= 20) -- it threw away attack while still alive.
-    let projected = board.height() as u32 + context.incoming;
+    // One appearance inserts at most `GARBAGE_CAP` rows, so the height that
+    // matters is `height + min(pending, 8)`, not `height + pending`.
+    let projected = board.height() as u32 + context.incoming.min(GARBAGE_CAP);
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     let mut value = weights.attack * f64::from(attack.total);
     value += if survival {
@@ -524,6 +539,12 @@ pub fn apply_placement(
     } else {
         weights.clear[placement.spin.index()][clear.lines as usize]
     };
+    if clear.lines > 0 && context.incoming >= 1 {
+        // `risk` keeps the term quiet while the stack is low: stopping an
+        // appearance only matters when one would kill us.
+        let risk = ((board.height() as f64 - 12.0) / 6.0).clamp(0.0, 1.0);
+        value += weights.defense * f64::from(context.incoming.min(GARBAGE_CAP)) * risk;
+    }
     if context.pieces_placed < OPENER_PIECES && clear.lines > 0 {
         value += weights.opener_clear;
     }
@@ -605,7 +626,9 @@ pub fn leaf_value(
     // OR (`incoming >= 8 || height >= 15`), which switched to defence at
     // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
     // (safe: 13 <= 20) -- it threw away attack while still alive.
-    let projected = board.height() as u32 + context.incoming;
+    // One appearance inserts at most `GARBAGE_CAP` rows, so the height that
+    // matters is `height + min(pending, 8)`, not `height + pending`.
+    let projected = board.height() as u32 + context.incoming.min(GARBAGE_CAP);
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
     // `wait_pieces = 21 - height - pending`: how many pieces can be spent on
     // preparation before a zero-line placement kills. No budget, no
@@ -658,7 +681,10 @@ pub fn leaf_value(
     // Only worth something when the next clear can stop a garbage packet from
     // appearing: a "one cell short" row is also a single, so pricing it
     // unconditionally invites singles.
-    if projected >= f64::from(SURVIVAL_PROJECTED) {
+    // `19` rather than `21`: at exactly 21 there is no guaranteed turn left to
+    // clear, so two rows of slack are needed to build the clear.
+    let capped = features.max_height + f64::from(context.incoming.min(GARBAGE_CAP));
+    if capped >= f64::from(SURVIVAL_PROJECTED - 2) {
         value += weights.combo_potential * features.combo_potential;
     }
     value -= weights.incoming * f64::from(context.incoming);
