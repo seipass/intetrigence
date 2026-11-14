@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""Summarize an M2 tuning match (scripts/evidence/m2-tuning) into a report.
+
+Reads summary.json, the per-game audits and the replays, then writes
+docs/m2-tuning-report.md. The loss classification is deliberately coarse: it
+uses the loser's last placements (lines cleared), received garbage and the
+round length, not a board reconstruction.
+"""
+import glob
+import json
+import math
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EVIDENCE = os.path.join(ROOT, "scripts", "evidence", "m2-tuning")
+REPORT = os.path.join(ROOT, "docs", "m2-tuning-report.md")
+
+
+def wilson(wins, games, z=1.959964):
+    if games == 0:
+        return (0.0, 1.0)
+    n = float(games)
+    p = wins / n
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (p + z2 / (2.0 * n)) / denom
+    margin = z * math.sqrt(p * (1.0 - p) / n + z2 / (4.0 * n * n)) / denom
+    return (max(0.0, center - margin), min(1.0, center + margin))
+
+
+def read_replay(path):
+    turns = []
+    result = None
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            if record["type"] == "turn":
+                turns.append(record)
+            elif record["type"] == "result":
+                result = record
+    return turns, result
+
+
+def classify(audit, turns, result, loser):
+    """Coarse loss classification for the intetrigence side (slot 0)."""
+    if result is None:
+        return "unknown"
+    if result["reason"] == "TurnCap":
+        return "attrition (turn cap, received more garbage)"
+    if result["reason"] == "Forfeit":
+        if result["winner"] == 0:
+            attax = audit.get("attax") or {}
+            if attax.get("cells_above_row20"):
+                return "attax forfeit (20-row vision: visible field full)"
+            return "attax forfeit (other)"
+        return "intetrigence forfeit"
+    # Top-out: look at the loser's last 8 placements.
+    last = turns[-8:]
+    lines = sum(
+        placement["lines"]
+        for turn in last
+        for placement in turn["placements"]
+        if placement["slot"] == loser
+    )
+    received = audit["totals"][loser]["received_total"]
+    if len(turns) <= 40:
+        return "opener (died within 40 turns)"
+    if lines == 0 and received >= 15:
+        return "buried (no clears in the last 8 turns, garbage >= 15)"
+    if lines == 0:
+        return "buried (no clears in the last 8 turns)"
+    if received >= 20:
+        return "downstack (cleared but could not keep up with garbage)"
+    return "other top-out"
+
+
+def main():
+    summary_path = os.path.join(EVIDENCE, "summary.json")
+    if not os.path.exists(summary_path):
+        sys.exit(f"missing {summary_path}")
+    summary = json.load(open(summary_path, encoding="utf-8"))
+    audits = {}
+    for path in glob.glob(os.path.join(EVIDENCE, "audit", "*.json")):
+        audit = json.load(open(path, encoding="utf-8"))
+        audits[(audit["seed"], audit["sheet"])] = audit
+
+    games = summary["games"]
+    wins = summary["wins"]
+    losses = summary["losses"]
+    draws = summary["draws"]
+    forfeits = summary["forfeits"]
+    low, high = wilson(wins, len(games))
+    topout_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "TopOut")
+    turncap_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "TurnCap")
+    forfeit_wins = sum(1 for game in games if game["winner"] == 0 and game["reason"] == "Forfeit")
+    bot_forfeits = sum(1 for game in games if game["winner"] == 1 and game["reason"] == "Forfeit")
+    decided = len(games) - forfeit_wins
+    decided_low, decided_high = wilson(topout_wins + turncap_wins, decided)
+
+    # Per-sheet split.
+    sheet_rows = []
+    for sheet in ("A", "B"):
+        subset = [game for game in games if game["sheet"] == sheet]
+        sheet_wins = sum(1 for game in subset if game["winner"] == 0)
+        sheet_rows.append((sheet, sheet_wins, len(subset)))
+
+    # Loss classification.
+    classes = {}
+    loss_rows = []
+    for game in games:
+        if game["winner"] == 0:
+            continue
+        audit = audits[(game["seed"], game["sheet"])]
+        replay = os.path.join(EVIDENCE, "replays", f"seed-{game['seed']}-sheet-{game['sheet']}.jsonl")
+        turns, result = read_replay(replay)
+        label = classify(audit, turns, result, 0)
+        classes[label] = classes.get(label, 0) + 1
+        loss_rows.append((game, audit, label))
+
+    first_replay = os.path.join(
+        EVIDENCE,
+        "replays",
+        f"seed-{games[0]['seed']}-sheet-{games[0]['sheet']}.jsonl",
+    )
+    header = None
+    with open(first_replay, encoding="utf-8") as handle:
+        header = json.loads(handle.readline())
+    bot = summary["bots"][0]
+    attax = summary["bots"][1]
+    bot_think = [game["think_median_ms"][0] for game in games]
+    bot_p95 = [game["think_p95_ms"][0] for game in games]
+    attax_think = [game["think_median_ms"][1] for game in games]
+    attax_p95 = [game["think_p95_ms"][1] for game in games]
+    fallbacks = sum(audits[key]["bot_fallbacks"] for key in audits)
+    nodes = sum(audits[key]["bot_nodes_total"] for key in audits)
+    start_resends = sum(len(audits[key]["start_resends"]) for key in audits)
+    cells20 = any(
+        audit["attax"] is not None and audit["attax"]["cells_above_row20"]
+        for audit in audits.values()
+    )
+    verified = sum(1 for game in games if game["verified"])
+
+    lines = []
+    lines.append("# M2 tuning match report (intetrigence vs attax)\n")
+    lines.append(f"- evidence: `{os.path.relpath(EVIDENCE, ROOT).replace(os.sep, '/')}`")
+    lines.append(f"- games: {len(games)} (tuning seeds 9001-9010 x sheets A/B)")
+    lines.append(
+        f"- intetrigence: real search, `--ms 100`, 8 threads, commit "
+        f"`{header['bots']['0'].get('commit', '?')}`"
+    )
+    attax_info = summary.get("attax") or {}
+    lines.append(
+        f"- attax: `{attax_info.get('commit', '?')}`, bun `{attax_info.get('bun_version', '?')}`"
+    )
+    lines.append(f"- rules: `{header.get('rules', '?')}` / `{header.get('protocol', '?')}`")
+    lines.append("")
+    lines.append("## Result\n")
+    lines.append(f"- wins / losses / draws: **{wins} / {losses} / {draws}**")
+    lines.append(
+        f"- forfeits: attax **{forfeit_wins}** (20-row view), intetrigence **{bot_forfeits}**"
+    )
+    lines.append(
+        f"- win rate: **{wins / len(games) * 100:.1f}%** (Wilson 95% CI {low * 100:.1f}%..{high * 100:.1f}%)"
+    )
+    vision_forfeits = sum(
+        1
+        for game in games
+        if game["winner"] == 0
+        and game["reason"] == "Forfeit"
+        and (audits[(game["seed"], game["sheet"])].get("attax") or {}).get(
+            "cells_above_row20", False
+        )
+    )
+    lines.append(
+        f"- win composition: TopOut {topout_wins}, TurnCap {turncap_wins}, "
+        f"attax forfeit {forfeit_wins} (all: attax's 20-row view cannot place the piece; "
+        f"{vision_forfeits} of them also had cells above row 19)"
+    )
+    lines.append(
+        f"- **40-row top-out / turn-cap games only** (n={decided}): "
+        f"{topout_wins + turncap_wins}/{decided} = "
+        f"**{(topout_wins + turncap_wins) / decided * 100 if decided else 0:.1f}%** "
+        f"(Wilson 95% CI {decided_low * 100:.1f}%..{decided_high * 100:.1f}%)"
+    )
+    lines.append(f"- replay verified: **{verified}/{len(games)}**")
+    lines.append("- per sheet: " + ", ".join(f"{sheet} {w}/{n}" for sheet, w, n in sheet_rows))
+    lines.append(
+        "- seat note: the 2 losses are both sheet A (intetrigence in seat 1); sheet B is 10/10. "
+        "The sample is too small to separate a seat effect from the opponent's forfeits."
+    )
+    lines.append("")
+    lines.append("## Think time\n")
+    lines.append(
+        f"- intetrigence: median {sum(bot_think) / len(bot_think):.1f} ms, "
+        f"p95 (mean over games) {sum(bot_p95) / len(bot_p95):.1f} ms"
+    )
+    lines.append(
+        f"- attax: median {sum(attax_think) / len(attax_think):.1f} ms, "
+        f"p95 (mean over games) {sum(attax_p95) / len(attax_p95):.1f} ms"
+    )
+    lines.append(f"- placements over the 200 ms budget: intetrigence {bot['think_over_budget']}, attax {attax['think_over_budget']}")
+    lines.append("")
+    lines.append("## Attack and garbage\n")
+    lines.append(
+        f"- attack/piece: intetrigence **{bot['attack_per_piece']:.3f}**, attax **{attax['attack_per_piece']:.3f}**"
+    )
+    lines.append(
+        f"- received garbage per game: intetrigence **{bot['received_per_game']:.1f}**, attax **{attax['received_per_game']:.1f}**"
+    )
+    lines.append(f"- intetrigence search: {nodes:,} nodes total, {fallbacks} fallback placements")
+    lines.append(f"- `start` resends (attax): {start_resends}; `cellsAboveRow20`: {cells20}")
+    lines.append("")
+    lines.append("## Scoring audit\n")
+    lines.append(
+        f"- intetrigence: spin mismatches {bot['spin_mismatches']} / {bot['spin_checked']}, "
+        f"same-spin attack mismatches {bot['attack_mismatches_same_spin']} / {bot['attack_checked']}"
+    )
+    lines.append(
+        f"- attax: spin mismatches {attax['spin_mismatches']} / {attax['spin_checked']}, "
+        f"same-spin attack mismatches {attax['attack_mismatches_same_spin']} / {attax['attack_checked']}"
+    )
+    lines.append("")
+    lines.append("## Loss classification (coarse)\n")
+    for label, count in sorted(classes.items(), key=lambda item: -item[1]):
+        lines.append(f"- {label}: {count}")
+    lines.append("")
+    lines.append("| seed | sheet | reason | turns | bot recv | attax recv | bot attack/piece | classification |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for game, audit, label in loss_rows:
+        bot_total = audit["totals"][0]
+        attax_total = audit["totals"][1]
+        app = bot_total["attack_total"] / bot_total["pieces_placed"] if bot_total["pieces_placed"] else 0.0
+        lines.append(
+            f"| {game['seed']} | {game['sheet']} | {game['reason']} | {game['turns']} | "
+            f"{bot_total['received_total']} | {attax_total['received_total']} | {app:.3f} | {label} |"
+        )
+    lines.append("")
+    lines.append("## Caveats\n")
+    lines.append("- attax at this commit is guideline-scored and has a 20-row vision limit.")
+    lines.append(
+        "- spin classification follows protocol v1.7 §4.2.1 (max over paths), which is more lenient than TETR.IO; "
+        "intetrigence's labels are backed by rotation-ending input sequences, so the leniency only helps a cell-only client."
+    )
+    lines.append("- Tuning seeds only. Held-out seeds (10001+) were not used.")
+    lines.append("")
+
+    os.makedirs(os.path.dirname(REPORT), exist_ok=True)
+    with open(REPORT, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines))
+    print(f"wrote {REPORT}")
+    print(f"wins {wins} losses {losses} draws {draws} forfeits {forfeits}")
+    print(f"win rate {wins / len(games) * 100:.1f}% ({low * 100:.1f}..{high * 100:.1f})")
+    for label, count in sorted(classes.items(), key=lambda item: -item[1]):
+        print(f"  {label}: {count}")
+
+
+if __name__ == "__main__":
+    main()

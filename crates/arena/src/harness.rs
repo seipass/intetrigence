@@ -2,8 +2,8 @@
 //!
 //! M0 acceptance (PLAN.md §5): ten games against attax with fixed seeds, both
 //! sheets, every game replay-verified, and an audit log per game. The opponent
-//! on our side is the M0 baseline stand-in (`crate::baseline`), so the win/loss
-//! numbers are a plumbing reference, not a strength claim.
+//! on our side is configurable: the M0 baseline stand-in (`crate::baseline`) or
+//! the real search (`crate::bot_agent`). The summary records which one ran.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -403,7 +403,7 @@ impl MatchSummary {
 
     pub fn to_markdown(&self) -> String {
         let mut text = String::new();
-        text.push_str("# S2 match summary (M0 gate)\n\n");
+        text.push_str("# S2 match summary\n\n");
         text.push_str(&format!("- games: {}\n", self.games.len()));
         text.push_str(&format!(
             "- intetrigence wins / losses / draws / forfeits: {} / {} / {} / {}\n",
@@ -464,12 +464,12 @@ impl MatchSummary {
         }
         text.push_str("\n## Per-bot audit\n\n");
         text.push_str(
-            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | think > 200ms |\n",
+            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
         );
-        text.push_str("|---|---|---|---|---|---|\n");
+        text.push_str("|---|---|---|---|---|---|---|---|\n");
         for bot in &self.bots {
             text.push_str(&format!(
-                "| {} | {} | {} | {} / {} | {} / {} | {} |\n",
+                "| {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
                 bot.slot,
                 bot.name,
                 bot.placements,
@@ -477,6 +477,8 @@ impl MatchSummary {
                 bot.spin_checked,
                 bot.attack_mismatches_same_spin,
                 bot.attack_checked,
+                bot.attack_per_piece,
+                bot.received_per_game,
                 bot.think_over_budget,
             ));
         }
