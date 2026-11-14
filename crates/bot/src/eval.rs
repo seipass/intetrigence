@@ -30,6 +30,10 @@ pub const COLUMNS: usize = 10;
 /// bursts are absorbed by a bot sitting at height 3-5.
 pub const SURGE_LETHAL: u32 = 8;
 
+/// Combo value above which the state term stops growing. Attack/piece peaks at
+/// combo 3-4 and declines after that.
+pub const COMBO_CAP: u32 = 4;
+
 /// Column height above which the non-linear danger term starts to bite.
 pub const DANGER_THRESHOLD: u32 = 12;
 
@@ -50,6 +54,10 @@ pub struct Features {
     /// `max(0, max_height - DANGER_BASE)^2`.
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
+    /// Rows that are one cell short of full, with the hole at the top of its
+    /// column (so one piece clears it), capped at 2. This is the "combo
+    /// groove": a combo only continues if a clear is available every piece.
+    pub combo_potential: f64,
     /// Column-wise `sum(max(0, h - DANGER_THRESHOLD)^2)`.
     ///
     /// `height_sq` only looks at the tallest column and is always on, which
@@ -138,6 +146,14 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
     let over = (max_height - DANGER_BASE).max(0);
     features.max_height = max_height as f64;
     features.height_sq = (over * over) as f64;
+    features.combo_potential = (0..Board::HEIGHT)
+        .filter(|&row| {
+            let mask = board.row(row);
+            mask.count_ones() == 9
+                && (0..COLUMNS).any(|x| mask & (1 << x) == 0 && heights[x] as usize == row + 1)
+        })
+        .count()
+        .min(2) as f64;
     features.danger_height = heights
         .iter()
         .map(|&h| {
@@ -213,6 +229,13 @@ pub struct Weights {
     pub height_sq: f64,
     /// Column-wise non-linear danger (`Features.danger_height`).
     pub danger_height: f64,
+    /// Value of the combo state itself: `combo_state * ln(1.25*combo + 1)`.
+    /// S2 pays `base * (1 + 0.25*combo)` and lifts `base` to
+    /// `ln(1.25*combo + 1)` once combo >= 2, so a live combo is a *state* with
+    /// value: holding it is what makes the next clear worth 2-3 lines.
+    pub combo_state: f64,
+    /// Value of a board that can keep a combo going (`Features.combo_potential`).
+    pub combo_potential: f64,
     /// Value per line of race lead (`sent_total - received_total`). Nothing in
     /// the TBP stream exposes the opponent's board, so the score difference is
     /// the only signal that says "we are winning the race"; without it the
@@ -297,6 +320,8 @@ impl Default for Weights {
             height_sq: 0.0,
             danger_height: -12.0,
             race: 1.0,
+            combo_state: 40.0,
+            combo_potential: 6.0,
             holes: -30.0,
             hole_cover: -6.0,
             hole_rows: -16.0,
@@ -554,7 +579,15 @@ pub fn leaf_value(
 
     let charge = f64::from(surge_charge_from_streak(context.b2b_streak));
     value += weights.surge_charge * charge.powf(weights.surge_exponent);
-    value += weights.combo * f64::from(context.combo);
+    value += weights.combo * f64::from(context.combo.min(COMBO_CAP));
+    // Capped at COMBO_CAP. Measured over 406 games (s2-spec-lead's
+    // decomposition): attack/piece peaks at combo 3-4 (1.196) and gets *worse*
+    // at combo 5+ (1.084) and 10+ (1.110), because holding a long combo means
+    // clearing singles, whose base is 0 -- only the ln lift applies. Rewarding
+    // combo 5+ therefore pushes the bot to trade TSDs and quads for singles.
+    let combo = f64::from(context.combo.min(COMBO_CAP));
+    value += weights.combo_state * (1.25 * combo + 1.0).ln();
+    value += weights.combo_potential * features.combo_potential;
     value -= weights.incoming * f64::from(context.incoming);
     let race = i64::from(context.sent_total) - i64::from(context.received_total);
     value += weights.race * race as f64;
@@ -718,6 +751,7 @@ mod tests {
                 // Column-wise sum of max(0, h - 12)^2 on the fixture: the
                 // tallest column contributes 64 and the rest 409.
                 danger_height: 473.0,
+                combo_potential: 0.0,
                 holes: 6.0,
                 hole_cover: 23.0,
                 hole_rows: 6.0,
