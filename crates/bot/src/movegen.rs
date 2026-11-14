@@ -247,6 +247,18 @@ pub fn generate_from(board: &Board, spawn: ActivePiece) -> Vec<Placement> {
     Movegen::new().generate_from(board, spawn).to_vec()
 }
 
+/// [`generate`] for an engine that may not have a 180-degree rotation.
+///
+/// The referee needs this to answer "does this opponent have a legal move?"
+/// for a bot whose movegen only knows shift, CW and CCW: a placement that
+/// only a 180 can reach is not legal for that opponent, and counting it makes
+/// the referee call a stuck bot "still alive" (the forfeit-other bug).
+pub fn generate_with_180(board: &Board, kind: PieceKind, supports_180: bool) -> Vec<Placement> {
+    Movegen::new()
+        .generate_with_180(board, kind, supports_180)
+        .to_vec()
+}
+
 /// Every input-reachable state, including airborne ones, in BFS order.
 ///
 /// This is the raw search result behind [`generate`]; it exists for tests and
@@ -278,6 +290,8 @@ pub struct Movegen {
     expanded: Vec<bool>,
     resting: Vec<(Rotation, i32, i32)>,
     placements: Vec<Placement>,
+    /// Whether the modelled engine has a 180-degree rotation.
+    supports_180: bool,
 }
 
 impl Default for Movegen {
@@ -296,6 +310,7 @@ impl Movegen {
             expanded: vec![false; POSITION_COUNT],
             resting: Vec::with_capacity(64),
             placements: Vec::with_capacity(64),
+            supports_180: true,
         }
     }
 
@@ -310,6 +325,30 @@ impl Movegen {
     /// The order is `(rotation, x, y)` ascending, which makes results easy to
     /// compare between implementations.
     pub fn generate_from(&mut self, board: &Board, spawn: ActivePiece) -> &[Placement] {
+        self.generate_from_with_180(board, spawn, true)
+    }
+
+    /// [`Movegen::generate`] with the 180-degree capability made explicit.
+    pub fn generate_with_180(
+        &mut self,
+        board: &Board,
+        kind: PieceKind,
+        supports_180: bool,
+    ) -> &[Placement] {
+        self.generate_from_with_180(board, spawn_piece(kind), supports_180)
+    }
+
+    /// [`Movegen::generate_from`] with the 180-degree capability made explicit.
+    ///
+    /// With `supports_180 == false` the 180 transition is dropped from the
+    /// BFS, so a placement that only a 180 can reach is not reported.
+    pub fn generate_from_with_180(
+        &mut self,
+        board: &Board,
+        spawn: ActivePiece,
+        supports_180: bool,
+    ) -> &[Placement] {
+        self.supports_180 = supports_180;
         self.placements.clear();
         if !self.explore(board, spawn) {
             return &self.placements;
@@ -412,6 +451,9 @@ impl Movegen {
                 (Action::RotateCcw, rotation.ccw()),
                 (Action::Rotate180, rotation.flip()),
             ] {
+                if action == Action::Rotate180 && !self.supports_180 {
+                    continue;
+                }
                 // SRS tries the kick candidates in table order and stops at
                 // the first one that fits.
                 for &(dx, dy) in kick::kicks(kind, rotation, to) {
@@ -812,6 +854,55 @@ mod tests {
                 let fresh = generate(board, kind);
                 assert_eq!(reused, fresh, "{kind:?}");
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod supports_180 {
+    use super::*;
+
+    /// A Z stack where exactly one of the 36 placements needs a 180.
+    fn one_eighty_only_board() -> Board {
+        let mut board = Board::new();
+        board.set_row(0, 0b1101110111);
+        board.set_row(1, 0b1111110011);
+        board.set_row(2, 0b1111111001);
+        board
+    }
+
+    fn keys(placements: &[Placement]) -> Vec<(Rotation, i32, i32)> {
+        placements
+            .iter()
+            .map(|p| (p.piece.rotation, p.piece.x, p.piece.y))
+            .collect()
+    }
+
+    #[test]
+    fn dropping_the_180_removes_only_180_only_placements() {
+        let board = one_eighty_only_board();
+        let with = generate_with_180(&board, PieceKind::Z, true);
+        let without = generate_with_180(&board, PieceKind::Z, false);
+        assert_eq!(with.len(), 36);
+        assert_eq!(without.len(), 35);
+        // Every placement the 180-less engine can reach is still reachable.
+        for key in keys(&without) {
+            assert!(
+                keys(&with).contains(&key),
+                "the 180-less set must be a subset, {key:?} is missing"
+            );
+        }
+        // And the default path still uses the 180.
+        assert_eq!(generate(&board, PieceKind::Z).len(), 36);
+    }
+
+    #[test]
+    fn an_open_board_is_unaffected() {
+        let board = Board::new();
+        for kind in [PieceKind::T, PieceKind::I, PieceKind::S, PieceKind::L] {
+            let with = generate_with_180(&board, kind, true).len();
+            let without = generate_with_180(&board, kind, false).len();
+            assert_eq!(with, without, "{kind:?} on an open board");
         }
     }
 }

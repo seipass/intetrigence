@@ -225,6 +225,13 @@ pub struct Weights {
     pub surge_charge: f64,
     /// Exponent applied to the charged amount in the leaf value.
     pub surge_exponent: f64,
+    /// Extra value for a full T-spin double. A TSD pays 4 attack and clears
+    /// two lines; against the 40-row attax we executed 40 of them to their
+    /// 100, which is the single largest attack-composition gap measured.
+    pub tsd_bonus: f64,
+    /// Penalty for a mini spin. 109 of our 300 spins were mini singles
+    /// against attax's 60; a mini single pays 1 attack where a full TSS pays 2.
+    pub mini_penalty: f64,
     /// Penalty when a placement releases surge below `SURGE_LETHAL` lines.
     /// A small burst is absorbed by a bot sitting at height 3-5; the charge
     /// is worth more held.
@@ -285,6 +292,8 @@ impl Default for Weights {
             surge_charge: 1.5,
             surge_exponent: 1.0,
             surge_hold_penalty: 0.0,
+            tsd_bonus: 0.0,
+            mini_penalty: 0.0,
             combo: 2.0,
             opener_attack: 6.0,
             garbage_clear: 10.0,
@@ -407,6 +416,12 @@ pub fn apply_placement(
     } else {
         weights.clear[placement.spin.index()][clear.lines as usize]
     };
+    if placement.spin == SpinType::Full && clear.lines == 2 {
+        value += weights.tsd_bonus;
+    }
+    if placement.spin == SpinType::Mini {
+        value += weights.mini_penalty;
+    }
     if clear.perfect_clear {
         value += weights.perfect_clear;
     }
@@ -553,6 +568,37 @@ fn t_slot_cutout_with_heights(
     value
 }
 
+/// Exact T-slot scan: the most lines any **reachable** T placement that the
+/// engine classifies as a spin would clear.
+///
+/// The cheap [`best_t_slot`] behind the leaf value only looks at nub-down
+/// entries and only checks geometry, so it can miss slots. This version asks
+/// the movegen for the placements the bot can actually reach and classifies
+/// them with the engine, so it is the reference the heuristic is measured
+/// against -- not something to call per leaf (a T movegen is ~10 us).
+pub fn t_slot_exact(board: &Board) -> u8 {
+    let mut best = 0;
+    for placement in crate::movegen::generate(board, PieceKind::T) {
+        if placement.spin == SpinType::None {
+            continue;
+        }
+        let mut probe = board.clone();
+        probe
+            .place(
+                placement.piece.kind,
+                placement.piece.rotation,
+                placement.piece.x,
+                placement.piece.y,
+            )
+            .expect("a generated placement is legal");
+        let lines = probe.clear_lines().lines;
+        if lines > best {
+            best = lines;
+        }
+    }
+    best
+}
+
 /// Best nub-down T slot: `(x, y, lines cleared)` for a rotation-2 T.
 fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)> {
     let mut best: Option<(i32, i32, u8)> = None;
@@ -681,6 +727,88 @@ mod tests {
         let weights = Weights::default();
         assert!(t_slot_cutout(&board, 1, &weights) > 0.0);
         assert_eq!(t_slot_cutout(&board, 0, &weights), 0.0);
+    }
+
+    /// The cheap nub-down scan is a leaf heuristic; `t_slot_exact` is the
+    /// reachability-checked reference. This pins where they disagree so the
+    /// gap is visible instead of assumed.
+    #[test]
+    fn tsd_bonus_and_mini_penalty_hit_only_their_cases() {
+        let plain = Weights::default();
+        let tuned = Weights {
+            tsd_bonus: 40.0,
+            mini_penalty: -30.0,
+            ..Weights::default()
+        };
+        // A full TSD: the bonus applies.
+        let tsd = tsd_board();
+        let tsd_placement = crate::movegen::generate(&tsd, PieceKind::T)
+            .into_iter()
+            .find(|placement| {
+                placement.spin == SpinType::Full && {
+                    let mut probe = tsd.clone();
+                    probe
+                        .place(
+                            placement.piece.kind,
+                            placement.piece.rotation,
+                            placement.piece.x,
+                            placement.piece.y,
+                        )
+                        .unwrap();
+                    probe.clear_lines().lines == 2
+                }
+            })
+            .expect("the fixture has a TSD");
+        let context = EvalContext::default();
+        let (_, base, _) = apply_placement(&tsd, &tsd_placement, &context, &plain);
+        let (_, bonus, _) = apply_placement(&tsd, &tsd_placement, &context, &tuned);
+        assert_eq!(base.spin, SpinType::Full);
+        assert_eq!(base.lines, 2);
+        assert!((bonus.value - base.value - 40.0).abs() < 1e-9);
+
+        // A plain quad: neither term applies.
+        let flat = Board::new();
+        let quad = crate::movegen::generate(&flat, PieceKind::I)
+            .into_iter()
+            .find(|placement| placement.piece.rotation == Rotation::Zero)
+            .expect("an I can lie flat");
+        let (_, base, _) = apply_placement(&flat, &quad, &context, &plain);
+        let (_, tuned_value, _) = apply_placement(&flat, &quad, &context, &tuned);
+        assert_eq!(base.spin, SpinType::None);
+        assert!((tuned_value.value - base.value).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_cheap_slot_scan_is_measured_against_the_exact_one() {
+        // A 2-wide, 2-deep well with an overhang on the left: the nub-down
+        // entry is blocked, so only a sideways entry reaches the slot.
+        let mut sideways = Board::new();
+        sideways.set_row(0, 0x1FF);
+        sideways.set_row(1, 0x1FF);
+        sideways.set_row(2, 0x1FF & !(0b11 << 3));
+        sideways.set_row(3, 0x1FF & !(0b11 << 3));
+        sideways.set_row(4, 0x1FF & !(0b1 << 3));
+
+        let mut cases = vec![
+            ("empty", Board::new()),
+            ("tsd", tsd_board()),
+            ("sideways", sideways),
+        ];
+        let mut one_wide = Board::new();
+        for y in 0..4 {
+            one_wide.set_row(y, Board::FULL_ROW & !(1u16 << 9));
+        }
+        cases.push(("one-wide well", one_wide));
+
+        for (name, board) in cases {
+            let cheap = t_slot_lines(&board);
+            let exact = t_slot_exact(&board);
+            println!("{name:14} cheap {cheap} exact {exact}");
+            assert!(
+                cheap <= exact,
+                "{name}: the heuristic must not claim a slot the exact scan cannot reach"
+            );
+        }
     }
 
     #[test]
