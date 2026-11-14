@@ -15,7 +15,8 @@ use std::time::Duration;
 
 use intetrigence_arena::engine::{Profile, Sheet};
 use intetrigence_arena::harness::{
-    AttaxConfig, BotChoice, MatchConfig, load_audits, now_stamp, run_match, summarize, verify_all,
+    AttaxConfig, BotChoice, MatchConfig, TbpOpponentConfig, load_audits, now_stamp, run_match,
+    summarize, verify_all,
 };
 use intetrigence_arena::render::{RenderOptions, render_replay};
 use intetrigence_arena::replay::verify_replay;
@@ -65,6 +66,13 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut pressure_rows = 4u32;
     let mut from_turn = 200u32;
     let mut self_play = false;
+    let mut tbp_program: Option<String> = None;
+    let mut tbp_args: Vec<String> = Vec::new();
+    let mut tbp_cwd: Option<PathBuf> = None;
+    let mut tbp_visible_rows = 40u32;
+    let mut tbp_suggest_delay_ms = 0u64;
+    let mut tbp_retry_empty_ms = 0u64;
+    let mut tbp_name = "tbp-bot".to_string();
 
     let mut index = 0;
     while index < args.len() {
@@ -177,11 +185,57 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 self_play = true;
                 index += 1;
             }
+            "--tbp-program" => {
+                tbp_program = Some(value(1)?);
+                index += 2;
+            }
+            "--tbp-args" => {
+                tbp_args = value(1)?
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|part| !part.is_empty())
+                    .map(ToString::to_string)
+                    .collect();
+                index += 2;
+            }
+            "--tbp-cwd" => {
+                tbp_cwd = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--tbp-visible-rows" => {
+                tbp_visible_rows = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--tbp-visible-rows: {error}"))?;
+                index += 2;
+            }
+            "--tbp-suggest-delay-ms" => {
+                tbp_suggest_delay_ms = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--tbp-suggest-delay-ms: {error}"))?;
+                index += 2;
+            }
+            "--tbp-retry-empty-ms" => {
+                tbp_retry_empty_ms = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--tbp-retry-empty-ms: {error}"))?;
+                index += 2;
+            }
+            "--tbp-name" => {
+                tbp_name = value(1)?;
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
 
-    if !no_attax && !self_play {
+    if let Some(program) = tbp_program {
+        let mut opponent = TbpOpponentConfig::new(tbp_name, program, tbp_args);
+        opponent.cwd = tbp_cwd;
+        opponent.visible_rows = tbp_visible_rows;
+        opponent.suggest_delay_ms = tbp_suggest_delay_ms;
+        opponent.retry_empty_suggest_ms = tbp_retry_empty_ms;
+        config.tbp_opponent = Some(opponent);
+    } else if !no_attax && !self_play {
         let dir = attax.ok_or_else(|| "match needs --attax DIR or --no-attax".to_string())?;
         let entry = dir.join("tbp").join("attax-tbp.ts");
         if !entry.exists() {
