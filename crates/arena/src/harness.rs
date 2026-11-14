@@ -26,7 +26,9 @@ pub struct AttaxConfig {
     pub bun: String,
     pub commit: Option<String>,
     pub bun_version: Option<String>,
-    /// attax's TBP grid is 40 rows (`src/ai/bot/movegen.ts` ROWS = 40).
+    /// attax's TBP grid rows. `0` auto-detects from
+    /// `<dir>/src/ai/bot/movegen.ts` (`ROWS = N`); upstream `7b38f51` is 20,
+    /// the vision patch sets 40.
     pub visible_rows: u32,
     pub timeout: Duration,
 }
@@ -38,7 +40,7 @@ impl AttaxConfig {
             bun: "bun".into(),
             commit: None,
             bun_version: None,
-            visible_rows: 40,
+            visible_rows: 0,
             timeout: Duration::from_secs(30),
         }
     }
@@ -120,6 +122,8 @@ pub struct MatchConfig {
     /// Notes written into the summary. Set per match so the M0 plumbing run and
     /// the M2 real-bot run cannot inherit each other's wording.
     pub notes: Vec<String>,
+    /// Weight overrides applied to the search, recorded in the replay header.
+    pub weights_note: Vec<String>,
 }
 
 impl MatchConfig {
@@ -140,8 +144,95 @@ impl MatchConfig {
             self_play: false,
             resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
+            weights_note: Vec::new(),
         }
     }
+}
+
+/// Parses `key=value[,key=value]` weight overrides.
+pub fn parse_weight_overrides(text: &str) -> Result<Vec<(String, String)>, String> {
+    let mut overrides = Vec::new();
+    for part in text.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (key, value) = part
+            .split_once('=')
+            .ok_or_else(|| format!("weight override `{part}` needs key=value"))?;
+        overrides.push((key.trim().to_string(), value.trim().to_string()));
+    }
+    Ok(overrides)
+}
+
+/// Applies weight overrides to `Weights`. Unknown keys are rejected; the
+/// defaults are untouched when the list is empty (bit-identical behaviour).
+pub fn apply_weight_overrides(
+    weights: &mut intetrigence_bot::Weights,
+    overrides: &[(String, String)],
+) -> Result<(), String> {
+    for (key, value) in overrides {
+        let number = |value: &str| -> Result<f64, String> {
+            value
+                .parse::<f64>()
+                .map_err(|error| format!("weight `{key}`: {error}"))
+        };
+        match key.as_str() {
+            "max_height" => weights.max_height = number(value)?,
+            "height_sq" => weights.height_sq = number(value)?,
+            "holes" => weights.holes = number(value)?,
+            "hole_cover" => weights.hole_cover = number(value)?,
+            "hole_rows" => weights.hole_rows = number(value)?,
+            "bumpiness" => weights.bumpiness = number(value)?,
+            "bumpiness_sq" => weights.bumpiness_sq = number(value)?,
+            "row_transitions" => weights.row_transitions = number(value)?,
+            "well_depth" => weights.well_depth = number(value)?,
+            "extra_wells" => weights.extra_wells = number(value)?,
+            "danger_projected" => weights.danger_projected = number(value)?,
+            "garbage_rows" => weights.garbage_rows = number(value)?,
+            "attack" => weights.attack = number(value)?,
+            "perfect_clear" => weights.perfect_clear = number(value)?,
+            "b2b_break" => weights.b2b_break = number(value)?,
+            "wasted_t" => weights.wasted_t = number(value)?,
+            "surge_charge" => weights.surge_charge = number(value)?,
+            "combo" => weights.combo = number(value)?,
+            "opener_attack" => weights.opener_attack = number(value)?,
+            "garbage_clear" => weights.garbage_clear = number(value)?,
+            "incoming" => weights.incoming = number(value)?,
+            "softdrop" => weights.softdrop = number(value)?,
+            "discount" => weights.discount = number(value)?,
+            "surge_exponent" => weights.surge_exponent = number(value)?,
+            "surge_hold_penalty" => weights.surge_hold_penalty = number(value)?,
+            "survival_line" => weights.survival_line = number(value)?,
+            "survival" => {
+                weights.survival = match value.as_str() {
+                    "1" | "true" | "yes" => true,
+                    "0" | "false" | "no" => false,
+                    other => return Err(format!("weight `survival`: bad bool `{other}`")),
+                }
+            }
+            other => return Err(format!("unknown weight `{other}`")),
+        }
+    }
+    Ok(())
+}
+
+/// Reads attax's board rows from its movegen source. Falls back to 20 (the
+/// upstream `7b38f51` value) when the file is missing or unparseable.
+pub fn detect_attax_visible_rows(dir: &Path) -> u32 {
+    let path = dir.join("src").join("ai").join("bot").join("movegen.ts");
+    if let Ok(text) = std::fs::read_to_string(path) {
+        for line in text.lines() {
+            let line = line.trim();
+            if let Some(rest) = line.strip_prefix("export const ROWS =") {
+                let value = rest.trim().trim_end_matches(';').trim();
+                if let Ok(rows) = value.parse::<u32>() {
+                    return rows;
+                }
+            }
+        }
+    }
+    20
 }
 
 /// Repository root (the arena crate lives at `<root>/crates/arena`).
@@ -744,6 +835,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     let mut bot_config =
                         crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
                     bot_config.commit = git_short_head();
+                    bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
                 }
             };
@@ -753,6 +845,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 };
                 let mut bot_config = crate::bot_agent::BotAgentConfig::new(search.as_ref().clone());
                 bot_config.commit = git_short_head();
+                bot_config.args.extend(config.weights_note.clone());
                 Box::new(crate::bot_agent::BotAgent::new(bot_config))
             } else if let Some(tbp) = &config.tbp_opponent {
                 let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
@@ -780,7 +873,11 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         let mut tbp_config = TbpAgentConfig::new(host);
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();
-                        tbp_config.visible_rows = attax.visible_rows;
+                        tbp_config.visible_rows = if attax.visible_rows == 0 {
+                            detect_attax_visible_rows(&attax.dir)
+                        } else {
+                            attax.visible_rows
+                        };
                         tbp_config.decision_log = Some(log_path.clone());
                         tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
                         Box::new(TbpAgent::new(tbp_config))

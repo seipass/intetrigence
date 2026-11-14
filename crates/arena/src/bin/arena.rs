@@ -15,8 +15,8 @@ use std::time::Duration;
 
 use intetrigence_arena::engine::{Profile, Sheet};
 use intetrigence_arena::harness::{
-    AttaxConfig, BotChoice, MatchConfig, TbpOpponentConfig, load_audits, now_stamp, run_match,
-    summarize, verify_all,
+    AttaxConfig, BotChoice, MatchConfig, TbpOpponentConfig, apply_weight_overrides, load_audits,
+    now_stamp, parse_weight_overrides, run_match, summarize, verify_all,
 };
 use intetrigence_arena::render::{RenderOptions, render_replay};
 use intetrigence_arena::replay::verify_replay;
@@ -74,7 +74,8 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_suggest_delay_ms = 0u64;
     let mut tbp_retry_empty_ms = 0u64;
     let mut tbp_name = "tbp-bot".to_string();
-    let mut attax_visible_rows = 40u32;
+    let mut attax_visible_rows = 0u32;
+    let mut weight_overrides: Vec<(String, String)> = Vec::new();
 
     let mut index = 0;
     while index < args.len() {
@@ -232,6 +233,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--attax-visible-rows: {error}"))?;
                 index += 2;
             }
+            "--weights" => {
+                weight_overrides.extend(parse_weight_overrides(&value(1)?)?);
+                index += 2;
+            }
             other => return Err(format!("unknown flag `{other}`")),
         }
     }
@@ -287,11 +292,19 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     config.self_play = self_play;
     config.bot = match bot.as_str() {
         "baseline" => BotChoice::Baseline,
-        "search" => BotChoice::Search(Box::new(SearchConfig {
-            budget: Duration::from_millis(ms),
-            threads,
-            ..SearchConfig::default()
-        })),
+        "search" => {
+            let mut search = SearchConfig {
+                budget: Duration::from_millis(ms),
+                threads,
+                ..SearchConfig::default()
+            };
+            apply_weight_overrides(&mut search.weights, &weight_overrides)?;
+            config.weights_note = weight_overrides
+                .iter()
+                .map(|(key, value)| format!("--weights {key}={value}"))
+                .collect();
+            BotChoice::Search(Box::new(search))
+        }
         other => return Err(format!("unknown --bot `{other}` (baseline|search)")),
     };
     config.started_at = now_stamp();

@@ -14,8 +14,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use intetrigence_arena::harness::BotChoice;
 use intetrigence_arena::harness::TbpOpponentConfig;
+use intetrigence_arena::harness::{BotChoice, apply_weight_overrides, parse_weight_overrides};
 use intetrigence_arena::round::{
     OpponentKind, OpponentSpec, RoundSpec, check_seed_discipline, current_build,
     default_report_path, head_commit, read_seeds_file, run_round,
@@ -81,7 +81,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut attax_bun = "bun".to_string();
     let mut attax_commit: Option<String> = None;
     let mut attax_patch: Option<String> = None;
-    let mut attax_visible_rows = 40u32;
+    let mut attax_visible_rows = 0u32;
     let mut cc2_program: Option<String> = None;
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
@@ -110,6 +110,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut check_only = false;
     let mut resume = false;
     let mut resume_reason: Option<String> = None;
+    let mut weight_overrides: Vec<(String, String)> = Vec::new();
 
     let mut index = 0;
     while index < args.len() {
@@ -316,6 +317,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 resume_reason = Some(value(1)?);
                 index += 2;
             }
+            "--weights" => {
+                weight_overrides.extend(parse_weight_overrides(&value(1)?)?);
+                index += 2;
+            }
             other => return Err(format!("unknown round flag `{other}`")),
         }
     }
@@ -453,11 +458,15 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         build_commit: build_commit.clone(),
         out_root,
         report_path: report_path.unwrap_or_else(|| default_report_path(round)),
-        bot: BotChoice::Search(Box::new(SearchConfig {
-            budget: Duration::from_millis(ms),
-            threads,
-            ..SearchConfig::default()
-        })),
+        bot: {
+            let mut search = SearchConfig {
+                budget: Duration::from_millis(ms),
+                threads,
+                ..SearchConfig::default()
+            };
+            apply_weight_overrides(&mut search.weights, &weight_overrides)?;
+            BotChoice::Search(Box::new(search))
+        },
         turn_cap,
         profile: intetrigence_arena::engine::Profile::Official,
         gates,
@@ -468,6 +477,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         max_stages,
         resume,
         resume_reason,
+        weights_note: weight_overrides
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect(),
     };
     let report = run_round(&spec)?;
     println!(

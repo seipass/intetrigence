@@ -71,6 +71,8 @@ pub struct RoundSpec {
     /// (protocol v1.18 §1.4). Requires the same build and seeds.
     pub resume: bool,
     pub resume_reason: Option<String>,
+    /// Applied weight overrides, recorded in the report and replay headers.
+    pub weights_note: Vec<String>,
 }
 
 /// One stage's result.
@@ -122,6 +124,8 @@ pub struct RoundReport {
     pub resumed_games: u32,
     #[serde(default)]
     pub resume_reason: Option<String>,
+    #[serde(default)]
+    pub weights: Vec<String>,
     pub stopped_at: Option<String>,
     /// 1-based stage number where the round stopped, when it did not complete.
     pub stopped_at_stage: Option<usize>,
@@ -477,6 +481,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.profile = spec.profile;
             config.notes = spec.notes.clone();
             config.resume = spec.resume;
+            config.weights_note = spec.weights_note.clone();
             match &opponent.kind {
                 OpponentKind::Attax {
                     dir,
@@ -547,6 +552,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         resumed: spec.resume,
         resumed_games,
         resume_reason: spec.resume_reason.clone(),
+        weights: spec.weights_note.clone(),
         stopped_at,
         stopped_at_stage,
         stop_reason,
@@ -799,6 +805,10 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     )
     .map_err(|e| e.to_string())?;
     writeln!(out, "- started: {}", report.started_at).map_err(|e| e.to_string())?;
+    if !report.weights.is_empty() {
+        writeln!(out, "- search weights: {}", report.weights.join(", "))
+            .map_err(|e| e.to_string())?;
+    }
     if report.resumed {
         writeln!(
             out,
