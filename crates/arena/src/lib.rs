@@ -25,9 +25,11 @@ pub mod audit;
 pub mod baseline;
 pub mod bot_agent;
 pub mod engine;
+pub mod font;
 pub mod harness;
 pub mod movegen;
 pub mod referee;
+pub mod render;
 pub mod replay;
 pub mod tbp_agent;
 
@@ -38,5 +40,6 @@ pub use bot_agent::{BotAgent, BotAgentConfig};
 pub use engine::{Engine, Sheet, View};
 pub use harness::{AttaxConfig, MatchConfig, MatchSummary, run_match};
 pub use referee::{RoundConfig, RoundOutcome, RoundReport, run_round};
+pub use render::{RenderOptions, RenderReport, render_replay};
 pub use replay::{ReplayRecord, VerifyReport, verify_replay, write_replay};
 pub use tbp_agent::{TbpAgent, TbpAgentConfig};

@@ -6,6 +6,7 @@
 //!              [--attax DIR] [--bun bun] [--no-attax]
 //! arena verify <replay.jsonl | match-dir>
 //! arena report <match-dir>
+//! arena render --replay <replay.jsonl> --out <video.mp4> [--fps 60]
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -16,6 +17,7 @@ use intetrigence_arena::engine::{Profile, Sheet};
 use intetrigence_arena::harness::{
     AttaxConfig, BotChoice, MatchConfig, load_audits, now_stamp, run_match, summarize, verify_all,
 };
+use intetrigence_arena::render::{RenderOptions, render_replay};
 use intetrigence_arena::replay::verify_replay;
 use intetrigence_bot::SearchConfig;
 
@@ -29,6 +31,7 @@ fn main() {
         "match" => cmd_match(&args[1..]),
         "verify" => cmd_verify(&args[1..]),
         "report" => cmd_report(&args[1..]),
+        "render" => cmd_render(&args[1..]),
         "-h" | "--help" | "help" => {
             usage();
             Ok(())
@@ -404,4 +407,82 @@ fn command_version(program: &str) -> Option<String> {
         return None;
     }
     Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn cmd_render(args: &[String]) -> Result<(), String> {
+    let mut replay: Option<PathBuf> = None;
+    let mut out: Option<PathBuf> = None;
+    let mut options = RenderOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].clone();
+        let value = |offset: usize| -> Result<String, String> {
+            args.get(index + offset)
+                .cloned()
+                .ok_or_else(|| format!("{flag} needs a value"))
+        };
+        match flag.as_str() {
+            "--replay" => {
+                replay = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--out" => {
+                out = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--fps" => {
+                options.fps = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--fps: {error}"))?;
+                index += 2;
+            }
+            "--width" => {
+                options.width = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--width: {error}"))?;
+                index += 2;
+            }
+            "--height" => {
+                options.height = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--height: {error}"))?;
+                index += 2;
+            }
+            "--end-card" => {
+                options.end_card_seconds = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--end-card: {error}"))?;
+                index += 2;
+            }
+            "--max-turns" => {
+                options.max_turns = Some(
+                    value(1)?
+                        .parse()
+                        .map_err(|error| format!("--max-turns: {error}"))?,
+                );
+                index += 2;
+            }
+            other => return Err(format!("unknown render flag `{other}`")),
+        }
+    }
+    let replay = replay.ok_or_else(|| "render needs --replay <path>".to_string())?;
+    let out = out.ok_or_else(|| "render needs --out <video.mp4>".to_string())?;
+    let report = render_replay(&replay, &out, &options)?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "replay": replay.display().to_string(),
+            "output": report.output.display().to_string(),
+            "seed": report.seed,
+            "sheet": report.sheet,
+            "turns": report.turns,
+            "frames": report.frames,
+            "duration_seconds": report.duration_seconds,
+            "winner": report.winner,
+            "reason": report.reason,
+            "forfeit_cause": report.forfeit_cause,
+            "verified": report.verified,
+        })
+    );
+    Ok(())
 }
