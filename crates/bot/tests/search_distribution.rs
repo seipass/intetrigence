@@ -63,10 +63,9 @@ fn real_game_search_distribution() {
     // builds in debug, where the search is several times slower, so the
     // completed depth was an artefact of the build profile. The referee runs
     // `--release`, so only a release measurement means anything.
-    assert!(
-        !cfg!(debug_assertions),
-        "run this with --release: the depth it reports is build-profile dependent"
-    );
+    if cfg!(debug_assertions) {
+        panic!("run this with --release: the depth it reports is build-profile dependent");
+    }
     let injections: Vec<(u32, u32)> = (20..400u32).step_by(8).map(|t| (t, 3)).collect();
     for (label, budget_ms, threads) in [
         ("100 ms / 8 threads", 100u64, 8usize),
