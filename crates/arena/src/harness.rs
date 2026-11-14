@@ -84,8 +84,8 @@ impl MatchConfig {
             out_dir: out_dir.into(),
             attax: None,
             started_at: now_stamp(),
-            rules: version_string("docs/s2-spec.md", "v1.3.9"),
-            protocol: version_string("docs/s2-referee-protocol.md", "v1.7"),
+            rules: version_string("docs/s2-spec.md", "v1.3.11"),
+            protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
         }

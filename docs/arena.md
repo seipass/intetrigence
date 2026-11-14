@@ -1,8 +1,8 @@
 # レフェリー実装メモ(`crates/arena` + `crates/tbp`)
 
 **対象**: S2 レフェリー、TBP host、ベンチハーネス、replay 検証、監査ログ
-**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.7
-**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.9
+**プロトコルの正**: [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) v1.9
+**ルールの正**: [`docs/s2-spec.md`](s2-spec.md) v1.3.11
 **状態**: M0 ゲート通過(10 ゲーム replay 検証済み)/ M1 レフェリー完成
 **最終更新**: 2026-11-14
 
