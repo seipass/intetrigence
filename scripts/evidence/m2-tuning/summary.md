@@ -35,11 +35,11 @@
 
 ## Per-bot audit
 
-| slot | bot | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |
-|---|---|---|---|---|---|---|---|
-| 0 | intetrigence | 5534 | 0 / 5534 | 0 / 5534 | 1.000 | 72.0 | 0 |
-| 1 | Attax | 5524 | 78 / 5524 | 0 / 5524 | 0.876 | 105.0 | 0 |
+| slot | bot | visible rows | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |
+|---|---|---|---|---|---|---|---|---|
+| 0 | intetrigence | 40 | 5534 | 0 / 5534 | 0 / 5534 | 1.000 | 72.0 | 0 |
+| 1 | Attax | 20 | 5524 | 78 / 5524 | 0 / 5524 | 0.876 | 105.0 | 0 |
 
 ## Notes
 
-- The intetrigence side is the bot recorded in each replay header.
+- M2 gate: real intetrigence search (--ms 100, 8 threads) vs attax 7b38f51. Forfeit wins are broken down by cause in the report.

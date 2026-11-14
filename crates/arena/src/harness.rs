@@ -201,6 +201,7 @@ pub struct BotAggregate {
     pub think_over_budget: u32,
     pub attack_per_piece: f64,
     pub received_per_game: f64,
+    pub visible_rows: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -405,6 +406,10 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 .round()
                 / 1000.0
         },
+        visible_rows: audits
+            .first()
+            .map(|audit| audit.bots[slot].visible_rows)
+            .unwrap_or(0),
     });
     MatchSummary {
         schema: "intetrigence/s2-match-summary/1".into(),
@@ -517,14 +522,15 @@ impl MatchSummary {
         }
         text.push_str("\n## Per-bot audit\n\n");
         text.push_str(
-            "| slot | bot | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
+            "| slot | bot | visible rows | placements | spin mismatch | attack mismatch (same spin) | attack/piece | received/game | think > 200ms |\n",
         );
-        text.push_str("|---|---|---|---|---|---|---|---|\n");
+        text.push_str("|---|---|---|---|---|---|---|---|---|\n");
         for bot in &self.bots {
             text.push_str(&format!(
-                "| {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
+                "| {} | {} | {} | {} | {} / {} | {} / {} | {:.3} | {:.1} | {} |\n",
                 bot.slot,
                 bot.name,
+                bot.visible_rows,
                 bot.placements,
                 bot.spin_mismatches,
                 bot.spin_checked,
@@ -725,6 +731,7 @@ mod tests {
                     think_over_budget: 0,
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
+                    visible_rows: 0,
                 },
                 BotAggregate {
                     slot: 1,
@@ -738,6 +745,7 @@ mod tests {
                     think_over_budget: 0,
                     attack_per_piece: 0.0,
                     received_per_game: 0.0,
+                    visible_rows: 0,
                 },
             ],
             notes: vec!["note".into()],
