@@ -111,6 +111,9 @@ pub struct MatchConfig {
     pub profile: Profile,
     /// Run both slots with the in-process search (self-play diagnostic).
     pub self_play: bool,
+    /// Reuse already verified `(seed, sheet)` games in `out_dir` (protocol
+    /// v1.18 §1.4). Only valid with the same build and seeds.
+    pub resume: bool,
     /// Notes written into the summary. Set per match so the M0 plumbing run and
     /// the M2 real-bot run cannot inherit each other's wording.
     pub notes: Vec<String>,
@@ -132,6 +135,7 @@ impl MatchConfig {
             bot: BotChoice::Baseline,
             profile: Profile::Official,
             self_play: false,
+            resume: false,
             notes: vec!["The intetrigence side is the bot recorded in each replay header.".into()],
         }
     }
@@ -281,6 +285,9 @@ pub struct MatchSummary {
     pub wilson_high: f64,
     pub verified: u32,
     pub verify_failures: u32,
+    /// Games reused from a previous interrupted run (protocol v1.18 §1.4).
+    #[serde(default)]
+    pub resumed_games: u32,
     pub attax: Option<AttaxSummary>,
     pub bots: [BotAggregate; 2],
     pub notes: Vec<String>,
@@ -519,6 +526,7 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         wilson_high: (wilson_high * 10000.0).round() / 10000.0,
         verified,
         verify_failures: games.len() as u32 - verified,
+        resumed_games: 0,
         attax,
         bots,
         notes,
@@ -648,6 +656,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     }
 
     let mut audits = Vec::new();
+    let mut resumed_games = 0u32;
     for &seed in &config.seeds {
         for &sheet in &config.sheets {
             let name = format!("seed-{seed}-sheet-{}", sheet.as_str());
@@ -655,6 +664,22 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
             let audit_path = audits_dir.join(format!("{name}.json"));
             let log_path = logs.join(format!("{name}-attax.jsonl"));
             let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
+
+            if config.resume && replay_path.exists() && audit_path.exists() {
+                if let Ok(verify) = verify_replay(&replay_path) {
+                    if verify.ok {
+                        if let Ok(text) = std::fs::read_to_string(&audit_path) {
+                            if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
+                                audit.verify = verify;
+                                println!("{name}: resumed (verified)");
+                                audits.push(audit);
+                                resumed_games += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
 
             let mut bot: Box<dyn Agent> = match &config.bot {
                 BotChoice::Baseline => Box::new(BaselineBot::new()),
@@ -748,7 +773,11 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         }
     }
 
-    let summary = summarize(&audits, config.notes.clone());
+    let mut summary = summarize(&audits, config.notes.clone());
+    summary.resumed_games = resumed_games;
+    if resumed_games > 0 {
+        println!("resume: {resumed_games} verified game(s) reused");
+    }
     summary
         .write(&config.out_dir)
         .map_err(|error| format!("write summary: {error}"))?;
@@ -832,6 +861,7 @@ mod tests {
             wilson_high: 1.0,
             verified: 0,
             verify_failures: 0,
+            resumed_games: 0,
             attax: None,
             bots: [
                 BotAggregate {

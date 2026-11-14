@@ -66,6 +66,10 @@ pub struct RoundSpec {
     pub notes: Vec<String>,
     /// Normally 3; a dry run sets 1.
     pub max_stages: usize,
+    /// Reuse verified `(seed, sheet)` games from a previous interrupted run
+    /// (protocol v1.18 §1.4). Requires the same build and seeds.
+    pub resume: bool,
+    pub resume_reason: Option<String>,
 }
 
 /// One stage's result.
@@ -86,6 +90,8 @@ pub struct StageReport {
     pub verified: u32,
     pub verify_failures: u32,
     pub forfeit_other: u32,
+    #[serde(default)]
+    pub resumed_games: u32,
 }
 
 /// The whole round, written to `scripts/evidence/round-N/round.json`.
@@ -101,6 +107,12 @@ pub struct RoundReport {
     pub profile: String,
     pub gates: [u32; 3],
     pub stages: Vec<StageReport>,
+    #[serde(default)]
+    pub resumed: bool,
+    #[serde(default)]
+    pub resumed_games: u32,
+    #[serde(default)]
+    pub resume_reason: Option<String>,
     pub stopped_at: Option<String>,
     /// 1-based stage number where the round stopped, when it did not complete.
     pub stopped_at_stage: Option<usize>,
@@ -395,6 +407,9 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
 
 /// Runs the stages in order, stopping at the first failed gate.
 pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
+    if spec.resume {
+        check_resume_compatibility(spec)?;
+    }
     let mut stages = Vec::new();
     let mut stopped_at = None;
     let mut stopped_at_stage = None;
@@ -421,6 +436,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 verified: 0,
                 verify_failures: 0,
                 forfeit_other: 0,
+                resumed_games: 0,
             }
         } else {
             let out_dir = spec
@@ -433,6 +449,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             config.bot = spec.bot.clone();
             config.profile = spec.profile;
             config.notes = spec.notes.clone();
+            config.resume = spec.resume;
             match &opponent.kind {
                 OpponentKind::Attax { dir, bun, commit } => {
                     let mut attax = AttaxConfig::new(dir.clone());
@@ -463,6 +480,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 verified: summary.verified,
                 verify_failures: summary.verify_failures,
                 forfeit_other: summary.wins_forfeit_other,
+                resumed_games: summary.resumed_games,
             }
         };
         let failed = !stage.passed;
@@ -477,6 +495,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         }
     }
     let completed = stages.len() == spec.max_stages && stopped_at.is_none();
+    let resumed_games: u32 = stages.iter().map(|stage| stage.resumed_games).sum();
     let report = RoundReport {
         schema: "intetrigence/round/1".into(),
         round: spec.round,
@@ -488,6 +507,9 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         profile: spec.profile.as_str().to_string(),
         gates: spec.gates,
         stages,
+        resumed: spec.resume,
+        resumed_games,
+        resume_reason: spec.resume_reason.clone(),
         stopped_at,
         stopped_at_stage,
         stop_reason,
@@ -712,6 +734,15 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     )
     .map_err(|e| e.to_string())?;
     writeln!(out, "- started: {}", report.started_at).map_err(|e| e.to_string())?;
+    if report.resumed {
+        writeln!(
+            out,
+            "- **resumed from an interrupted run**: {} verified game(s) reused; reason: {}",
+            report.resumed_games,
+            report.resume_reason.as_deref().unwrap_or("unspecified")
+        )
+        .map_err(|e| e.to_string())?;
+    }
     writeln!(
         out,
         "- environment: {} / {} logical CPUs / bun 1.4.0",
@@ -830,6 +861,38 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     }
     std::fs::write(&spec.report_path, out)
         .map_err(|error| format!("write {}: {error}", spec.report_path.display()))?;
+    Ok(())
+}
+
+/// Refuses to resume when the previous `round.json` used a different build or
+/// seed set (protocol v1.18 §1.4: resume only continues the same measurement).
+fn check_resume_compatibility(spec: &RoundSpec) -> Result<(), String> {
+    let path = spec
+        .out_root
+        .join(format!("round-{}", spec.round))
+        .join("round.json");
+    if !path.exists() {
+        return Ok(());
+    }
+    let text = std::fs::read_to_string(&path)
+        .map_err(|error| format!("read {}: {error}", path.display()))?;
+    let previous: RoundReport = serde_json::from_str(&text)
+        .map_err(|error| format!("parse {}: {error}", path.display()))?;
+    if previous.build_commit != spec.build_commit {
+        return Err(format!(
+            "cannot resume: previous build {:?} != current build {:?}",
+            previous.build_commit, spec.build_commit
+        ));
+    }
+    if previous.seeds != spec.seeds {
+        return Err("cannot resume: previous seeds differ from the current seeds".into());
+    }
+    if previous.seeds_commit != spec.seeds_commit {
+        return Err(format!(
+            "cannot resume: previous seeds commit {:?} != current {:?}",
+            previous.seeds_commit, spec.seeds_commit
+        ));
+    }
     Ok(())
 }
 

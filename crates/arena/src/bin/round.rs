@@ -107,6 +107,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut report_path: Option<PathBuf> = None;
     let mut dry_run = false;
     let mut check_only = false;
+    let mut resume = false;
+    let mut resume_reason: Option<String> = None;
 
     let mut index = 0;
     while index < args.len() {
@@ -299,6 +301,14 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 check_only = true;
                 index += 1;
             }
+            "--resume" => {
+                resume = true;
+                index += 1;
+            }
+            "--resume-reason" => {
+                resume_reason = Some(value(1)?);
+                index += 2;
+            }
             other => return Err(format!("unknown round flag `{other}`")),
         }
     }
@@ -448,6 +458,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             "Staged round (protocol v1.13 §1.4); evaluation seeds are pre-committed and burned after use.".into(),
         ],
         max_stages,
+        resume,
+        resume_reason,
     };
     let report = run_round(&spec)?;
     println!(

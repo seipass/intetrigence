@@ -52,6 +52,15 @@ v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 
 (Same fields as stage 1. clys is not S2-native; same interpretation as CC2.)
 
+## Interruption and resume (protocol v1.18 §1.4)
+
+- Verified replays from an interrupted round are kept.
+- Resume is allowed only with the **same build and the same seeds**: completed
+  `(seed, sheet)` games are reused after verification and the report records
+  the resume point, the reused game count and the interruption reason.
+- A build or seed change starts a new round; partial results are not used for
+  claims.
+
 ## Compatibility patches (protocol v1.14 §7.3)
 
 | opponent | upstream commit | patch | purpose | direction |
