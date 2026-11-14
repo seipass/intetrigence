@@ -969,3 +969,35 @@ pub struct SearchConfig { ..., pub deterministic: bool }   // 既定 false
 ### 専有スケジュール
 
 **bot-dev が先、harness-dev が後。公式ラウンドはラウンドの間だけ専有。** `scripts/measurement-lock.sh` で排他制御。
+
+## 23. 決定論が完成(2026-11-16)
+
+### 最後の穴: マージのタイブレーク
+
+時計を外しても、**ビームマージの同値候補のタイブレークがワーカーの完了順に依存**していました。
+
+```rust
+// 修正前: (value desc, key asc, index asc)
+//   index = マージ後のベクトル位置 → ワーカーの完了順に依存
+// 修正後: (value desc, key asc, (rotation, x, y, hold_used) asc, index asc)
+```
+
+**タイブレークを「配置そのもの」にした**ので、ソートが内容の全順序になり、到着順に依存しません。`state_key` は FNV(ランダムシードなし)なので、ハッシュ自体は非決定ではありませんでした。
+
+### 検証
+
+- **`cargo test --workspace` が並列で 3 回連続緑**(288 passed)
+- **`deterministic_mode_repeats_exactly` を `threads: 1 / 2 / 8` すべてで検証**
+- **arena の `threads: 2` / `8` テストも緑**
+
+### 公式構成(最終)
+
+| 項目 | 値 |
+|---|---|
+| モード | 決定論 |
+| スケジュール | `depth 6 / width 96` |
+| 時間上限 | なし(設計上) |
+| 実測(専有、1,200 手) | median 23.3ms / max 47.5〜72.9ms |
+| 専有 | 必須 |
+
+**再現性が確保された。** 同じ seed + 同じ設定で**完全に同じゲーム**が再現できる。
