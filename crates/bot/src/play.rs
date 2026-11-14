@@ -304,18 +304,31 @@ mod tests {
         assert!(report.median_think() <= budget * 3);
     }
 
-    /// A starting stack is inserted before the first turn, so a nearly full
-    /// board ends the game almost immediately.
+    /// A starting stack is inserted before the first turn, so the first
+    /// recorded height reflects it.
+    ///
+    /// This used to assert that 19 start rows end the game within 20 turns.
+    /// That stopped being true once the anytime loop kept its completed
+    /// iterations (`91ec267`): the bot now downstacks 19 rows and plays out
+    /// the whole 60-turn cap, which is the improvement, not a regression. The
+    /// test therefore checks the property it was really about -- the stack is
+    /// there on turn 0 -- instead of a strength threshold.
     #[test]
     fn starting_garbage_is_inserted() {
         let config = quick_config(2);
         let stressed = play_game_with_setup(1, &config, 60, &[], 19);
-        assert!(
-            stressed.topped_out || stressed.turns < 20,
-            "19 start rows must end the game quickly: {stressed:?}"
-        );
         let calm = play_game_with_setup(1, &config, 60, &[], 0);
-        assert!(calm.turns > stressed.turns);
+        assert!(
+            stressed.heights.first().copied().unwrap_or(0) >= 15,
+            "19 start rows must show on turn 0: {:?}",
+            stressed.heights.first()
+        );
+        assert!(
+            calm.heights.first().copied().unwrap_or(99) <= 4,
+            "a calm start must begin low: {:?}",
+            calm.heights.first()
+        );
+        assert!(calm.turns > 0 && stressed.turns > 0);
     }
 
     #[test]

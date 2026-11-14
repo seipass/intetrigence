@@ -43,6 +43,10 @@ use crate::movegen::{Movegen, Placement};
 /// Maximum worker threads (PLAN §7: default 8, the physical core count).
 pub const MAX_THREADS: usize = 8;
 
+/// Depth the first anytime iteration uses, so that a completed result exists
+/// almost immediately. The iteration then deepens and widens.
+pub const START_DEPTH: usize = 2;
+
 /// Search parameters.
 #[derive(Clone, Debug)]
 pub struct SearchConfig {
@@ -255,18 +259,23 @@ impl Searcher {
         // Leave a small margin for the final merge, which happens after the
         // last deadline check, so the wall-clock time stays inside the budget.
         let deadline = start + self.config.budget.mul_f32(0.95);
-        let depth = self.config.depth.max(1);
-        let sequence = PieceSequence::new(root.current, &root.preview, depth);
-
+        let max_depth = self.config.depth.max(1);
+        // Iterative deepening: start shallow enough that the first iteration
+        // almost always completes, then grow the depth, then widen the beam,
+        // then grow the depth again. The previous version only widened a fixed
+        // depth, and if that depth did not finish it fell back to a 1-ply
+        // greedy move after burning the whole budget.
+        let mut depth = max_depth.clamp(1, START_DEPTH);
         let mut best: Option<SearchResult> = None;
         let mut width = self.config.width.max(1);
         loop {
+            let sequence = PieceSequence::new(root.current, &root.preview, depth);
             let outcome = if self.config.threads <= 1 {
                 self.run_sequential(root, &sequence, depth, width, deadline)
             } else {
                 self.run_parallel(root, &sequence, depth, width, deadline)
             };
-            let Some((nodes, candidates, line)) = outcome else {
+            let Some((nodes, candidates, line, completed)) = outcome else {
                 break;
             };
             if candidates.is_empty() {
@@ -276,17 +285,23 @@ impl Searcher {
             best = Some(SearchResult {
                 best: first,
                 value,
-                depth,
+                depth: completed,
                 width,
                 nodes,
                 elapsed: start.elapsed(),
                 candidates,
                 line,
             });
-            if width >= self.config.max_width || Instant::now() >= deadline {
+            if Instant::now() >= deadline {
                 break;
             }
-            width = (width * 3 / 2).min(self.config.max_width);
+            if width < self.config.max_width {
+                width = (width * 3 / 2).min(self.config.max_width);
+            } else if depth < max_depth {
+                depth = (depth + 2).min(max_depth);
+            } else {
+                break;
+            }
         }
 
         best.or_else(|| self.greedy(root, start))
@@ -339,22 +354,26 @@ impl Searcher {
         depth: usize,
         width: usize,
         deadline: Instant,
-    ) -> Option<(u64, Vec<Candidate>, Vec<Move>)> {
+    ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
         let mut arena = vec![root_record(root)];
         let mut beam = vec![0u32];
         let mut transposition = HashMap::new();
         let mut nodes = 0u64;
 
+        // A beam at level k is a complete search to depth k, so a deadline hit
+        // keeps the last completed depth instead of throwing the iteration
+        // away. `None` is reserved for "not even one level finished".
+        let mut completed = 0usize;
         for level in 0..depth {
             if Instant::now() >= deadline {
-                return None;
+                break;
             }
             let mut children = Vec::with_capacity(beam.len() * 32);
             for (index, &node_id) in beam.iter().enumerate() {
                 // A level can be long, so the deadline is checked inside it as
-                // well; the iteration is abandoned and the previous one kept.
+                // well; the completed levels are kept.
                 if index % 4 == 0 && Instant::now() >= deadline {
-                    return None;
+                    break;
                 }
                 let node = arena[node_id as usize].clone();
                 expand_node(
@@ -369,17 +388,22 @@ impl Searcher {
                 nodes += 1;
             }
             // Do not start a merge that would run past the deadline: the
-            // previous iteration is complete and only slightly narrower.
+            // previous level is complete and only slightly narrower.
             if Instant::now() >= deadline {
-                return None;
+                break;
             }
             let next = commit(&mut arena, children, width, &mut transposition);
             if next.is_empty() {
                 break;
             }
             beam = next;
+            completed = level + 1;
         }
-        Some(finish(&arena, &beam, nodes))
+        if completed == 0 {
+            return None;
+        }
+        let (nodes, candidates, line) = finish(&arena, &beam, nodes);
+        Some((nodes, candidates, line, completed))
     }
 
     fn run_parallel(
@@ -389,7 +413,7 @@ impl Searcher {
         depth: usize,
         width: usize,
         deadline: Instant,
-    ) -> Option<(u64, Vec<Candidate>, Vec<Move>)> {
+    ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
         let threads = self.config.threads.clamp(1, MAX_THREADS);
         let weights = &self.config.weights;
         let mut arena = vec![root_record(root)];
@@ -430,9 +454,15 @@ impl Searcher {
             }
             drop(result_tx);
 
+            // A beam at level k is a complete search to depth k, so a deadline
+            // hit still yields a usable answer: the frontier is the last
+            // completed depth. Returning `None` here used to throw the whole
+            // iteration away and drop the bot to the 1-ply `greedy` move,
+            // which is what every game up to `91ec267` actually played.
+            let mut completed = 0usize;
             for level in 0..depth {
                 if Instant::now() >= deadline {
-                    return None;
+                    break;
                 }
                 let chunk_size = beam.len().div_ceil(threads).max(1);
                 let mut jobs = 0usize;
@@ -448,13 +478,15 @@ impl Searcher {
                         nodes,
                     };
                     if job_txs[chunk].send(job).is_err() {
-                        return None;
+                        break;
                     }
                     jobs += 1;
                 }
                 let mut collected: Vec<Option<Vec<Child>>> = vec![None; jobs];
                 for _ in 0..jobs {
-                    let (chunk, children) = result_rx.recv().ok()?;
+                    let Some((chunk, children)) = result_rx.recv().ok() else {
+                        break;
+                    };
                     collected[chunk] = Some(children);
                 }
                 let mut children = Vec::new();
@@ -462,16 +494,21 @@ impl Searcher {
                     children.extend(chunk);
                 }
                 nodes += beam.len() as u64;
-                if Instant::now() >= deadline {
-                    return None;
-                }
                 let next = commit(&mut arena, children, width, &mut transposition);
                 if next.is_empty() {
                     break;
                 }
                 beam = next;
+                completed = level + 1;
+                if Instant::now() >= deadline {
+                    break;
+                }
             }
-            Some(finish(&arena, &beam, nodes))
+            if completed == 0 {
+                return None;
+            }
+            let (nodes, candidates, line) = finish(&arena, &beam, nodes);
+            Some((nodes, candidates, line, completed))
         })
     }
 }
