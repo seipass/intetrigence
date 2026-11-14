@@ -575,6 +575,7 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
     let mut forfeit_unknown = 0u32;
     let mut verified = 0u32;
     let mut cause_mismatches = 0u32;
+    let mut game_rows: Vec<serde_json::Value> = Vec::new();
     for file in &files {
         let records = intetrigence_arena::replay::read_replay(file)
             .map_err(|error| format!("read {}: {error}", file.display()))?;
@@ -606,6 +607,32 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
             .iter()
             .filter(|mismatch| mismatch.contains("forfeit_cause"))
             .count() as u32;
+        let audit_path = if path.is_dir() {
+            path.join("audit")
+                .join(format!("seed-{}-sheet-{}.json", report.seed, report.sheet))
+        } else {
+            path.with_extension("json")
+        };
+        let (attax_max, intetrigence_max) = std::fs::read_to_string(&audit_path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|audit| {
+                let heights = audit.get("heights")?.as_array()?;
+                let h0 = heights.first()?.get("max")?.as_u64()?;
+                let h1 = heights.get(1)?.get("max")?.as_u64()?;
+                Some((h1, h0))
+            })
+            .unwrap_or((0, 0));
+        game_rows.push(serde_json::json!({
+            "seed": report.seed,
+            "sheet": report.sheet,
+            "winner": result.winner,
+            "reason": result.reason,
+            "forfeit_cause": report.forfeit_cause.map(|cause| cause.as_str()),
+            "turns": result.turns,
+            "attax_max_height": attax_max,
+            "intetrigence_max_height": intetrigence_max,
+        }));
         match result.reason.as_str() {
             "TopOut" => {
                 if result.winner == Some(0) {
@@ -643,6 +670,7 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         "gate_wins": gate_wins,
         "verified": verified,
         "cause_mismatches": cause_mismatches,
+        "game_rows": game_rows,
     });
     let out = if path.is_dir() {
         path.join("summary-reclassified.json")

@@ -25,6 +25,10 @@ use crate::engine::{Engine, PlacementTarget, Profile, Sheet, board_hash};
 
 pub const SCHEMA: &str = "intetrigence/s2-replay/1";
 
+fn default_profile() -> String {
+    "official".into()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ReplayRecord {
@@ -52,6 +56,8 @@ pub struct Header {
     pub frames_per_turn: u64,
     pub preview: usize,
     /// Match profile (protocol v1.11 §1.3): `official` or `defense-stress:N`.
+    /// Older replays predate the field; they were all `official`.
+    #[serde(default = "default_profile")]
     pub profile: String,
     /// Start garbage holes in insertion order; empty for `official`. The
     /// verifier rebuilds the same initial boards from this.
