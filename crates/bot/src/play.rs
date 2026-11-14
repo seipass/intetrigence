@@ -315,7 +315,18 @@ mod tests {
         assert!(report.turns > 0, "the bot must place at least one piece");
         assert_eq!(report.clutch_fallbacks, 0);
         assert_eq!(report.think_times.len(), report.turns as usize);
-        assert!(report.attack >= report.lines / 4);
+        // S2 attack is not proportional to lines: a single pays 0, a quad 5 for
+        // 4 lines, a TSD 5 for 2. The old `attack >= lines / 4` encoded a
+        // premise the scoring table does not have, and it broke once
+        // `clear[None]` stopped rewarding singles. The invariant that does
+        // hold is that no clear pays more than one attack line per line
+        // cleared, plus the surge a B2B break releases.
+        assert!(
+            report.attack <= report.lines + report.surge_releases.iter().sum::<u32>(),
+            "attack {} cannot exceed lines {} plus surge",
+            report.attack,
+            report.lines
+        );
     }
 
     #[test]
