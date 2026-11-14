@@ -43,6 +43,10 @@ use crate::movegen::{Movegen, Placement};
 /// Maximum worker threads (PLAN §7: default 8, the physical core count).
 pub const MAX_THREADS: usize = 8;
 
+/// Hard cap for one deterministic search, leaving 5 ms for the referee's own
+/// bookkeeping under the 100 ms budget.
+pub const DETERMINISTIC_DEADLINE: Duration = Duration::from_millis(95);
+
 /// Depth the first anytime iteration uses, so that a completed result exists
 /// almost immediately. The iteration then deepens and widens.
 pub const START_DEPTH: usize = 2;
@@ -131,6 +135,12 @@ pub struct SearchResult {
     pub iterations: usize,
     /// True when `best` came from `greedy` rather than from the beam.
     pub fallback: bool,
+    /// True when a deterministic search hit `DETERMINISTIC_DEADLINE` before
+    /// finishing its fixed schedule and returned the last completed level.
+    ///
+    /// Distinct from `fallback`: an aborted search still completed at least one
+    /// level, so it is a normal, time-respecting result.
+    pub aborted: bool,
     pub elapsed: Duration,
     /// Every root move that survived, best first.
     pub candidates: Vec<Candidate>,
@@ -311,6 +321,7 @@ impl Searcher {
                 nodes,
                 iterations: iterations + 1,
                 fallback: false,
+                aborted: false,
                 elapsed: start.elapsed(),
                 candidates,
                 line,
@@ -351,11 +362,14 @@ impl Searcher {
         let depth = self.config.depth.max(1);
         let width = self.config.width.max(1);
         let sequence = PieceSequence::new(root.current, &root.preview, depth);
-        let deadline = start + Duration::from_secs(3600);
+        // A fixed schedule has no natural stop, and 400 moves of headroom does
+        // not bound 10,000. The cap keeps the worst case under the 100 ms
+        // budget; a move that hits it returns the last completed level and is
+        // recorded as `aborted`, which is a normal time-respecting result.
+        let deadline = start + DETERMINISTIC_DEADLINE;
         // Always sequential: the parallel path is not thread-invariant
         // (harness-dev measured threads=1 reproducible, threads=2 not), and a
-        // reproducible round is the whole point of this mode. The cost is the
-        // measurement below.
+        // reproducible round is the whole point of this mode.
         let outcome = self.run_sequential(root, &sequence, depth, width, deadline);
         let Some((nodes, candidates, line, completed)) = outcome else {
             return self.greedy(root, start).map(|mut result| {
@@ -367,6 +381,7 @@ impl Searcher {
         if candidates.is_empty() {
             return None;
         }
+        let aborted = completed < depth;
         let Candidate { first, value } = candidates[0];
         Some(SearchResult {
             best: first,
@@ -376,6 +391,7 @@ impl Searcher {
             nodes,
             iterations: 1,
             fallback: false,
+            aborted,
             elapsed: start.elapsed(),
             candidates,
             line,
@@ -415,6 +431,7 @@ impl Searcher {
             nodes: 1,
             iterations: 0,
             fallback: true,
+            aborted: false,
             elapsed: start.elapsed(),
             candidates: vec![Candidate {
                 first,
