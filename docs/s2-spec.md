@@ -1393,6 +1393,34 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | think median | 97.1 ms vs 37.0 ms(200 ms 超 0) |
 | 採点不一致 | intetrigence 0/0、attax spin 78 / same-spin attack 0 |
 
+### 12.8 M3 ゲートの実測(2026-11-13)
+
+`scripts/evidence/m3-tuning/`(seeds 9001–9010 × 両シート = 20 ゲーム、bot `a723bf3`、attax `7b38f51`、replay 20/20 検証):
+
+| 項目 | M2 | M3 |
+|---|---|---|
+| 勝敗 | 18–2(90.0%) | **20–0(100.0%、Wilson 83.9–100.0%)** |
+| 勝ちの内訳 | forfeit 18 / TopOut 0 | **forfeit 19 / TurnCap 1 / TopOut 0** |
+| 負け | TopOut 2 | 0 |
+| 9006-A | top-out(turn 111、受信 46) | **勝ち**(attax forfeit、turn 859、受信 247) |
+| 9010-A | top-out(turn 188、受信 73) | **勝ち**(attax forfeit、turn 140、受信 33) |
+| attack/piece | 0.986 | 0.961 |
+| 受信ゴミ/ゲーム | 75.7 | 111.0 |
+| think median / p95 | 97.1 / 98.7 ms | 97.1 / 99.4 ms(200 ms 超 0) |
+| 採点不一致(ours) | 0 / 5934 | 0 / 8070 |
+
+**改善は本物**: 9006-A は同じシードで**生存 7.7 倍・受信ゴミ 5.4 倍**。防御項(`danger_projected` = 予測高さの二乗、`garbage_rows`、`garbage_clear`)を入れた効果。
+
+**ただし主張の形は変わらない**:
+
+1. **TopOut 勝ちは 0 件**。20 勝のうち 19 は attax の 20 行視野による forfeit、1 はターン上限(§6.3 の順位付け)。
+2. **attax が 20 行視野である限り、我々は TopOut で勝てない** — attax はスタックが 20 行に達した時点で置けなくなり、40 行トップアウトまで到達しない。M3 の「100%」は**ゲート指標であって強さの主張ではない**(レポートもそう書いている)。
+3. **ターン上限の決着が初めて発生した**(9010-B、1000 turn)。§6.3 の順位付けが実戦で exercise されたのはこれが初。
+
+**エビデンスの不備(要再生成)**: `scripts/evidence/m3-tuning/summary.json` の各ゲームに **`forfeit_cause` が無い**(キー自体が存在しない)。M3 の実行が forfeit 会計(`fd6264b`)より前のバイナリで行われたため。protocol §7.1.2 は `forfeit_cause` を必須にしているので、**最終レポートの前に現行バイナリで再生成**すること。再生成すれば 19 件すべて `vision` になる見込み。
+
+**レポート記述の注意**: `docs/m3-tuning-report.md` の「40-row top-out / turn-cap games | 0/2 | **2/2 wins**」は**誤解を招く**。9006-A と 9010-A は現在**どちらも forfeit 勝ち**であり、top-out/turn-cap で決着したゲームではない。「M2 で負けた 2 シードが現在は勝ち」と書くのが正確。
+
 ## 13. 改訂履歴
 
 | 版 | 日付 | 変更 |
@@ -1413,3 +1441,4 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.10 | 2026-11-13 | §12.7 を追加。M2 ゲートの内訳(18 forfeit 勝ち / 2 top-out 負け)と、`summary.json` の `notes` が M0 の文言のままハードコードされている不備を記録。扱いは protocol §7.1(v1.8)で決定。 |
 | v1.3.11 | 2026-11-13 | §12.7 を更新。`notes` のハードコードを修正済みに。`vision` 判定を protocol v1.9 の 3 条件に追随(スタック上端だけでは 9 件以上を誤分類)。再実行後の M2 内訳を反映。 |
 | v1.3.12 | 2026-11-13 | §12.5 を更新。movegen の二重実装を**解消済み**に(`f1c2e79` で `intetrigence_bot::movegen` に一本化、`movegen_crosscheck.rs` が `(cells, spin)` の集合一致を恒久検証)。`vision` 判定と `notes` の修正も解消済みに。 |
+| v1.3.13 | 2026-11-13 | §12.8 を追加。M3 ゲート(20–0、内訳 forfeit 19 / TurnCap 1 / TopOut 0)と、9006-A の生存 7.7 倍を記録。**TopOut 勝ちは 0 件**であること、`forfeit_cause` が M3 証拠に無いこと(要再生成)、レポートの「2/2 wins」行が誤解を招くことを指摘。 |
