@@ -32,6 +32,9 @@ pub struct AttaxConfig {
     pub visible_rows: u32,
     /// SHA-256 of the compatibility patch applied to attax (if any).
     pub patch_sha256: Option<String>,
+    /// Extra environment variables for the attax process (for example
+    /// `ATTAX_TBP_LOG` or `ATTAX_TBP_BOARD_LOG`).
+    pub env: Vec<(String, String)>,
     pub timeout: Duration,
 }
 
@@ -44,6 +47,7 @@ impl AttaxConfig {
             bun_version: None,
             visible_rows: 0,
             patch_sha256: None,
+            env: Vec::new(),
             timeout: Duration::from_secs(30),
         }
     }
@@ -916,6 +920,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         );
                         host.timeout = attax.timeout;
                         host.stderr_path = Some(stderr_path.clone());
+                        host.env = attax.env.clone();
                         let mut tbp_config = TbpAgentConfig::new(host);
                         tbp_config.commit = attax.commit.clone();
                         tbp_config.bun_version = attax.bun_version.clone();

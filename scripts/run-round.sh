@@ -12,6 +12,7 @@
 #   ATTAX_COMMIT   attax commit (default: 7b38f51...)
 #   ATTAX_PATCH_NOTE / ATTAX_PATCH_SHA256  compatibility patch disclosure
 #   ATTAX_VISIBLE_ROWS  default 0 = auto-detect from movegen.ts
+#   ATTAX_ENV      comma separated KEY=VALUE passed to the attax process
 #   CC2_PROGRAM    CC2 launcher (empty = stage 2 not configured)
 #   CC2_ARGS       comma separated CC2 arguments
 #   CC2_COMMIT     CC2 commit
@@ -32,6 +33,7 @@ ATTAX_COMMIT="${ATTAX_COMMIT:-7b38f51f2ba313bfdb2e7aa7b48d1a6bbcb4ac3b}"
 ATTAX_PATCH_NOTE="${ATTAX_PATCH_NOTE:-attax-vision-40.patch (68 lines): ROWS 40, Y_SPAN 48, grid 40, board.rows 40, attaxCellsToTbp 19->39, posY = 18 - maxY (S2 spawn); no search/evaluation changes}"
 ATTAX_PATCH_SHA256="${ATTAX_PATCH_SHA256:-e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70}"
 ATTAX_VISIBLE_ROWS="${ATTAX_VISIBLE_ROWS:-0}"
+ATTAX_ENV="${ATTAX_ENV:-}"
 GATE_ATTAX="${GATE_ATTAX:-50}"
 GATE_CC2="${GATE_CC2:-48}"
 GATE_CLYS="${GATE_CLYS:-48}"
@@ -51,6 +53,12 @@ if [ -n "${SEEDS_OVERRIDE:-}" ]; then
   ARGS+=(--seeds "$SEEDS_OVERRIDE")
 else
   ARGS+=(--seeds-file "$SEEDS_FILE")
+fi
+if [ -n "$ATTAX_ENV" ]; then
+  IFS=',' read -ra _attax_envs <<< "$ATTAX_ENV"
+  for _env in "${_attax_envs[@]}"; do
+    ARGS+=(--attax-env "$_env")
+  done
 fi
 if [ -n "${CC2_PROGRAM:-}" ]; then
   ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}")

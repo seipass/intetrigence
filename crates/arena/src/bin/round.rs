@@ -83,6 +83,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut attax_patch: Option<String> = None;
     let mut attax_visible_rows = 0u32;
     let mut attax_patch_sha256: Option<String> = None;
+    let mut attax_env: Vec<(String, String)> = Vec::new();
     let mut cc2_program: Option<String> = None;
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
@@ -168,6 +169,14 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 attax_visible_rows = value(1)?
                     .parse()
                     .map_err(|error| format!("--attax-visible-rows: {error}"))?;
+                index += 2;
+            }
+            "--attax-env" => {
+                let pair = value(1)?;
+                let (key, value) = pair
+                    .split_once('=')
+                    .ok_or_else(|| format!("--attax-env expects KEY=VALUE, got `{pair}`"))?;
+                attax_env.push((key.to_string(), value.to_string()));
                 index += 2;
             }
             "--attax-patch-sha256" => {
@@ -395,6 +404,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 bun: attax_bun,
                 commit: attax_commit,
                 visible_rows: attax_visible_rows,
+                env: attax_env.clone(),
             },
         },
         None => OpponentSpec {

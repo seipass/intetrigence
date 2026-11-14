@@ -31,6 +31,7 @@ pub enum OpponentKind {
         bun: String,
         commit: Option<String>,
         visible_rows: u32,
+        env: Vec<(String, String)>,
     },
     Tbp(TbpOpponentConfig),
     /// Not configured for this run (the stage fails if it is reached).
@@ -513,12 +514,14 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                     bun,
                     commit,
                     visible_rows,
+                    env,
                 } => {
                     let mut attax = AttaxConfig::new(dir.clone());
                     attax.bun = bun.clone();
                     attax.commit = commit.clone();
                     attax.visible_rows = *visible_rows;
                     attax.patch_sha256 = opponent.patch_sha256.clone();
+                    attax.env = env.clone();
                     config.attax = Some(attax);
                 }
                 OpponentKind::Tbp(tbp) => {

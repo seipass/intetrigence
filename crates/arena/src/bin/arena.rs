@@ -77,6 +77,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut attax_visible_rows = 0u32;
     let mut weight_overrides: Vec<(String, String)> = Vec::new();
     let mut attax_patch_sha256: Option<String> = None;
+    let mut attax_env: Vec<(String, String)> = Vec::new();
 
     let mut index = 0;
     while index < args.len() {
@@ -238,6 +239,14 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 weight_overrides.extend(parse_weight_overrides(&value(1)?)?);
                 index += 2;
             }
+            "--attax-env" => {
+                let pair = value(1)?;
+                let (key, value) = pair
+                    .split_once('=')
+                    .ok_or_else(|| format!("--attax-env expects KEY=VALUE, got `{pair}`"))?;
+                attax_env.push((key.to_string(), value.to_string()));
+                index += 2;
+            }
             "--attax-patch-sha256" => {
                 attax_patch_sha256 = Some(value(1)?);
                 index += 2;
@@ -273,6 +282,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         attax_config.bun_version = bun_version;
         attax_config.visible_rows = attax_visible_rows;
         attax_config.patch_sha256 = attax_patch_sha256;
+        attax_config.env = attax_env;
         attax_config.timeout = Duration::from_secs(timeout);
         config.attax = Some(attax_config);
     }
