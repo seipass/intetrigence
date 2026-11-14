@@ -1,0 +1,201 @@
+{
+  "seed": 9005,
+  "sheet": "B",
+  "started_at": "unix:1794680980",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 52,
+  "surge_released": [
+    4,
+    0
+  ],
+  "max_b2b_streak": [
+    5,
+    4
+  ],
+  "turns_with_b2b_ge_4": [
+    3,
+    4
+  ],
+  "totals": [
+    {
+      "sent_total": 32,
+      "received_total": 10,
+      "attack_total": 44,
+      "pieces_placed": 51,
+      "lines_cleared": 27
+    },
+    {
+      "sent_total": 22,
+      "received_total": 21,
+      "attack_total": 31,
+      "pieces_placed": 52,
+      "lines_cleared": 22
+    }
+  ],
+  "heights": [
+    {
+      "max": 9,
+      "mean": 4.02,
+      "final_height": 3
+    },
+    {
+      "max": 21,
+      "mean": 8.1,
+      "final_height": 21
+    }
+  ],
+  "think": [
+    {
+      "count": 51,
+      "median_ms": 106.422,
+      "p95_ms": 112.278,
+      "p99_ms": 114.892,
+      "max_ms": 114.892,
+      "mean_ms": 105.513,
+      "over_budget": 0
+    },
+    {
+      "count": 52,
+      "median_ms": 100.126,
+      "p95_ms": 100.164,
+      "p99_ms": 100.179,
+      "max_ms": 100.179,
+      "mean_ms": 100.125,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 51,
+      "accepted_first": 51,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 52,
+      "accepted_first": 52,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 51,
+      "spin_checked": 51,
+      "spin_matches": 51,
+      "spin_mismatches": 0,
+      "attack_checked": 51,
+      "attack_matches": 51,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 44,
+      "recomputed_total": 44,
+      "examples": []
+    },
+    {
+      "placements": 52,
+      "spin_checked": 52,
+      "spin_matches": 52,
+      "spin_mismatches": 0,
+      "attack_checked": 52,
+      "attack_matches": 52,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 31,
+      "recomputed_total": 31,
+      "examples": []
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 17677429665911301660,
+      "turn": 10
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17028302145527398866,
+      "turn": 14
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12009225309758865764,
+      "turn": 26
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6525730302792844654,
+      "turn": 27
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2336024889436907432,
+      "turn": 28
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17107761817730240678,
+      "turn": 29
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2977064025415439723,
+      "turn": 47
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7440403529742077792,
+      "turn": 49
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17152724714369463448,
+      "turn": 50
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "00d1a5e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8",
+        "--weights attack=28",
+        "--weights holes=-18"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9005-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9005,
+    "sheet": "B",
+    "turns": 52,
+    "placements": 103,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 78084
+}

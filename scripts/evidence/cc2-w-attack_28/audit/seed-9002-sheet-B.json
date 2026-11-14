@@ -1,0 +1,204 @@
+{
+  "seed": 9002,
+  "sheet": "B",
+  "started_at": "unix:1794680730",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 48,
+  "surge_released": [
+    9,
+    0
+  ],
+  "max_b2b_streak": [
+    6,
+    2
+  ],
+  "turns_with_b2b_ge_4": [
+    18,
+    0
+  ],
+  "totals": [
+    {
+      "sent_total": 30,
+      "received_total": 7,
+      "attack_total": 42,
+      "pieces_placed": 47,
+      "lines_cleared": 24
+    },
+    {
+      "sent_total": 19,
+      "received_total": 25,
+      "attack_total": 23,
+      "pieces_placed": 48,
+      "lines_cleared": 21
+    }
+  ],
+  "heights": [
+    {
+      "max": 9,
+      "mean": 3.6,
+      "final_height": 4
+    },
+    {
+      "max": 19,
+      "mean": 10.21,
+      "final_height": 19
+    }
+  ],
+  "think": [
+    {
+      "count": 47,
+      "median_ms": 107.216,
+      "p95_ms": 112.198,
+      "p99_ms": 113.097,
+      "max_ms": 113.097,
+      "mean_ms": 106.829,
+      "over_budget": 0
+    },
+    {
+      "count": 48,
+      "median_ms": 100.127,
+      "p95_ms": 100.177,
+      "p99_ms": 100.234,
+      "max_ms": 100.234,
+      "mean_ms": 100.133,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 47,
+      "accepted_first": 47,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 48,
+      "accepted_first": 48,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 47,
+      "spin_checked": 47,
+      "spin_matches": 47,
+      "spin_mismatches": 0,
+      "attack_checked": 47,
+      "attack_matches": 47,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 42,
+      "recomputed_total": 42,
+      "examples": []
+    },
+    {
+      "placements": 48,
+      "spin_checked": 48,
+      "spin_matches": 47,
+      "spin_mismatches": 1,
+      "attack_checked": 48,
+      "attack_matches": 48,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 23,
+      "recomputed_total": 23,
+      "examples": [
+        {
+          "turn": 44,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 9208941555380012187,
+      "turn": 12
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6587704552979438301,
+      "turn": 13
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7171527005395890565,
+      "turn": 14
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3662524868032250712,
+      "turn": 16
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 17108441622528278443,
+      "turn": 34
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13193773560986576661,
+      "turn": 40
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9360863521676892591,
+      "turn": 41
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13907733902363143719,
+      "turn": 46
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "00d1a5e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8",
+        "--weights attack=28"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9002-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9002,
+    "sheet": "B",
+    "turns": 48,
+    "placements": 95,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 72429
+}

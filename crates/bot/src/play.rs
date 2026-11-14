@@ -17,6 +17,21 @@ use crate::eval::EvalContext;
 use crate::movegen::spawn_piece;
 use crate::search::{RootState, SearchConfig, Searcher};
 
+/// What the anytime loop completed for one move.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SearchStats {
+    /// Depth of the last completed iteration.
+    pub depth: usize,
+    /// Beam width of the last completed iteration.
+    pub width: usize,
+    /// Nodes expanded by the last completed iteration.
+    pub nodes: u64,
+    /// Anytime iterations that completed.
+    pub iterations: usize,
+    /// True when the move came from the 1-ply `greedy` path.
+    pub fallback: bool,
+}
+
 /// Per-game statistics.
 #[derive(Clone, Debug)]
 pub struct GameReport {
@@ -43,6 +58,8 @@ pub struct GameReport {
     pub actions: Vec<Action>,
     /// Surge burst sizes released in this game, in order.
     pub surge_releases: Vec<u32>,
+    /// Per-move search statistics, in turn order.
+    pub search_stats: Vec<SearchStats>,
     /// Deepest garbage queue seen (rows). The failure mode the M5 provisional
     /// losses share is the queue building to 8-12 rows and then landing in
     /// two waves, so this is the diagnostic that matters.
@@ -150,6 +167,7 @@ pub fn play_game_with_setup(
         think_times: Vec::new(),
         actions: Vec::new(),
         surge_releases: Vec::new(),
+        search_stats: Vec::new(),
         max_pending: 0,
         heights: Vec::new(),
     };
@@ -167,6 +185,8 @@ pub fn play_game_with_setup(
         let board = game.board().clone();
         let preview = game.preview(5);
         let context = EvalContext {
+            sent_total: report.sent_total,
+            received_total: report.garbage_inserted,
             b2b_streak: scoring.state.b2b_streak,
             combo: scoring.state.combo,
             pieces_placed: game.stats().pieces_placed,
@@ -189,6 +209,13 @@ pub fn play_game_with_setup(
                 break;
             };
             report.think_times.push(start.elapsed());
+            report.search_stats.push(SearchStats {
+                depth: result.depth,
+                width: result.width,
+                nodes: result.nodes,
+                iterations: result.iterations,
+                fallback: result.fallback,
+            });
             (
                 result.best.hold,
                 result.best.placement,
@@ -304,18 +331,31 @@ mod tests {
         assert!(report.median_think() <= budget * 3);
     }
 
-    /// A starting stack is inserted before the first turn, so a nearly full
-    /// board ends the game almost immediately.
+    /// A starting stack is inserted before the first turn, so the first
+    /// recorded height reflects it.
+    ///
+    /// This used to assert that 19 start rows end the game within 20 turns.
+    /// That stopped being true once the anytime loop kept its completed
+    /// iterations (`91ec267`): the bot now downstacks 19 rows and plays out
+    /// the whole 60-turn cap, which is the improvement, not a regression. The
+    /// test therefore checks the property it was really about -- the stack is
+    /// there on turn 0 -- instead of a strength threshold.
     #[test]
     fn starting_garbage_is_inserted() {
         let config = quick_config(2);
         let stressed = play_game_with_setup(1, &config, 60, &[], 19);
-        assert!(
-            stressed.topped_out || stressed.turns < 20,
-            "19 start rows must end the game quickly: {stressed:?}"
-        );
         let calm = play_game_with_setup(1, &config, 60, &[], 0);
-        assert!(calm.turns > stressed.turns);
+        assert!(
+            stressed.heights.first().copied().unwrap_or(0) >= 15,
+            "19 start rows must show on turn 0: {:?}",
+            stressed.heights.first()
+        );
+        assert!(
+            calm.heights.first().copied().unwrap_or(99) <= 4,
+            "a calm start must begin low: {:?}",
+            calm.heights.first()
+        );
+        assert!(calm.turns > 0 && stressed.turns > 0);
     }
 
     #[test]

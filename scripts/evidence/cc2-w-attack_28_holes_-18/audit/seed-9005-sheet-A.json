@@ -1,0 +1,216 @@
+{
+  "seed": 9005,
+  "sheet": "A",
+  "started_at": "unix:1794680980",
+  "profile": "official",
+  "winner": 1,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 94,
+  "surge_released": [
+    0,
+    7
+  ],
+  "max_b2b_streak": [
+    2,
+    8
+  ],
+  "turns_with_b2b_ge_4": [
+    0,
+    33
+  ],
+  "totals": [
+    {
+      "sent_total": 38,
+      "received_total": 41,
+      "attack_total": 64,
+      "pieces_placed": 94,
+      "lines_cleared": 54
+    },
+    {
+      "sent_total": 71,
+      "received_total": 20,
+      "attack_total": 89,
+      "pieces_placed": 93,
+      "lines_cleared": 54
+    }
+  ],
+  "heights": [
+    {
+      "max": 19,
+      "mean": 11.01,
+      "final_height": 15
+    },
+    {
+      "max": 16,
+      "mean": 7.94,
+      "final_height": 4
+    }
+  ],
+  "think": [
+    {
+      "count": 94,
+      "median_ms": 105.623,
+      "p95_ms": 111.739,
+      "p99_ms": 118.343,
+      "max_ms": 118.343,
+      "mean_ms": 105.242,
+      "over_budget": 0
+    },
+    {
+      "count": 93,
+      "median_ms": 100.12,
+      "p95_ms": 100.168,
+      "p99_ms": 100.207,
+      "max_ms": 100.207,
+      "mean_ms": 100.127,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 94,
+      "accepted_first": 94,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 93,
+      "accepted_first": 93,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 94,
+      "spin_checked": 94,
+      "spin_matches": 94,
+      "spin_mismatches": 0,
+      "attack_checked": 94,
+      "attack_matches": 94,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 64,
+      "recomputed_total": 64,
+      "examples": []
+    },
+    {
+      "placements": 93,
+      "spin_checked": 93,
+      "spin_matches": 90,
+      "spin_mismatches": 3,
+      "attack_checked": 93,
+      "attack_matches": 93,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 89,
+      "recomputed_total": 89,
+      "examples": [
+        {
+          "turn": 5,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 18,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        },
+        {
+          "turn": 36,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 493982930986103445,
+      "turn": 11
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9117793503101730455,
+      "turn": 12
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14964472467941229579,
+      "turn": 14
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 15822358225927475456,
+      "turn": 21
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3811758531077681398,
+      "turn": 22
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9808324674852627141,
+      "turn": 24
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12774860337932471643,
+      "turn": 74
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "00d1a5e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8",
+        "--weights attack=28",
+        "--weights holes=-18"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9005-sheet-A.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9005,
+    "sheet": "A",
+    "turns": 94,
+    "placements": 187,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 105420
+}

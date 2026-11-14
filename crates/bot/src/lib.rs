@@ -25,12 +25,15 @@ pub mod movegen;
 pub mod play;
 pub mod search;
 
-pub use eval::{EvalContext, Features, Reward, Weights, apply_placement, features, leaf_value};
+pub use eval::{
+    EvalContext, Features, Reward, Weights, analyse, apply_placement, features, leaf_value,
+    t_slot_cutout,
+};
 pub use movegen::{
     ActionSeq, Arrival, Movegen, Placement, State, generate, generate_from, reachable_states,
     spawn_piece, unique_by_cells,
 };
-pub use play::{GameReport, play_game, play_game_with_garbage, play_game_with_setup};
+pub use play::{GameReport, SearchStats, play_game, play_game_with_garbage, play_game_with_setup};
 pub use search::{
     Candidate, MAX_THREADS, Move, PieceSequence, RootState, SearchConfig, SearchResult, Searcher,
 };

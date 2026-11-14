@@ -67,16 +67,54 @@ the arithmetic: `surge_exponent_makes_a_large_charge_worth_more` and
 `crates/bot/src/play.rs`: `GameReport.surge_releases` records every burst size,
 so any harness that reads a `GameReport` can compute the distribution.
 
-## 5. What is blocked
+## 5. A/B result (harness-dev's `--weights`, commit 12196ec)
 
-The A/B the manager asked for (exponent 1.3 / 1.5 / 1.8, then the hold penalty)
-needs the weights to reach the referee. `crates/arena` is owned by
-harness-dev and has no `--weights` / `--surge-exponent` / `--surge-hold` flag,
-and I must not edit it. Requesting one flag pair is the unblocking step;
-alternatively the A/B can be run as an in-crate versus loop, which would
-duplicate the referee's cancellation semantics and risks divergence.
+Self-play, `--profile garbage-pressure` (interval 8, 4 rows), 100 ms, 4 threads
+each, tuning seeds 9001-9004 x both sheets. Run 1 is 2 seeds x 2 sheets, run 2
+is 4 seeds x 2 sheets; the seeds overlap between runs, so treat the two runs as
+one sample per setting rather than independent measurements.
 
-Until then the honest statement is: the terms are implemented and unit-tested,
-their direction is argued from the reward arithmetic and the measured release
-distribution, and **no measurement yet shows that they increase the size of the
-bursts**.
+| setting | games | turns | attack/piece | releases | surge lines | >=8 | >=8 % | >=12 | surge % of attack |
+|---|---|---|---|---|---|---|---|---|---|
+| default (1.0 / 0) | 8 | 612 | 0.84 | 8 | 44 | **0** | 0.0 | 0 | 4.3 |
+| 1.5 / 0 | 4 | 504 | 0.90 | 6 | 34 | 0 | 0.0 | 0 | 3.8 |
+| 1.5 / -60 | 8 | 844 | 0.87 | 7 | 41 | 1 | 14.3 | 0 | 2.8 |
+| 0 / -60 | 4 | 399 | 0.93 | 3 | 14 | 0 | 0.0 | 0 | 1.9 |
+| **1.8 / -100** | 8 | 720 | 0.91 | 6 | 48 | **4** | **66.7** | 0 | 3.7 |
+
+Histograms: default `{4:2, 5:1, 6:4, 7:1}`; 1.5/-60 `{4:2, 5:1, 6:2, 7:1, 9:1}`;
+1.8/-100 `{6:1, 7:1, 8:2, 9:1, 10:1}`.
+
+What this says:
+
+- the response is **monotone in the strength of the two terms**: 0/8, then 1/7,
+  then 4/6 releases at or above 8 lines;
+- the exponent alone does nothing (1.5/0 is 0/6), exactly as the arithmetic in
+  section 2 predicted -- the hold penalty is the term that moves the decision;
+- the hold penalty alone *reduces* the number of releases (3 in 399 turns)
+  without making them bigger, so the two terms are complementary;
+- **no release ever reaches 12 lines**, so the "9-13 line burst" target is only
+  half met even at the extreme setting.
+
+Caveats that stop this from being a strength claim:
+
+- 6-8 releases per setting: the sample is tiny and the seeds overlap;
+- self-play is a mirror, so the win rate is ~50% by construction and says
+  nothing about strength;
+- the extreme setting also lengthened games (720 turns against 612), which
+  confounds "more bursts" with "survived longer to have them".
+
+The committed defaults stay at 1.0 / 0.0, i.e. bit-identical to `7aa0c73`.
+Adopting 1.8 / -100 needs a real-match measurement, which the patched attax
+(40 rows, forfeit 0) now makes possible.
+
+## 6. What is blocked
+
+Nothing is blocked any more: harness-dev added `arena match --weights
+key=value` (12196ec) and the A/B above ran on it.
+
+The open question is whether a bigger burst actually converts into top-outs.
+The only instrument for that is the real match against the patched attax
+(40-row vision, forfeit 0), and the honest statement today is: the terms are
+implemented, unit-tested and shown to raise the burst size at extreme settings,
+but **no measurement yet shows that they win games**.

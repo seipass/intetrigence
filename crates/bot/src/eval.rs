@@ -30,6 +30,9 @@ pub const COLUMNS: usize = 10;
 /// bursts are absorbed by a bot sitting at height 3-5.
 pub const SURGE_LETHAL: u32 = 8;
 
+/// Column height above which the non-linear danger term starts to bite.
+pub const DANGER_THRESHOLD: u32 = 12;
+
 /// Garbage queued (rows) at which the evaluation switches to survival mode.
 pub const SURVIVAL_PENDING: u32 = 8;
 
@@ -46,6 +49,16 @@ pub struct Features {
     pub max_height: f64,
     /// `max(0, max_height - DANGER_BASE)^2`.
     pub height_sq: f64,
+    /// Column-wise non-linear danger (`Features.danger_height`).
+    /// Column-wise `sum(max(0, h - DANGER_THRESHOLD)^2)`.
+    ///
+    /// `height_sq` only looks at the tallest column and is always on, which
+    /// makes the evaluation want a flat board at every depth -- measured
+    /// against CC2, a depth-4.4 search with it active becomes a downstacker
+    /// that stops attacking (attack/piece 0.811 -> 0.722, quads 170 -> 113).
+    /// This term is flat below the threshold and steep above it, so "attack
+    /// normally, dig when it gets dangerous" is expressible.
+    pub danger_height: f64,
     /// Empty cells with an occupied cell above them in the same column.
     pub holes: f64,
     /// Sum over holes of the occupied cells above them, capped at 4.
@@ -125,6 +138,13 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
     let over = (max_height - DANGER_BASE).max(0);
     features.max_height = max_height as f64;
     features.height_sq = (over * over) as f64;
+    features.danger_height = heights
+        .iter()
+        .map(|&h| {
+            let over = (h - DANGER_THRESHOLD as i32).max(0);
+            f64::from(over * over)
+        })
+        .sum();
 
     // Main well: the lowest column, leftmost on a tie.
     let mut well = 0usize;
@@ -191,6 +211,13 @@ pub struct Weights {
     // Board shape (negative is bad).
     pub max_height: f64,
     pub height_sq: f64,
+    /// Column-wise non-linear danger (`Features.danger_height`).
+    pub danger_height: f64,
+    /// Value per line of race lead (`sent_total - received_total`). Nothing in
+    /// the TBP stream exposes the opponent's board, so the score difference is
+    /// the only signal that says "we are winning the race"; without it the
+    /// evaluation can only see our own board and our own attack.
+    pub race: f64,
     pub holes: f64,
     pub hole_cover: f64,
     pub hole_rows: f64,
@@ -267,7 +294,9 @@ impl Default for Weights {
     fn default() -> Self {
         Self {
             max_height: -3.0,
-            height_sq: -12.0,
+            height_sq: 0.0,
+            danger_height: -12.0,
+            race: 1.0,
             holes: -30.0,
             hole_cover: -6.0,
             hole_rows: -16.0,
@@ -280,7 +309,7 @@ impl Default for Weights {
             danger_projected: -12.0,
             garbage_rows: -6.0,
 
-            attack: 14.0,
+            attack: 28.0,
             clear: [
                 [0.0, -14.0, -6.0, 2.0, 20.0],
                 [0.0, -5.0, 2.0, 8.0, 30.0],
@@ -294,7 +323,7 @@ impl Default for Weights {
             surge_hold_penalty: 0.0,
             tsd_bonus: 0.0,
             mini_penalty: 0.0,
-            combo: 2.0,
+            combo: 12.0,
             opener_attack: 6.0,
             garbage_clear: 10.0,
             survival: true,
@@ -318,6 +347,10 @@ pub struct EvalContext {
     pub pieces_placed: u32,
     /// Pending garbage rows (versus term; 0 in single-player).
     pub incoming: u32,
+    /// Attack lines sent so far in this game.
+    pub sent_total: u32,
+    /// Garbage rows received so far in this game.
+    pub received_total: u32,
     /// Lines a T could clear in the current board (0/1/2), for `wasted_t`.
     pub t_slot: u8,
 }
@@ -464,6 +497,8 @@ pub fn apply_placement(
         attack.total
     };
     let next_context = EvalContext {
+        sent_total: context.sent_total,
+        received_total: context.received_total,
         b2b_streak: attack.b2b_streak_after,
         combo: attack.combo_after,
         pieces_placed: context.pieces_placed + 1,
@@ -488,6 +523,7 @@ pub fn leaf_value(
         && (context.incoming >= SURVIVAL_PENDING || board.height() as u32 >= SURVIVAL_HEIGHT);
     let mut value = weights.max_height * features.max_height
         + weights.height_sq * features.height_sq
+        + weights.danger_height * features.danger_height
         + weights.holes * features.holes
         + weights.hole_cover * features.hole_cover
         + weights.hole_rows * features.hole_rows
@@ -520,6 +556,8 @@ pub fn leaf_value(
     value += weights.surge_charge * charge.powf(weights.surge_exponent);
     value += weights.combo * f64::from(context.combo);
     value -= weights.incoming * f64::from(context.incoming);
+    let race = i64::from(context.sent_total) - i64::from(context.received_total);
+    value += weights.race * race as f64;
     value += t_slot_cutout_with_heights(board, &heights, t_available, weights);
     value
 }
@@ -677,6 +715,9 @@ mod tests {
             Features {
                 max_height: 20.0,
                 height_sq: 64.0,
+                // Column-wise sum of max(0, h - 12)^2 on the fixture: the
+                // tallest column contributes 64 and the rest 409.
+                danger_height: 473.0,
                 holes: 6.0,
                 hole_cover: 23.0,
                 hole_rows: 6.0,
@@ -945,6 +986,8 @@ mod tests {
             combo: 0,
             pieces_placed: 20,
             incoming: 0,
+            sent_total: 0,
+            received_total: 0,
             t_slot: 0,
         };
         let (_, reward, _) = apply_placement(&board, clear, &context, &weights);

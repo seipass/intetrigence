@@ -93,6 +93,8 @@ impl BotAgent {
             combo: view.combo,
             pieces_placed: view.pieces_placed,
             incoming: view.pending_garbage,
+            sent_total: view.sent_total,
+            received_total: view.received_total,
             t_slot: 0,
         }
     }

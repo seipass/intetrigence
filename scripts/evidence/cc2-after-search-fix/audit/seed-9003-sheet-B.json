@@ -1,0 +1,203 @@
+{
+  "seed": 9003,
+  "sheet": "B",
+  "started_at": "unix:1794680107",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "turns": 66,
+  "surge_released": [
+    9,
+    4
+  ],
+  "max_b2b_streak": [
+    10,
+    5
+  ],
+  "turns_with_b2b_ge_4": [
+    27,
+    13
+  ],
+  "totals": [
+    {
+      "sent_total": 43,
+      "received_total": 11,
+      "attack_total": 61,
+      "pieces_placed": 65,
+      "lines_cleared": 31
+    },
+    {
+      "sent_total": 29,
+      "received_total": 23,
+      "attack_total": 47,
+      "pieces_placed": 66,
+      "lines_cleared": 28
+    }
+  ],
+  "heights": [
+    {
+      "max": 10,
+      "mean": 4.3,
+      "final_height": 7
+    },
+    {
+      "max": 17,
+      "mean": 8.97,
+      "final_height": 17
+    }
+  ],
+  "think": [
+    {
+      "count": 65,
+      "median_ms": 103.546,
+      "p95_ms": 110.844,
+      "p99_ms": 113.571,
+      "max_ms": 113.571,
+      "mean_ms": 103.985,
+      "over_budget": 0
+    },
+    {
+      "count": 66,
+      "median_ms": 100.112,
+      "p95_ms": 100.145,
+      "p99_ms": 100.176,
+      "max_ms": 100.176,
+      "mean_ms": 100.115,
+      "over_budget": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 65,
+      "accepted_first": 65,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 66,
+      "accepted_first": 66,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 65,
+      "spin_checked": 65,
+      "spin_matches": 65,
+      "spin_mismatches": 0,
+      "attack_checked": 65,
+      "attack_matches": 65,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 61,
+      "recomputed_total": 61,
+      "examples": []
+    },
+    {
+      "placements": 66,
+      "spin_checked": 66,
+      "spin_matches": 65,
+      "spin_mismatches": 1,
+      "attack_checked": 66,
+      "attack_matches": 66,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 47,
+      "recomputed_total": 47,
+      "examples": [
+        {
+          "turn": 28,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 13373327612354529043,
+      "turn": 13
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4581231855974835859,
+      "turn": 33
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7214634704857937775,
+      "turn": 35
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8749711817962747110,
+      "turn": 38
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5060377235162820548,
+      "turn": 39
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 16310568267787972924,
+      "turn": 40
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6700417628401042329,
+      "turn": 44
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 643724015693483462,
+      "turn": 46
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "00d1a5e",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40
+    }
+  ],
+  "replay": "replays/seed-9003-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9003,
+    "sheet": "B",
+    "turns": 66,
+    "placements": 131,
+    "mismatches": [],
+    "forfeit_cause": null
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 95255
+}
