@@ -173,6 +173,24 @@ pub struct StartPayload {
     pub hold: Option<Piece>,
     pub combo: u32,
     pub back_to_back: bool,
+    /// Bag state at the tail of `queue` (TBP spec 0001). clys requires it;
+    /// CC2 uses it to enable speculation. Omitted when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub randomizer: Option<Randomizer>,
+}
+
+/// Randomizer state carried in `start` (TBP spec 0001).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Randomizer {
+    SevenBag {
+        /// Pieces left in the current bag, in draw order, at the tail of the
+        /// queue.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        bag_state: Vec<Piece>,
+    },
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -342,6 +360,7 @@ mod tests {
             hold: None,
             combo: 0,
             back_to_back: false,
+            randomizer: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         assert_eq!(json["board"].as_array().unwrap().len(), 40);

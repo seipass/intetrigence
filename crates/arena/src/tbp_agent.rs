@@ -118,6 +118,7 @@ impl TbpAgent {
             hold: hold.map(Piece::from_core),
             combo,
             back_to_back: b2b_streak >= 1,
+            randomizer: None,
         }
     }
 }
