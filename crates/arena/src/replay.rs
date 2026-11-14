@@ -583,24 +583,10 @@ fn verify_result(
             _ => (None, "TurnCap".to_string()),
         }
     } else {
-        let a = &engine.players[0];
-        let b = &engine.players[1];
-        let winner = if a.received_total() != b.received_total() {
-            Some(if a.received_total() < b.received_total() {
-                0
-            } else {
-                1
-            })
-        } else if a.sent_total() != b.sent_total() {
-            Some(if a.sent_total() > b.sent_total() {
-                0
-            } else {
-                1
-            })
-        } else {
-            None
-        };
-        (winner, "TurnCap".to_string())
+        // A turn-cap is not a decision (no "higher attack wins on timeout" rule
+        // exists). The game is unresolved: no winner, and the round gate rejects
+        // any turn-cap.
+        (None, "TurnCap".to_string())
     };
     if winner != result.winner {
         report.mismatches.push(format!(

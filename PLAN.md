@@ -236,3 +236,7 @@ intetrigence/
   - TopOut 負け: 11004-A(724), 11005-A(191)
   - 未決着(TurnCap 1000): 11001-A, 11002-A
   - ゲート定義: 段階 1 = `wins_topout >= 50 && losses_topout == 0 && turncap == 0`、段階 2・3 = `wins_topout >= 48 && turncap == 0`
+- **🚫 2026-11-15 追加(ユーザー指示): 時間切れで攻撃力が高い方を勝ちにしない**。TETR.IO にそのようなルールは存在しない。**TurnCap は勝者を決めない**(`winner: None`)。
+  - `crates/arena/src/referee.rs` の TurnCap 判定から `received_total` / `sent_total` の比較を削除。
+  - `crates/arena/src/replay.rs` の verify 側にも同じ比較が複製されていたため削除(記録と再計算が食い違う原因になっていた)。
+  - ゲートは `turncap == 0` を要求(1 件でも未決着があれば不通過)。

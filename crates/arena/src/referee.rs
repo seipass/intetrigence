@@ -350,26 +350,17 @@ pub fn run_round(
             Some("no legal placement".to_string()),
             None,
         ),
-        End::TurnCap => {
-            let a = &engine.players[0];
-            let b = &engine.players[1];
-            let winner = if a.received_total() != b.received_total() {
-                Some(if a.received_total() < b.received_total() {
-                    0
-                } else {
-                    1
-                })
-            } else if a.sent_total() != b.sent_total() {
-                Some(if a.sent_total() > b.sent_total() {
-                    0
-                } else {
-                    1
-                })
-            } else {
-                None
-            };
-            (winner, "TurnCap".to_string(), None, None)
-        }
+        // A turn-cap is not a decision. TETR.IO has no "higher attack wins on
+        // timeout" rule: a versus game ends when a player tops out. Reporting a
+        // winner here would turn a stalemate into a fabricated result, so the
+        // game is recorded as unresolved (no winner) and the round gate treats
+        // any turn-cap as a failure.
+        End::TurnCap => (
+            None,
+            "TurnCap".to_string(),
+            Some("unresolved: turn cap reached".to_string()),
+            None,
+        ),
         End::Forfeit {
             slot,
             detail,
