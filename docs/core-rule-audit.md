@@ -40,7 +40,7 @@
 | `derive_seeds` | [我々の取り決め] | §11-U7。TETR.IO の導出式は非公開 |
 | bag の初期配列順 | [我々の取り決め] | 仕様に明記なし。既知列テストで固定 |
 | `BagState` / `Game::bag_state` | [我々の取り決め] | TBP `start.randomizer` 互換 |
-| 勝者決定 | core には無い | referee の責務。TurnCap の攻撃量比較は referee の決定 |
+| 勝者決定 | core には無い | referee の責務。TurnCap は未決着（勝者なし） |
 | ターン上限 | core には無い | referee の責務 |
 
 ## 2. 盤面・spawn・終了条件
@@ -213,10 +213,10 @@ core には **勝者を選ぶロジックは無い**。core が持つのは「�
 | 11 | `GarbageQueue` | top-out を判定しない | 実装詳細 |
 | 12 | referee | どちらかが top-out した瞬間にラウンド終了、相手の勝ち | [我々の取り決め]（protocol §6.1） |
 | 13 | referee | 空の suggestion の 2 段判定（合法手あり → forfeit、無し → top-out） | [我々の取り決め]（protocol §7） |
-| 14 | referee | 1000 turn cap の順位（受信ゴミ少 → 送信ゴミ多 → draw） | [我々の取り決め]（protocol §6.3。S2 のルールではない） |
+| 14 | referee | 1000 turn cap は未決着（`winner = None`、勝者なし） | [我々の取り決め]（protocol v1.26 §6.3。S2 のルールではない） |
 | 15 | referee | forfeit（非合法手、タイムアウト、プロトコル違反） | [我々の取り決め]（protocol §7） |
 
-- **TurnCap の「攻撃量が多い方を勝ち」は core には存在しない**。referee の決定であり、S2 のルールではない。今回の修正対象は referee 側。
+- **TurnCap は未決着（勝者なし）**。攻撃量・被ゴミ量で勝者を決める規則は S2 にも我々のルールにも存在しない（protocol v1.26 で削除済み）。core にはこの規則は無い。
 - core の `is_over` は block-out のみ。lock-out は無い。`[S2 準拠]`
 - `has_legal_move` は core ではなく referee の movegen。`[我々の取り決め]`
 - `insert_garbage` の active 再スポーンは **TBP 互換のための我々の取り決め**。S2 の「garbage 挿入後に active がどうなるか」を規定する一次ソースは無い。公式レフェリー経路はロック後挿入なので、再スポーン後の block-out 判定は S2 の block-out と一致する。
@@ -296,5 +296,5 @@ core には **勝者を選ぶロジックは無い**。core が持つのは「�
 
 1. **spec lead**: §6.8 の `lines > 0` ガード（F1）と §2.4 の bag 初期配列順（F4）は **対応済み**（v1.3.14 / v1.3.15）。19 件目の fixture も追加済み。
 2. **manager**: レポートで F2（active 再スポーン）、F3（U7 seed 導出）、F4（bag 初期順）、F5（max spin label）、F7（has_legal_move は referee 側）を「我々の取り決め」として開示する。
-3. **referee**: TurnCap の攻撃量比較は S2 のルールではない。protocol §6.3 の決定として明記する（既に修正済みと聞いている）。
+3. **referee**: TurnCap は未決着（勝者なし）。攻撃量比較は protocol v1.26 で削除済み。core にはこの規則は無い。
 4. **core**: F1 以外に S2 に存在しない勝者決定/終了ロジックは無い。core は勝者を決めない。
