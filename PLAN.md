@@ -1,33 +1,68 @@
-# intetrigence 計画 — attax 100% + 汎化検証(TETR.IO S2 ルール)
+# intetrigence 計画 — CC2 100% → clys 100% → attax 95%
 
-## 1. 現行 goal(2026-11-14 改訂・旧 goal は §8 進捗ログ参照)
+## 1. 現行 goal(2026-11-15 改訂)
 
-> **goal文(圧縮耐性版)**
+> **goal文**
 >
-> TETR.IO Season 2(TETRA LEAGUE デフォルト相当)ルールで動く versus Tetris AI「intetrigence」を、旧実装(CC2 派生)に依存せず Rust で構築・強化する。S2 ルールエンジン・レフェリー・監査機能(replay 検証・思考時間記録・採点オーディット)は自作済みの資産(crates/*、docs/s2-spec.md、docs/s2-referee-protocol.md)を引き続き使用する。ライセンスは AGPL-3.0(ハーネス周りは attax コードの利用可・作者許可済み、本体 bot は独自実装)。
+> Intetrigence を強化する。段階ゲート:
+> 1. **Cold Clear 2 に 50 戦で勝率 100%**
+> 2. 通過したら **clys に 50 戦で勝率 100%**
+> 3. 通過したら **attax に 50 戦で勝率 95%**
 >
-> 達成条件(同一ビルド・同一コミットの intetrigence で、1 ラウンド内で段階的に満たすこと):
-> 1. **attax(https://github.com/souta-lab/attax、現行公開版 7b38f51 をコミット固定)との公式マッチ — 事前確定の held-out seeds 25 個 × 両シート = 50 ゲーム、5 PPS、思考 100ms、5 preview + hold、S2 ルール、全ゲーム replay 検証 — で 50 勝 0 敗(勝率 100%)**
-> 2. attax が 50 勝 0 敗だった場合のみ、続けて同一条件で:
->    - **Cold Clear 2(MinusKelvin、最新公開版をコミット固定、TBP 接続)との公式マッチで 50 ゲーム中 48 勝以上(勝率 95% 以上)**
->    - **clys(citrus610、最新公開版をコミット固定、専用アダプタで接続)との公式マッチで 50 ゲーム中 48 勝以上(勝率 95% 以上)**
->    両ボットは S2 非対応のため、レフェリー側で採点・監査する。この 2 マッチは attax への過学習を防ぐ汎化検証であり、勝率の解釈(S2 非対応ボット相手である旨)をレポートに明記する
-> 3. **レポート**: 3 マッチの勝率 + Wilson 95% CI、勝ちの種類別内訳(TopOut / forfeit / turn-cap)、attack/piece、受信ゴミ、両者の思考時間、対戦相手と intetrigence のビルドコミット固定を docs/ に残すこと
+> 勝ちは **TopOut 決着のみ**。TurnCap(ターン上限)は未決着で勝者を決めない。forfeit は no contest(勝ちにも負けにも数えない)。
+> 各段階 50 ゲーム = 事前確定 seeds 25 個 × 両シート。全ゲーム replay 検証 + 監査ログ + 相手の decision log が必須。
+> 評価 seeds は実行前にコミットで確定し、チューニングに使わない。再挑戦はラウンド全体のやり直し。
 >
-> シード規則(特定シード値への最適化の禁止):
-> - **評価 seeds(ラウンドで使用する 25 seeds)はラウンド実行前にコミットで事前確定し、重み・パラメータ・評価関数の調整に一切使わない**。調整は評価 seeds と番号が重ならない専用 tuning seeds のみで行う
-> - **評価 seeds は公式マッチで使ったら焼き付き**(以後チューニングに使わない)
-> - **再挑戦はラウンド全体のやり直し**: どの段階で基準未達でも、修正後の新しいビルド + 新しい事前確定 seeds でラウンド全体(attax 50 → CC2 50 → clys 50)を最初からやり直す。部分再実行・過去の合格結果とのつなぎ合わせは不可
-> - 診断プロファイル(defense-stress / garbage-pressure 等)の数字を公式主張に混ぜない(protocol の規律)
->
-> コンテキストを失った場合は、まず本書(PLAN.md)と docs/s2-spec.md(S2 ルール仕様)を読んでから再開すること。
+> コンテキストを失った場合は、まず本書(PLAN.md)と docs/s2-spec.md(S2 ルール仕様)、docs/s2-referee-protocol.md(計測プロトコル)を読んでから再開すること。
 
-前提:
-- 旧 intetrigence (CC2 派生) のコード・資産は**使わない**。レフェリー/ハーネスも含めて完全新規
-- ルールは guideline ではなく **TETR.IO S2**(TETRA LEAGUE デフォルト相当)
-- intetrigence は S2 ネイティブエンジン(ゴミキュー・surge・opener phase を含む全状態を参照)
-- **attax は S2 対応予定(作者確認済み)**。マッチは S2 ネイティブ同士の真の勝負として行う
-- 現行の guideline 版 attax(TBP 接続)は、ハーネスのブリングアップと暫定スパーリング用
+## 2. 現状(2026-11-15 時点の実測)
+
+| 相手 | 条件 | TopOut 成績 |
+|---|---|---|
+| **attax**(40 行パッチ + spawn 修正) | tuning 20 ゲーム | **2 勝 16 敗**(11.1%) |
+| attax(同) | スモーク 10 ゲーム | **0 勝 9 敗 1 未決着** |
+| Cold Clear 2 | スモーク 2 ゲーム | 2 勝 0 敗(TopOut) |
+| clys | スモーク 2 ゲーム | 1 勝 1 敗(TopOut) |
+
+**旧「94%」「95%」は forfeit を勝ちに数えた無効な数字**(5 つの計測バグ。docs/seed-registry.md §5、docs/s2-rule-audit.md)。
+
+## 3. 判明している敗因(attax 戦)
+
+`docs/wave9-loss-analysis.md`(bot-dev、10 ゲーム 3 勝 7 敗の分析):
+
+| 指標 | intetrigence | attax |
+|---|---|---|
+| 攻撃合計 | 2,633 | 2,710(**3% 差**) |
+| **spin からの攻撃** | **489** | **737**(+51%) |
+| full TSS / **TSD** | 30 / **40** | 60 / **100** |
+| mini 1 ライン | **109** | 60 |
+| max B2B(中央値) | 7 | 5 |
+| surge 放出 | 104 | 41 |
+
+**攻撃量は互角。差は T-spin の質**(full spin 160 対 70、TSD 100 対 40)。spin 総数は同じ 300 対 298 なので、**我々が T を mini に変換している**。
+
+## 4. 判明している計測ギャップ
+
+1. **attax の movegen に 180° 回転がない**(`src/ai/bot/movegen.ts` に "180" が 0 回)。我々のレフェリーは 180° を含む movegen で合法性を判定するため、**180° でしか到達できない配置を「合法手あり」と判定 → forfeit-other**(40 行パッチ後も 2/20 = 10%)
+2. attax の anytime 探索は非決定論的(我々の bot も)。同じ seed の再実行で結果が変わる
+3. 段階 1(CC2)は `wins_topout == 50` を要求。**forfeit 0 が前提**
+
+## 5. アーキテクチャ(変更なし)
+
+```
+crates/
+  core/   # 純粋 S2 ルールエンジン
+  bot/    # exact movegen / anytime 探索 / S2 評価関数 / 重み
+  arena/  # S2 レフェリー / replay 検証 / 監査 / ラウンドランナー / 動画レンダラ
+  tbp/    # TBP メッセージ I/F と host
+adapters/ # attax / CC2 / clys の互換パッチとアダプタ
+docs/     # 仕様、プロトコル、監査、計測レポート
+scripts/  # ベンチ、スモーク、ラウンド実行、動画生成
+```
+
+---
+
+*(以下は旧 goal 時代の記録。経緯として保持)*
 
 ## 2. 敵の分析(README + ソース参照)
 
