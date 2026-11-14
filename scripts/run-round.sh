@@ -55,7 +55,7 @@ ARGS=(run --round "$ROUND" --out "$OUT"
   --attax-patch-note "$ATTAX_PATCH_NOTE" --attax-patch-sha256 "$ATTAX_PATCH_SHA256"
   --attax-visible-rows "$ATTAX_VISIBLE_ROWS"
   --gate-attax "$GATE_ATTAX" --gate-cc2 "$GATE_CC2" --gate-clys "$GATE_CLYS"
-  --deterministic --depth "${DEPTH:-8}" --width "${WIDTH:-96}"
+  --deterministic --depth "${DEPTH:-6}" --width "${WIDTH:-96}"
   --ms "$MS" --threads "$THREADS" --turns "$TURNS" --max-stages "$MAX_STAGES")
 
 if [ -n "${SEEDS_OVERRIDE:-}" ]; then
