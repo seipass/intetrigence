@@ -58,11 +58,11 @@ pub struct Features {
     pub max_height: f64,
     /// `max(0, max_height - DANGER_BASE)^2`.
     pub height_sq: f64,
-    /// Column-wise non-linear danger (`Features.danger_height`).
-    /// 1-wide, 4-deep clean wells (an I piece fills one vertically), capped at
-    /// 1. This is the "preparation" the depth-4 search cannot see: building a
-    /// quad takes four pieces of holding a well open, and at four plies
-    /// clearing a single always looks better.
+    /// Value of a ready 4-deep well (`Features.quad_ready`).
+    ///
+    /// This is the "preparation" the depth-4 search cannot see: building a quad
+    /// takes four pieces of holding a well open, and at four plies clearing a
+    /// single always looks better.
     pub quad_ready: f64,
     /// Rows that are one cell short of full, with the hole at the top of its
     /// column (so one piece clears it), capped at 2. This is the "combo
