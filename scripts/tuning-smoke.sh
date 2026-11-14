@@ -17,6 +17,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Only one measurement may use the machine at a time (the think times are
+# contaminated by concurrent runs).
+source "$ROOT/scripts/measurement-lock.sh"
+acquire_measurement "tuning-smoke"
 OUT="${OUT:-$ROOT/scripts/evidence}"
 SEEDS="${SEEDS:-9001,9002,9003,9004,9005,9006,9007,9008,9009,9010}"
 CC2_SHEETS="${CC2_SHEETS:-A,B}"

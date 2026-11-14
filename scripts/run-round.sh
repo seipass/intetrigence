@@ -27,6 +27,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Only one measurement may use the machine at a time.
+source "$ROOT/scripts/measurement-lock.sh"
+acquire_measurement "round-$ROUND"
 ROUND="${ROUND:?set ROUND (e.g. ROUND=1)}"
 SEEDS_FILE="${SEEDS_FILE:-$ROOT/docs/seeds-round-$ROUND.md}"
 OUT="${OUT:-$ROOT/scripts/evidence}"

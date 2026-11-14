@@ -816,10 +816,11 @@ fn stage_section(
         )?;
         writeln!(
             out,
-            "- aborted (hard deadline): **{}/{} ({:.1}%)**",
+            "- aborted (hard deadline): **{}/{} ({:.1}%)**, depths {:?}",
             bot.aborted_turns,
             bot.search_turns,
-            bot.aborted_rate * 100.0
+            bot.aborted_rate * 100.0,
+            bot.aborted_depth_histogram
         )?;
     }
     writeln!(

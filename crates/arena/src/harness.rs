@@ -5,6 +5,7 @@
 //! on our side is configurable: the M0 baseline stand-in (`crate::baseline`) or
 //! the real search (`crate::bot_agent`). The summary records which one ran.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -326,6 +327,9 @@ pub struct SearchGameSummary {
     pub fallback_turns: u32,
     #[serde(default)]
     pub aborted_turns: u32,
+    /// Depth of the completed iteration on aborted turns (depth -> count).
+    #[serde(default)]
+    pub aborted_depth_histogram: BTreeMap<u32, u32>,
     #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
@@ -461,6 +465,18 @@ pub struct BotAggregate {
     pub aborted_turns: u32,
     #[serde(default)]
     pub aborted_rate: f64,
+    /// Merged aborted-turn depth histogram (depth -> count).
+    #[serde(default)]
+    pub aborted_depth_histogram: BTreeMap<u32, u32>,
+    /// Median think time across games.
+    #[serde(default)]
+    pub think_median_ms: f64,
+    /// Maximum per-game p99 think time.
+    #[serde(default)]
+    pub think_p99_max: f64,
+    /// Maximum per-game think time.
+    #[serde(default)]
+    pub think_max: f64,
     #[serde(default)]
     pub depth_median: Option<f64>,
     #[serde(default)]
@@ -576,6 +592,9 @@ pub struct MatchSummary {
     /// Deterministic search mode (fixed schedule, no wall-clock deadline).
     #[serde(default)]
     pub deterministic: bool,
+    /// Load warning (e.g. over-100 ms moves in deterministic mode).
+    #[serde(default)]
+    pub load_note: Option<String>,
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
@@ -650,6 +669,14 @@ fn search_game_summary(turns: &[crate::audit::SearchTurn]) -> SearchGameSummary 
         turns: turns.len() as u32,
         fallback_turns: turns.iter().filter(|turn| turn.fallback).count() as u32,
         aborted_turns: turns.iter().filter(|turn| turn.aborted).count() as u32,
+        aborted_depth_histogram: turns
+            .iter()
+            .filter(|turn| turn.aborted)
+            .filter_map(|turn| turn.depth)
+            .fold(BTreeMap::new(), |mut histogram, depth| {
+                *histogram.entry(depth).or_insert(0) += 1;
+                histogram
+            }),
         depth_median: median(&depths),
         depth_p95: percentile(&depths, 95.0),
         depth_max: max_f64(&depths).map(|value| value as u32),
@@ -977,6 +1004,29 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                     .sum(),
                 games.iter().map(|game| game.search[slot].turns).sum(),
             ),
+            aborted_depth_histogram: games.iter().fold(BTreeMap::new(), |mut merged, game| {
+                for (depth, count) in &game.search[slot].aborted_depth_histogram {
+                    *merged.entry(*depth).or_insert(0) += count;
+                }
+                merged
+            }),
+            think_median_ms: if games.is_empty() {
+                0.0
+            } else {
+                games
+                    .iter()
+                    .map(|game| game.think_median_ms[slot])
+                    .sum::<f64>()
+                    / games.len() as f64
+            },
+            think_p99_max: games
+                .iter()
+                .map(|game| game.think_p99_ms[slot])
+                .fold(0.0f64, f64::max),
+            think_max: games
+                .iter()
+                .map(|game| game.think_max_ms[slot])
+                .fold(0.0f64, f64::max),
             depth_median: search.depth_median,
             depth_p95: search.depth_p95,
             depth_max: search.depth_max,
@@ -1106,6 +1156,7 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         width: 0,
         threads: 0,
         deterministic: false,
+        load_note: None,
         measurement_complete: false,
         attax_patch_sha256: None,
         attax,
@@ -1589,6 +1640,12 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     summary.depth = search_depth;
     summary.width = search_width;
     summary.threads = search_threads;
+    if config.deterministic && summary.bots[0].think_over_100ms > 0 {
+        summary.load_note = Some(format!(
+            "possible contamination: {} move(s) over 100 ms in deterministic mode (expected 0)",
+            summary.bots[0].think_over_100ms
+        ));
+    }
     summary.measurement_complete = measurement_incomplete == 0;
     summary.attax_patch_sha256 = config
         .attax
