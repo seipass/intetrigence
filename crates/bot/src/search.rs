@@ -768,19 +768,37 @@ fn commit(
 ) -> Vec<u32> {
     // Sort small keys rather than the ~300-byte children: the merge is the
     // only serial part of a level, and moving structs dominated it.
-    let mut order: Vec<(f64, u64, u32)> = children
+    // A total order on *content*, not on position: the tie-break is the
+    // placement itself, so the beam does not depend on the order the workers
+    // happened to finish in. Sorting by the input index instead made the
+    // parallel merge reproducible only when the workers were, which harness-dev
+    // measured failing at `threads: 2` and under parallel test load.
+    let mut order: Vec<(f64, u64, (u8, i32, i32, bool), u32)> = children
         .iter()
         .enumerate()
-        .map(|(index, child)| (child.value, child.key, index as u32))
+        .map(|(index, child)| {
+            (
+                child.value,
+                child.key,
+                (
+                    child.placement.piece.rotation as u8,
+                    child.placement.piece.x,
+                    child.placement.piece.y,
+                    child.hold_used,
+                ),
+                index as u32,
+            )
+        })
         .collect();
     order.sort_unstable_by(|a, b| {
         b.0.total_cmp(&a.0)
             .then_with(|| a.1.cmp(&b.1))
             .then_with(|| a.2.cmp(&b.2))
+            .then_with(|| a.3.cmp(&b.3))
     });
 
     let mut beam = Vec::with_capacity(width);
-    for (_, _, index) in order {
+    for (_, _, _, index) in order {
         let child = &children[index as usize];
         if let Some(&best) = transposition.get(&child.key) {
             if best >= child.value {
