@@ -37,6 +37,7 @@
 - no-contest record: `<wins_topout>/<games - no_contest>` (TopOut games)
 - attack/piece: `<a>` vs `<b>`
 - attack/line: `<a>`, spin rate: `<a>%`
+- losses by type: collapse `<n>`, pending `<n>`, race `<n>`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
 - think over 200 ms: `<n>` vs `<n>`

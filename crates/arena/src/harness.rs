@@ -394,6 +394,10 @@ pub struct GameSummary {
     /// Garbage burst profile per slot.
     #[serde(default)]
     pub burst: [crate::replay::BurstProfile; 2],
+    /// Loss type when intetrigence lost: `collapse` (final height >= 14),
+    /// `pending` (net damage <= -20) or `race` (otherwise).
+    #[serde(default)]
+    pub loss_type: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -480,6 +484,13 @@ pub struct BotAggregate {
     /// Share of placements with a non-none spin label.
     #[serde(default)]
     pub spin_rate: f64,
+    /// Intetrigence losses by type (slot 0 only).
+    #[serde(default)]
+    pub collapse_losses: u32,
+    #[serde(default)]
+    pub pending_losses: u32,
+    #[serde(default)]
+    pub race_losses: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -728,6 +739,23 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         lines_cleared: [audit.totals[0].lines_cleared, audit.totals[1].lines_cleared],
         spin_placements: audit.spin_placements,
         burst: audit.verify.burst.clone(),
+        loss_type: if audit.winner == Some(1) {
+            let final_height = audit.heights[0].final_height;
+            let net =
+                i64::from(audit.totals[0].sent_total) - i64::from(audit.totals[0].received_total);
+            Some(
+                if final_height >= 14 {
+                    "collapse"
+                } else if net <= -20 {
+                    "pending"
+                } else {
+                    "race"
+                }
+                .to_string(),
+            )
+        } else {
+            None
+        },
     }
 }
 
@@ -956,6 +984,18 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                 games.iter().map(|game| game.spin_placements[slot]).sum(),
                 games.iter().map(|game| game.pieces_placed[slot]).sum(),
             ),
+            collapse_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("collapse"))
+                .count() as u32,
+            pending_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("pending"))
+                .count() as u32,
+            race_losses: games
+                .iter()
+                .filter(|game| game.loss_type.as_deref() == Some("race"))
+                .count() as u32,
         }
     });
     MatchSummary {
