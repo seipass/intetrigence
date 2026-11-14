@@ -35,7 +35,7 @@
 - non-forfeit record: `<w>/<n>` (TopOut + turn-cap games)
 - attack/piece: `<a>` vs `<b>`
 - received garbage/game: `<a>` vs `<b>`
-- think median / p95: `<a> / <b> ms` vs `<a> / <b> ms`
+- think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
 - think over 200 ms: `<n>` vs `<n>`
 - replay verified: **50/50**
 - audit: spin mismatches `<n>` / `<n>`, same-spin attack mismatches `<n>` / `<n>`

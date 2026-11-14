@@ -98,6 +98,10 @@ pub struct RoundReport {
     pub gates: [u32; 3],
     pub stages: Vec<StageReport>,
     pub stopped_at: Option<String>,
+    /// 1-based stage number where the round stopped, when it did not complete.
+    pub stopped_at_stage: Option<usize>,
+    /// Human-readable reason for the stop (the failed stage's reason).
+    pub stop_reason: Option<String>,
     pub completed: bool,
 }
 
@@ -389,6 +393,8 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
 pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
     let mut stages = Vec::new();
     let mut stopped_at = None;
+    let mut stopped_at_stage = None;
+    let mut stop_reason = None;
     for (index, opponent) in spec.opponents.iter().enumerate() {
         if index >= spec.max_stages {
             break;
@@ -454,9 +460,13 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
             }
         };
         let failed = !stage.passed;
-        stages.push(stage);
         if failed {
             stopped_at = Some(opponent.key.clone());
+            stopped_at_stage = Some(index + 1);
+            stop_reason = Some(stage.reason.clone());
+        }
+        stages.push(stage);
+        if failed {
             break;
         }
     }
@@ -473,6 +483,8 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         gates: spec.gates,
         stages,
         stopped_at,
+        stopped_at_stage,
+        stop_reason,
         completed,
     };
     let round_dir = spec.out_root.join(format!("round-{}", spec.round));
@@ -589,13 +601,24 @@ fn stage_section(
     let think = |slot: usize, field: fn(&crate::harness::GameSummary) -> [f64; 2]| {
         mean(summary.games.iter().map(|game| field(game)[slot]))
     };
+    let think_max = |slot: usize| {
+        summary
+            .games
+            .iter()
+            .map(|game| game.think_max_ms[slot])
+            .fold(0.0f64, f64::max)
+    };
     writeln!(
         out,
-        "- think median / p95: **{:.1} / {:.1} ms** vs **{:.1} / {:.1} ms**",
+        "- think median / p95 / p99 / max: **{:.1} / {:.1} / {:.1} / {:.1} ms** vs **{:.1} / {:.1} / {:.1} / {:.1} ms**",
         think(0, |game| game.think_median_ms),
         think(0, |game| game.think_p95_ms),
+        think(0, |game| game.think_p99_ms),
+        think_max(0),
         think(1, |game| game.think_median_ms),
-        think(1, |game| game.think_p95_ms)
+        think(1, |game| game.think_p95_ms),
+        think(1, |game| game.think_p99_ms),
+        think_max(1)
     )?;
     writeln!(
         out,
@@ -714,7 +737,13 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     if let Some(stage) = &report.stopped_at {
         writeln!(
             out,
-            "**Round stopped at stage `{stage}`.** The remaining stages were not run; a retry needs a new build and a new pre-committed seed set (protocol v1.13 §1.4)."
+            "**Round stopped at stage {} (`{}`): {}.** The remaining stages were not run; a retry needs a new build and a new pre-committed seed set (protocol v1.13 §1.4).",
+            report
+                .stopped_at_stage
+                .map(|stage| stage.to_string())
+                .unwrap_or_else(|| "?".into()),
+            stage,
+            report.stop_reason.as_deref().unwrap_or("unknown")
         )
         .map_err(|e| e.to_string())?;
         writeln!(out).map_err(|e| e.to_string())?;

@@ -202,6 +202,10 @@ pub struct GameSummary {
     pub verify_mismatches: usize,
     pub think_median_ms: [f64; 2],
     pub think_p95_ms: [f64; 2],
+    #[serde(default)]
+    pub think_p99_ms: [f64; 2],
+    #[serde(default)]
+    pub think_max_ms: [f64; 2],
     pub first_choice_rate: [f64; 2],
     pub spin_match_rate: [f64; 2],
     pub attack_match_rate: [f64; 2],
@@ -317,6 +321,8 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         verify_mismatches: audit.verify.mismatches.len(),
         think_median_ms: [audit.think[0].median_ms, audit.think[1].median_ms],
         think_p95_ms: [audit.think[0].p95_ms, audit.think[1].p95_ms],
+        think_p99_ms: [audit.think[0].p99_ms, audit.think[1].p99_ms],
+        think_max_ms: [audit.think[0].max_ms, audit.think[1].max_ms],
         first_choice_rate: [audit.first_choice[0].rate, audit.first_choice[1].rate],
         spin_match_rate: [spin_rate(audit, 0), spin_rate(audit, 1)],
         attack_match_rate: [attack_rate(audit, 0), attack_rate(audit, 1)],
