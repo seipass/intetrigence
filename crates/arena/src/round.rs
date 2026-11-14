@@ -41,6 +41,9 @@ pub struct OpponentSpec {
     pub key: String,
     pub display: String,
     pub commit: Option<String>,
+    /// Protocol-compatibility patch disclosure (v1.14 §7.3): file names,
+    /// line count, purpose, and the "no search/eval changes" statement.
+    pub patch_note: Option<String>,
     pub kind: OpponentKind,
 }
 
@@ -71,6 +74,7 @@ pub struct StageReport {
     pub key: String,
     pub opponent: String,
     pub commit: Option<String>,
+    pub patch_note: Option<String>,
     pub games: u32,
     pub wins: u32,
     pub losses: u32,
@@ -405,6 +409,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 key: opponent.key.clone(),
                 opponent: opponent.display.clone(),
                 commit: opponent.commit.clone(),
+                patch_note: opponent.patch_note.clone(),
                 games: 0,
                 wins: 0,
                 losses: 0,
@@ -446,6 +451,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 key: opponent.key.clone(),
                 opponent: opponent.display.clone(),
                 commit: opponent.commit.clone(),
+                patch_note: opponent.patch_note.clone(),
                 games: summary.games.len() as u32,
                 wins: summary.wins,
                 losses: summary.losses,
@@ -534,6 +540,9 @@ fn stage_section(
         "- opponent commit: `{}`",
         stage.commit.as_deref().unwrap_or("unknown")
     )?;
+    if let Some(note) = &stage.patch_note {
+        writeln!(out, "- compatibility patch: {note}")?;
+    }
     writeln!(
         out,
         "- gate: **{}** (wins needed) — {}",
@@ -787,6 +796,11 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
     writeln!(
         out,
         "- A `forfeit-other` win is an invalid game (protocol v1.13 §7.1.3-4) and fails the stage."
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "- Protocol-compatibility patches (v1.14 §7.3) only remove handicaps: they align spawn positions and the empty-hold representation with TBP/S2. They do not touch the opponents' search, evaluation or move legality, and they can only make the opponent stronger."
     )
     .map_err(|e| e.to_string())?;
     writeln!(

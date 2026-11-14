@@ -52,6 +52,16 @@ v1.13 §7.2. This stage is a generalization check, not an S2-vs-S2 claim.)
 
 (Same fields as stage 1. clys is not S2-native; same interpretation as CC2.)
 
+## Compatibility patches (protocol v1.14 §7.3)
+
+| opponent | upstream commit | patch | purpose | direction |
+|---|---|---|---|---|
+| CC2 | `ed8b193...` | `adapters/cc2-tbp-compat.patch` (116 lines) | empty-hold representation + spawn row 21 | removes a handicap (opponent stronger) |
+| clys | `ccae45f...` | `adapters/clys-tbp-spawn.patch` (38 lines) | spawn row 21 | removes a handicap (opponent stronger) |
+
+- The patches only align TBP/S2 protocol details (spawn position, empty hold). They do **not** touch the opponents' search, evaluation, or move legality.
+- Without the patches, CC2 would misread the current piece as held (hold disabled) and both bots would return no moves at a tall stack (vision-style forfeits). The patches remove those handicaps; the matches are therefore real TopOut games, not weakened-opponent wins.
+
 ## Claims and caveats
 
 - Only the `official` profile is used; diagnostic profiles are never part of a round.

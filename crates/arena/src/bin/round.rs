@@ -80,9 +80,11 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut attax_dir: Option<PathBuf> = None;
     let mut attax_bun = "bun".to_string();
     let mut attax_commit: Option<String> = None;
+    let mut attax_patch: Option<String> = None;
     let mut cc2_program: Option<String> = None;
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
+    let mut cc2_patch: Option<String> = None;
     let mut cc2_visible_rows = 40u32;
     let mut cc2_suggest_delay_ms = 100u64;
     let mut cc2_retry_empty_ms = 2000u64;
@@ -91,6 +93,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_program: Option<String> = None;
     let mut clys_args: Vec<String> = Vec::new();
     let mut clys_commit: Option<String> = None;
+    let mut clys_patch: Option<String> = None;
     let mut clys_visible_rows = 40u32;
     let mut clys_suggest_delay_ms = 0u64;
     let mut clys_retry_empty_ms = 0u64;
@@ -152,6 +155,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 attax_commit = Some(value(1)?);
                 index += 2;
             }
+            "--attax-patch-note" => {
+                attax_patch = Some(value(1)?);
+                index += 2;
+            }
             "--cc2-program" => {
                 cc2_program = Some(value(1)?);
                 index += 2;
@@ -162,6 +169,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             }
             "--cc2-commit" => {
                 cc2_commit = Some(value(1)?);
+                index += 2;
+            }
+            "--cc2-patch-note" => {
+                cc2_patch = Some(value(1)?);
                 index += 2;
             }
             "--cc2-visible-rows" => {
@@ -200,6 +211,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             }
             "--clys-commit" => {
                 clys_commit = Some(value(1)?);
+                index += 2;
+            }
+            "--clys-patch-note" => {
+                clys_patch = Some(value(1)?);
                 index += 2;
             }
             "--clys-visible-rows" => {
@@ -346,6 +361,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             key: "attax".into(),
             display: "attax".into(),
             commit: attax_commit.clone(),
+            patch_note: attax_patch.clone(),
             kind: OpponentKind::Attax {
                 dir,
                 bun: attax_bun,
@@ -356,6 +372,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             key: "attax".into(),
             display: "attax".into(),
             commit: None,
+            patch_note: attax_patch.clone(),
             kind: OpponentKind::Missing,
         },
     };
@@ -372,6 +389,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 key: "cc2".into(),
                 display: "Cold Clear 2".into(),
                 commit: cc2_commit,
+                patch_note: cc2_patch,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -379,6 +397,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             key: "cc2".into(),
             display: "Cold Clear 2".into(),
             commit: None,
+            patch_note: cc2_patch,
             kind: OpponentKind::Missing,
         },
     };
@@ -395,6 +414,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 key: "clys".into(),
                 display: "clys".into(),
                 commit: clys_commit,
+                patch_note: clys_patch,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -402,6 +422,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             key: "clys".into(),
             display: "clys".into(),
             commit: None,
+            patch_note: clys_patch,
             kind: OpponentKind::Missing,
         },
     };
