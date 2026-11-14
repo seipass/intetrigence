@@ -26,6 +26,10 @@ use crate::movegen::Placement;
 /// Columns of the playfield.
 pub const COLUMNS: usize = 10;
 
+/// Surge size (lines) at or above which a release is worth taking. Smaller
+/// bursts are absorbed by a bot sitting at height 3-5.
+pub const SURGE_LETHAL: u32 = 8;
+
 /// Garbage queued (rows) at which the evaluation switches to survival mode.
 pub const SURVIVAL_PENDING: u32 = 8;
 
@@ -213,8 +217,18 @@ pub struct Weights {
     pub b2b_break: f64,
     /// Penalty for spending a T without a T-spin while a slot was ready.
     pub wasted_t: f64,
-    /// Value per line of surge currently charged.
+    /// Value per line of surge currently charged, scaled by
+    /// `charge^surge_exponent`. Exponent 1 is linear (the old behaviour);
+    /// above 1 makes a large charge worth disproportionately more, which is
+    /// the incentive to hold it for a 9-13 line burst instead of cashing a
+    /// 4-7 line one. Measured on 372 games: 80% of releases were 4-7 lines.
     pub surge_charge: f64,
+    /// Exponent applied to the charged amount in the leaf value.
+    pub surge_exponent: f64,
+    /// Penalty when a placement releases surge below `SURGE_LETHAL` lines.
+    /// A small burst is absorbed by a bot sitting at height 3-5; the charge
+    /// is worth more held.
+    pub surge_hold_penalty: f64,
     /// Value per combo step after the placement.
     pub combo: f64,
     /// Extra value per attack line while the opener phase is active: the
@@ -269,6 +283,8 @@ impl Default for Weights {
             b2b_break: -20.0,
             wasted_t: -18.0,
             surge_charge: 1.5,
+            surge_exponent: 1.0,
+            surge_hold_penalty: 0.0,
             combo: 2.0,
             opener_attack: 6.0,
             garbage_clear: 10.0,
@@ -400,7 +416,10 @@ pub fn apply_placement(
     if wasted_t {
         value += weights.wasted_t;
     }
-    value += weights.surge_charge * f64::from(surge_charged);
+    value += weights.surge_charge * f64::from(surge_charged).powf(weights.surge_exponent);
+    if attack.surge_amount > 0 && attack.surge_amount < SURGE_LETHAL {
+        value += weights.surge_hold_penalty;
+    }
     value += weights.combo * f64::from(attack.combo_after);
     value += weights.garbage_clear * f64::from(clear.garbage_lines);
     if context.opener() {
@@ -482,7 +501,8 @@ pub fn leaf_value(
     value += weights.danger_projected * over * over;
     value += weights.garbage_rows * features.garbage_rows;
 
-    value += weights.surge_charge * f64::from(surge_charge_from_streak(context.b2b_streak));
+    let charge = f64::from(surge_charge_from_streak(context.b2b_streak));
+    value += weights.surge_charge * charge.powf(weights.surge_exponent);
     value += weights.combo * f64::from(context.combo);
     value -= weights.incoming * f64::from(context.incoming);
     value += t_slot_cutout_with_heights(board, &heights, t_available, weights);
@@ -805,5 +825,89 @@ mod tests {
         // Surge charge from a 6-streak is 5 lines, released in three chunks.
         assert_eq!(reward.surge_released, 5);
         assert_eq!(reward.b2b_after, 0);
+    }
+
+    /// A single line ready to clear with an I piece, and not a perfect clear.
+    fn single_ready() -> Board {
+        let mut board = Board::new();
+        board.set_row(0, Board::FULL_ROW & !0x0F);
+        board.set_row(1, 0x200);
+        board
+    }
+
+    fn single_placement(board: &Board) -> crate::movegen::Placement {
+        crate::movegen::generate(board, PieceKind::I)
+            .into_iter()
+            .find(|placement| placement.piece.rotation == Rotation::Zero && placement.piece.x == 0)
+            .expect("the I can finish the row")
+    }
+
+    #[test]
+    fn surge_exponent_makes_a_large_charge_worth_more() {
+        let board = Board::new();
+        let linear = Weights::default();
+        let convex = Weights {
+            surge_exponent: 1.5,
+            ..Weights::default()
+        };
+        let value = |weights: &Weights, b2b: u32| {
+            leaf_value(
+                &board,
+                &EvalContext {
+                    b2b_streak: b2b,
+                    ..EvalContext::default()
+                },
+                weights,
+                1,
+            )
+        };
+        // charge 4 at b2b 5, charge 10 at b2b 11.
+        let small_gain = value(&convex, 5) - value(&linear, 5);
+        let big_gain = value(&convex, 11) - value(&linear, 11);
+        assert!(
+            small_gain > 0.0,
+            "a convex charge is worth more than a linear one"
+        );
+        assert!(
+            big_gain > 2.5 * small_gain,
+            "the surplus has to grow with the charge: {big_gain} vs {small_gain}"
+        );
+    }
+
+    #[test]
+    fn surge_hold_penalty_only_bites_below_lethal() {
+        let board = single_ready();
+        let placement = single_placement(&board);
+        let plain = Weights::default();
+        let holding = Weights {
+            surge_hold_penalty: -60.0,
+            ..Weights::default()
+        };
+        let reward = |weights: &Weights, b2b: u32| {
+            apply_placement(
+                &board,
+                &placement,
+                &EvalContext {
+                    b2b_streak: b2b,
+                    ..EvalContext::default()
+                },
+                weights,
+            )
+            .1
+        };
+        let small = reward(&holding, 5);
+        let small_plain = reward(&plain, 5);
+        assert_eq!(small.surge_released, 4);
+        assert!(
+            (small.value - small_plain.value - holding.surge_hold_penalty).abs() < 1e-9,
+            "the penalty applies to a 4-line release"
+        );
+        let large = reward(&holding, 11);
+        let large_plain = reward(&plain, 11);
+        assert_eq!(large.surge_released, 10);
+        assert!(
+            (large.value - large_plain.value).abs() < 1e-9,
+            "a 10-line release is lethal and pays no penalty"
+        );
     }
 }

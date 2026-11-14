@@ -41,6 +41,8 @@ pub struct GameReport {
     pub think_times: Vec<Duration>,
     /// Every input applied, in order, so the game can be replayed.
     pub actions: Vec<Action>,
+    /// Surge burst sizes released in this game, in order.
+    pub surge_releases: Vec<u32>,
     /// Deepest garbage queue seen (rows). The failure mode the M5 provisional
     /// losses share is the queue building to 8-12 rows and then landing in
     /// two waves, so this is the diagnostic that matters.
@@ -147,6 +149,7 @@ pub fn play_game_with_setup(
         clutch_fallbacks: 0,
         think_times: Vec::new(),
         actions: Vec::new(),
+        surge_releases: Vec::new(),
         max_pending: 0,
         heights: Vec::new(),
     };
@@ -239,6 +242,9 @@ pub fn play_game_with_setup(
         report.sent_total += cancelled.sent;
         report.lines += u32::from(clear.lines);
         report.garbage_cleared += u32::from(clear.garbage_lines);
+        if attack.surge_amount > 0 {
+            report.surge_releases.push(attack.surge_amount);
+        }
         report.turns += 1;
         report.heights.push(game.board().height() as u32);
 
