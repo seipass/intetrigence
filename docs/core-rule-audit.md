@@ -100,7 +100,7 @@ pub fn is_over(&self) -> bool {
 - **F1（修正済み）**: 0 ライン設置では combo 乗数を適用しない。§6.8 の擬似コードは `lines > 0` ガードを省略しており、stale combo > 0 の 0 ライン設置に ln 項が攻撃を作る。S2 では 0 ライン設置は攻撃 0。`[誤り / S2 に存在しない]`
   - 修正: `if input.lines > 0 { ... }` で乗算と ln 項を囲む。
   - テスト: `no_clear_resets_combo_but_keeps_b2b` を combo=5 / lines=0 に変更し、events 空・base 0 を固定。
-  - fixture 18/18 は全ケース lines > 0 のため影響なし。
+  - 追加された `no-clear-stale-combo`（19 件目）で F1 を固定。残り 18 件は lines > 0 のため影響なし。
 
 ### 3.3 B2B Charging
 
@@ -238,9 +238,9 @@ core には **勝者を選ぶロジックは無い**。core が持つのは「�
 ### F1 [誤り / S2 に存在しない] — 0 ライン設置の combo ln 攻撃（修正済み）
 
 - 症状: `compute_attack` が combo 乗数を `lines > 0` でガードしていなかった。stale combo > 0 の 0 ライン設置で `ln_1p` 項が攻撃を作り、referee が 1 行送っていた。
-- 影響: ライン消去に続く 0 ライン設置で、意図しない攻撃が発生。fixture 18 件は全て lines > 0 のため検出できなかった。
+- 影響: ライン消去に続く 0 ライン設置で、意図しない攻撃が発生。当時の fixture 18 件は全て lines > 0 のため検出できなかった（現在は 19 件目で固定）。
 - 修正: combo 乗数と ln 項を `if input.lines > 0 { ... }` で囲む。
-- テスト: `no_clear_resets_combo_but_keeps_b2b` を combo=5 / lines=0 に変更し、events 空・base 0 を固定。fixture 18/18 は引き続き緑。
+- テスト: `no_clear_resets_combo_but_keeps_b2b` を combo=5 / lines=0 に変更し、events 空・base 0 を固定。fixture 19/19（追加ケース含む）は緑。
 - 仕様側の対応依頼: §6.8 の擬似コードに `lines > 0` ガードを追記する（spec lead へ）。
 
 ### F2 [我々の取り決め] — `insert_garbage` 後の active 再スポーン
@@ -289,12 +289,12 @@ core には **勝者を選ぶロジックは無い**。core が持つのは「�
 - `cargo test --workspace`: 全テスト緑（本チェックアウト。harness-dev の保留中 3 テストは未反映）
 - `cargo clippy --workspace --all-targets -- -D warnings`: 緑
 - `cargo fmt --all -- --check`: 緑
-- fixture: `docs/s2-attack-examples.json` 18/18、`docs/s2-rng-derivation.json` 4/4
-- F1 修正後も fixture 18/18 と全 core テストが緑
+- fixture: `docs/s2-attack-examples.json` 19/19、`docs/s2-rng-derivation.json` 4/4
+- F1 修正後も fixture 19/19 と全 core テストが緑
 
 ## 13. 申し送り
 
-1. **spec lead**: §6.8 の擬似コードに `lines > 0` ガードを追記（F1）。§2.4 に bag の初期配列順を追記（F4）。
+1. **spec lead**: §6.8 の `lines > 0` ガード（F1）と §2.4 の bag 初期配列順（F4）は **対応済み**（v1.3.14 / v1.3.15）。19 件目の fixture も追加済み。
 2. **manager**: レポートで F2（active 再スポーン）、F3（U7 seed 導出）、F4（bag 初期順）、F5（max spin label）、F7（has_legal_move は referee 側）を「我々の取り決め」として開示する。
 3. **referee**: TurnCap の攻撃量比較は S2 のルールではない。protocol §6.3 の決定として明記する（既に修正済みと聞いている）。
 4. **core**: F1 以外に S2 に存在しない勝者決定/終了ロジックは無い。core は勝者を決めない。

@@ -16,7 +16,7 @@ fn fixture(name: &str) -> Value {
 }
 
 #[test]
-fn attack_fixtures_match_18_of_18() {
+fn attack_fixtures_match() {
     let root = fixture("s2-attack-examples.json");
     assert_eq!(
         root["schema"].as_str(),
