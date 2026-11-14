@@ -1804,6 +1804,7 @@ mod tests {
             width: 0,
             threads: 0,
             deterministic: false,
+            load_note: None,
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,
