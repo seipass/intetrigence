@@ -1355,6 +1355,27 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 - 12 件の spin 不一致のうち攻撃量が変わったのは 2 件のみ。mini single の base は 0 で none single の base も 0 なので、**B2B が乗っていない限り攻撃量は一致する**(§6.1 / §6.2)。差が出た 2 件は B2B が有効な局面。
 
 
+### 12.7 M2 ゲートの実測と forfeit 問題(2026-11-13)
+
+`scripts/evidence/m2-tuning/`(seeds 9001–9010 × 両シート = 20 ゲーム、attax `7b38f51`、replay 20/20 検証):
+
+| 内訳 | 件数 |
+|---|---|
+| `Forfeit` 勝ち(attax の 20 行視野による候補 0) | **18** |
+| `TopOut` 負け(40 行トップアウトまで到達) | **2**(いずれも sheet A) |
+| 合計 | 18–2 = 90.0%(Wilson 95% CI 69.9–97.2%) |
+
+**この数字を「フル視野の attax に対する 90%」と読んではいけない。** `TopOut` で決着した 2 ゲームは **0 勝 2 敗**であり、現行 attax に勝ち越している根拠は「20 行視野を突いた」ことだけである。
+
+扱いは **protocol §7.1(forfeit の扱い、v1.8)** で決定した。要点:
+
+- forfeit は**勝ちとして数える**(分母を結果で変えない)
+- ただし `reason` と `forfeit_cause` で**内訳を必ず記録**し、レポートで**勝ちを種類別に分ける**
+- `vision` forfeit 勝ちがある場合、**「フル視野相手の勝率」を主張してはならない**
+- フル視野相手の推定は `TopOut` 決着のみを別掲し、n と CI を併記して「参考値」と明記
+
+**エビデンス側の不備(要修正)**: `scripts/evidence/m2-tuning/summary.json` の `notes` が **M0 の文言のままハードコード**されており、「the intetrigence side is the in-process M0 baseline stand-in, not the real bot」と書かれている。M2 は**本物の bot**(`think_median_ms = 96.9`、`--ms 100`)で走っているので、この注記は**事実と異なる**。`crates/arena/src/harness.rs` の `notes` が固定文字列であることが原因。最終レポートの前に必ず直すこと。
+
 ## 13. 改訂履歴
 
 | 版 | 日付 | 変更 |
@@ -1372,3 +1393,4 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.7 | 2026-11-13 | §12.6 に M0 の実測裏付けを追加(attax の spin 不一致 12/730 はすべて非 T の `none → mini`、同 spin の攻撃不一致は 0)。All-Mini+ の差が実測で確認できた。 |
 | v1.3.8 | 2026-11-13 | §12.5 の残件を更新。movegen 二重実装に加えて、**空の候補の 2 段判定(protocol §7 / v1.6)が未追随**であることを記録。 |
 | v1.3.9 | 2026-11-13 | §12.5 の「空の候補の 2 段判定」を**未追随 → 到達不能(実装済み)**に更新(harness-dev `c50397d`)。`NoMoves` が到達しない証明を protocol §7 に追加。 |
+| v1.3.10 | 2026-11-13 | §12.7 を追加。M2 ゲートの内訳(18 forfeit 勝ち / 2 top-out 負け)と、`summary.json` の `notes` が M0 の文言のままハードコードされている不備を記録。扱いは protocol §7.1(v1.8)で決定。 |
