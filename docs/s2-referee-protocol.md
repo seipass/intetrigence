@@ -1091,6 +1091,7 @@ v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていた�
 | 6 | `referee.rs` から「TurnCap の攻撃量順位付け」を削除 → **protocol §6.3 に同じ規則が残っていた**(実装と文書が食い違ったまま) | **その規則を記述している文書**(`grep -rn "順位付け\|受信ゴミ行数" docs/`) |
 | 7 | `measurement_complete` を `Path::exists()` で判定 → **0 バイト・途中で切れたファイルでも true** | **「その条件が偽になる入力」を 1 つ挙げたか**(負のテスト) |
 | 8 | §8.3.1.2「`suggestion` 件数 == replay の turn 数」 | **席順**(敗者が seat 1 なら相手は最終 turn を打たない)。**片方の席のデータだけで規則を作った** |
+| 9 | 「`arrived` は既に実装済み」と伝えたが、**相手の worktree には無かった**(main の `c130e55` で追加されたばかり) | **どのツリーで確認したか**。main と worktree は別 |
 
 **手順**:
 
@@ -1106,6 +1107,7 @@ v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていた�
 - **定数の実値を引用する**。`movegen.ts:20` のような**行番号を「値」と読み違えない**。
   - 正しい引用: **`ROWS = 20`(`src/ai/bot/movegen.ts`)** のように、**定数名と値**を書く。
 - **作業ツリーと upstream を区別する**。**必ず `git show <commit>:<path>` で確認する**。
+- **「既に実装済み」と伝えるときは、どのツリーで確認したかを書く**。**main と相手の worktree は別**(失敗 9)。`git log --oneline -1` で自分の HEAD を確認し、「main の `<sha>` にはある」と伝える。**相手の worktree が古ければ存在しない**。
   - 実際に起きた事故(2026-11-15): 他担当が `adapters/attax-vision-40.patch` を**作業ツリーに適用したまま**にしていたため、作業ツリーを読んで「upstream は `ROWS = 40`」と誤結論し、正しい記述を誤って訂正した。`git show 7b38f51:src/ai/bot/movegen.ts` の 20 行目は **`ROWS = 20`**。
   - **確認手順**: `git status --porcelain` で作業ツリーの変更を確認 → `git show <commit>:<path>` で upstream の実値を読む。
 - **相手の仕様は、相手のソースの実値で確認する**。二次資料(自前の分析ノート)だけを根拠にしない。
@@ -1174,3 +1176,4 @@ v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていた�
 | v1.33 | 2026-11-16 | **§8.3.1.2 の 3 項目を修正**(harness-dev の実装報告より)。`start` は「1 回」ではなく「**initial `start`(reason なし)が 1 回**、ゴミ再送は許容」。`suggest` 行は transcript に無いので対応検査は不可。**「`suggestion` 件数 == replay の turn 数」は誤り** → §8.3.1.3 を新設し「**相手が実際に着手した turn 数**」に修正。`turns` との関係は**席順と敗者に依存**する(敗者が seat 1 なら `turns - 1`、seat 2 なら `turns`)。「勝った側は最後の turn を打たない」も**誤り**(反例を明記)。§10.2 に失敗 8 を追加。 |
 | v1.34 | 2026-11-16 | **§7.1.3.2 を新設**(プロセスの終了 = no contest、リトライしない。§8.3.1 との区別を明記)。**§7.1.4 item 2 を修正**(勝率は `TopOut` のみ。v1.26 の TurnCap 変更が反映されていなかった)。**§8.4 に burst 3 指標**を追加(`max_burst_1` / `max_burst_5` / `burst_over_capacity`)。 |
 | v1.35 | 2026-11-16 | **§8.4 の burst 3 指標の定義を確定**(実装一致)。`H` は **burst 前**(5 turn 窓の最初の turn 開始時点、ゴミ挿入前)。`burst_over_capacity` は**オーバーラップ窓の数**で、**「burst の回数」ではない**(同じ burst が複数回数えられる)。`max_burst_1` / `max_burst_5` はゲーム間の最大、`burst_over_capacity` はゲーム間の合計。clys の `CLYS_TBP_LOG` は常時有効(1 ゲーム 174KB、50 ゲームで約 8.7MB)。 |
+| v1.36 | 2026-11-16 | **§10.2 に失敗 9 を追加**。「`arrived` は既に実装済み」と伝えたが**相手の worktree には無かった**(main の `c130e55` で追加されたばかり)。**「既に実装済み」と伝えるときは、どのツリーで確認したかを書く**。main と worktree は別。 |
