@@ -602,6 +602,7 @@ else                   → forfeit-other    (表現できるのに 0 候補 = �
 >
 > **TETRA LEAGUE との差**: TETRA LEAGUE では切断は負け。我々の forfeit は「相手が合法手を返せない」であり、切断ではない。**この差はレポートで開示する**(§8.5)。
 
+<<<<<<< Updated upstream
 #### 7.1.3.2 プロセスの終了(プロセス死、2026-11-16 追加)
 
 - 相手プロセスの終了(stdout の EOF)は `forfeit`(`cause = other`)として
@@ -614,12 +615,30 @@ else                   → forfeit-other    (表現できるのに 0 候補 = �
   出れば不通過**。
 - clys 戦は常に `CLYS_TBP_LOG` を有効にし、プロセス死の exit code/signal を
   記録する(次回の原因特定のため)。stderr は空のことが多い。
+=======
+#### 7.1.3.2 プロセスの終了(2026-11-16 決定)
+
+**相手(または自分)のプロセスが死んだら、再起動もリトライもしない。**
+
+- **stdout の EOF = `forfeit`(`cause = other`)= no contest**(`winner = None`)。勝ちにも負けにも数えない(§7.1.3.1)
+- **分母は常に 50**。不成立ゲームを除いた勝率は計算しない(§7.1.1)
+- **段階 1・2 は `no_contest == 0`**(1 件でも不通過)
+- clys 戦は**常に `CLYS_TBP_LOG` を有効**にし、**exit code / signal を記録**する
+
+**なぜリトライしないか**: 状態が失われた後の続行は**別のゲーム**であり、それを同じゲームとして数えるのは **forfeit を勝ちに数えるのと同じ誤り**。さらに、死んだゲームだけをやり直すと**結果を見てから seed を選ぶ**ことになり、§1.5 の事前確定が壊れる。
+
+> **§8.3.1 との区別**: §8.3.1 は「**レフェリー側の成果物の欠損**は再実行で補える」と言っている。**相手プロセスの死はこれに該当しない。** 欠損の原因が (a) レフェリーのバグ・ディスク・中断なら再実行してよい、(b) **相手プロセスの死なら no contest で確定**し、**そのゲームをやり直してはいけない**。
+>>>>>>> Stashed changes
 
 #### 7.1.4 レポート要件(必須)
 
 1. **決着を種類別に分けて出す**: `wins_topout` / `losses_topout` / `unresolved`(TurnCap)/ `no_contest`(Forfeit)/ `stuck`。`no_contest` は `forfeit_vision` / `forfeit_other` / `forfeit_unknown` に割る。**合計だけを出してはいけない。`draws` という名前を使わない。**
+<<<<<<< Updated upstream
 2. **勝率は `TopOut` の勝数で計算する**。`TurnCap` は未決着で勝ちに数えない
    (v1.26)。`forfeit-vision` を勝ちに含めた数字を「勝率」として出してはいけない。
+=======
+2. **勝率は `TopOut` の勝数で計算する**。`TurnCap` は未決着で勝ちに数えない(v1.26)。`forfeit-vision` を勝ちに含めた数字を「勝率」として出してはいけない。
+>>>>>>> Stashed changes
 3. **`forfeit-vision` は件数と理由を別掲**する(ゲート外)。「相手の視野制限により N ゲームが不戦」と書く。
 4. **`forfeit-other` が 1 件でもあればラウンド不成立**。原因を修正して新しい seeds でやり直す(§7.1.2 のアダプタ故障)。
 5. **フル視野相手の推定**を出したいなら、`TopOut` で決着したゲームのみの勝率を別掲し、n と Wilson CI を併記して「参考値」と明記する。
@@ -918,6 +937,9 @@ v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていた�
 | attax の `nodes` / `extra.ms` | attax の実仕事量(attax-integration §8-F2) |
 | 両者の commit / 起動コマンド / Bun バージョン | 再現性(PLAN §5) |
 | **intetrigence が実際に完了した探索の深さ・幅・ノード数**(手ごと) | **`think_ms` が探索に使われたことの証明**(§8.4.1) |
+| **`max_burst_1`**(1 turn に受けた最大行数、両者) | 単発の最大 |
+| **`max_burst_5`**(連続 5 turn で受けた最大行数、両者) | 塊の大きさ |
+| **`burst_over_capacity`**(`max_burst_5 > 21 - H` だった回数、両者) | **受け止められなかった回数**。崩壊の直接の原因 |
 
 **surge 指標が必要な理由**(2026-11-14): attax 相手の 220 ゲームで **surge 放出が 0 回**だった。評価関数は放出を報酬しているのに実戦で起きていない。原因は 2 つに切り分けられる:
 
@@ -1154,3 +1176,4 @@ v1.32 は「`suggestion` の件数 == replay の turn 数」と書いていた�
 | v1.31 | 2026-11-16 | **§8.4.1 を新設**。`think_ms` は探索の証明ではない。anytime ループが期限超過で反復を捨てて `None` を返し、**全設定で 1-ply greedy にフォールバック**していた事故を記録。レポートに「完了した探索の深さ・幅・ノード数」と「1-ply フォールバック率」を必須化。 |
 | v1.32 | 2026-11-16 | **§8.3.1.1 / §8.3.1.2 を新設**。相手ごとの decision log の実体(attax = `ATTAX_TBP_LOG`、CC2/clys = TBP transcript を decision log とみなす)を明記。**`measurement_complete` を `Path::exists()` で判定してはいけない**ことを明記(0 バイト・truncation・`suggestion` 欠落はすべて `exists() == true`)。内容による 6 検査と**負のテスト**(ゲーム途中で kill → `false`)を必須化。§10.2 に失敗 7 を追加。 |
 | v1.33 | 2026-11-16 | **§8.3.1.2 の 3 項目を修正**(harness-dev の実装報告より)。`start` は「1 回」ではなく「**initial `start`(reason なし)が 1 回**、ゴミ再送は許容」。`suggest` 行は transcript に無いので対応検査は不可。**「`suggestion` 件数 == replay の turn 数」は誤り** → §8.3.1.3 を新設し「**相手が実際に着手した turn 数**」に修正。`turns` との関係は**席順と敗者に依存**する(敗者が seat 1 なら `turns - 1`、seat 2 なら `turns`)。「勝った側は最後の turn を打たない」も**誤り**(反例を明記)。§10.2 に失敗 8 を追加。 |
+| v1.34 | 2026-11-16 | **§7.1.3.2 を新設**(プロセスの終了 = no contest、リトライしない。§8.3.1 との区別を明記)。**§7.1.4 item 2 を修正**(勝率は `TopOut` のみ。v1.26 の TurnCap 変更が反映されていなかった)。**§8.4 に burst 3 指標**を追加(`max_burst_1` / `max_burst_5` / `burst_over_capacity`)。 |
