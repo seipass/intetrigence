@@ -385,6 +385,9 @@ pub struct GameSummary {
     /// Lines cleared in the opener phase (first 14 placements) per slot.
     #[serde(default)]
     pub opener_lines: [u32; 2],
+    /// Garbage burst profile per slot.
+    #[serde(default)]
+    pub burst: [crate::replay::BurstProfile; 2],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -456,6 +459,15 @@ pub struct BotAggregate {
     /// Mean opener-phase lines (first 14 placements) per game.
     #[serde(default)]
     pub opener_lines_per_game: f64,
+    /// Maximum rows received in one turn.
+    #[serde(default)]
+    pub max_burst_1: u32,
+    /// Maximum rows received in five consecutive turns.
+    #[serde(default)]
+    pub max_burst_5: u32,
+    /// Five-turn windows exceeding the stack capacity.
+    #[serde(default)]
+    pub burst_over_capacity: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -701,6 +713,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         ],
         final_height: [audit.heights[0].final_height, audit.heights[1].final_height],
         opener_lines: audit.opener_lines,
+        burst: audit.verify.burst.clone(),
     }
 }
 
@@ -907,6 +920,20 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                     .sum::<f64>()
                     / games.len() as f64
             },
+            max_burst_1: games
+                .iter()
+                .map(|game| game.burst[slot].max_burst_1)
+                .max()
+                .unwrap_or(0),
+            max_burst_5: games
+                .iter()
+                .map(|game| game.burst[slot].max_burst_5)
+                .max()
+                .unwrap_or(0),
+            burst_over_capacity: games
+                .iter()
+                .map(|game| game.burst[slot].burst_over_capacity)
+                .sum(),
         }
     });
     MatchSummary {
