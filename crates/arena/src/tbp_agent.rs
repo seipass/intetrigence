@@ -228,7 +228,36 @@ impl Agent for TbpAgent {
         Ok(())
     }
 
-    fn suggest(&mut self, _view: &View) -> Result<Suggestion, AgentError> {
+    fn suggest(&mut self, view: &View) -> Result<Suggestion, AgentError> {
+        // Opt-in board dump for desync diagnosis: the referee's board at the
+        // moment of `suggest`, in the same 40-row `|`-joined format as the
+        // attax adapter's `ATTAX_TBP_BOARD_LOG`. Default off.
+        if let Ok(path) = std::env::var("TBP_BOARD_LOG") {
+            let mut rows = Vec::with_capacity(intetrigence_core::Board::HEIGHT);
+            for y in 0..intetrigence_core::Board::HEIGHT {
+                let bits = view.board.row(y);
+                rows.push(
+                    (0..intetrigence_core::Board::WIDTH)
+                        .map(|x| if bits & (1 << x) != 0 { '1' } else { '0' })
+                        .collect::<String>(),
+                );
+            }
+            let line = serde_json::json!({
+                "turn": view.turn,
+                "board": rows.join("|"),
+                "hold": format!("{:?}", view.hold),
+                "active": format!("{:?}", view.active.kind),
+                "combo": view.combo,
+                "b2b": view.b2b_streak,
+            });
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                let _ = writeln!(file, "{line}");
+            }
+        }
         let delay = self.config.suggest_delay_ms;
         if delay > 0 {
             std::thread::sleep(std::time::Duration::from_millis(delay));
