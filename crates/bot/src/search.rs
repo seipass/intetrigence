@@ -75,7 +75,7 @@ pub struct SearchConfig {
 impl Default for SearchConfig {
     fn default() -> Self {
         Self {
-            depth: 8,
+            depth: 12,
             width: 96,
             max_width: 768,
             threads: MAX_THREADS,
@@ -352,11 +352,11 @@ impl Searcher {
         let width = self.config.width.max(1);
         let sequence = PieceSequence::new(root.current, &root.preview, depth);
         let deadline = start + Duration::from_secs(3600);
-        let outcome = if self.config.threads <= 1 {
-            self.run_sequential(root, &sequence, depth, width, deadline)
-        } else {
-            self.run_parallel(root, &sequence, depth, width, deadline)
-        };
+        // Always sequential: the parallel path is not thread-invariant
+        // (harness-dev measured threads=1 reproducible, threads=2 not), and a
+        // reproducible round is the whole point of this mode. The cost is the
+        // measurement below.
+        let outcome = self.run_sequential(root, &sequence, depth, width, deadline);
         let Some((nodes, candidates, line, completed)) = outcome else {
             return self.greedy(root, start).map(|mut result| {
                 result.fallback = true;
@@ -995,7 +995,7 @@ mod tests {
     #[test]
     fn deadline_falls_back_to_a_greedy_move() {
         let mut searcher = Searcher::new(SearchConfig {
-            depth: 8,
+            depth: 12,
             width: 4096,
             max_width: 4096,
             threads: 1,
