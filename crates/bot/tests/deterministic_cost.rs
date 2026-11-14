@@ -17,20 +17,14 @@ fn deterministic_schedule_cost() {
     if cfg!(debug_assertions) {
         panic!("run with --release");
     }
-    let injections: Vec<(u32, u32)> = (20..400u32).step_by(8).map(|t| (t, 3)).collect();
+    // `official` is the profile the round uses: an empty board, which has the
+    // most candidates. `garbage-pressure` starts buried and may be cheaper.
+    let injections: Vec<(u32, u32)> = Vec::new();
     println!(
         "{:<18} {:>6} {:>8} {:>8} {:>8} {:>7}",
         "schedule", "moves", "median", "p99", "max", "over100"
     );
-    for (depth, width) in [
-        (8usize, 128usize),
-        (8, 192),
-        (8, 256),
-        (10, 96),
-        (10, 128),
-        (12, 96),
-        (12, 128),
-    ] {
+    for (depth, width) in [(4usize, 128usize), (6, 96), (6, 128), (8, 96), (8, 64)] {
         let config = SearchConfig {
             deterministic: true,
             depth,
@@ -39,7 +33,9 @@ fn deterministic_schedule_cost() {
             budget: Duration::from_millis(100),
             ..SearchConfig::default()
         };
-        let report = play_game_with_setup(9001, &config, 300, &injections, 0);
+        // 400 turns on the official profile: long enough to reach the tall,
+        // sparse boards where the candidate count peaks.
+        let report = play_game_with_setup(9001, &config, 400, &injections, 0);
         let mut times = report.think_times.clone();
         times.sort();
         let n = times.len();
