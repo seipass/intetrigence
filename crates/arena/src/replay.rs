@@ -309,6 +309,36 @@ pub struct VerifyReport {
     /// support; `None` for non-forfeit games).
     #[serde(default)]
     pub forfeit_cause: Option<ForfeitCause>,
+    /// Garbage burst profile per slot (received rows per turn).
+    #[serde(default)]
+    pub burst: [BurstProfile; 2],
+}
+
+/// Garbage burst profile (manager's clys analysis).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct BurstProfile {
+    /// Maximum rows received in one turn.
+    pub max_burst_1: u32,
+    /// Maximum rows received in five consecutive turns.
+    pub max_burst_5: u32,
+    /// Five-turn windows whose received rows exceed `21 - H` at the window
+    /// start (the stack capacity).
+    pub burst_over_capacity: u32,
+}
+
+fn burst_profile(received: &[[u32; 2]], start_height: &[[u32; 2]], slot: usize) -> BurstProfile {
+    let mut profile = BurstProfile::default();
+    for turn in 0..received.len() {
+        profile.max_burst_1 = profile.max_burst_1.max(received[turn][slot]);
+        let end = (turn + 5).min(received.len());
+        let sum: u32 = received[turn..end].iter().map(|rows| rows[slot]).sum();
+        profile.max_burst_5 = profile.max_burst_5.max(sum);
+        let capacity = 21i64 - i64::from(start_height[turn][slot]);
+        if i64::from(sum) > capacity {
+            profile.burst_over_capacity += 1;
+        }
+    }
+    profile
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -400,6 +430,9 @@ pub fn verify_replay_with_options(
         ..VerifyReport::default()
     };
 
+    let mut prev_received = [0u32; 2];
+    let mut turn_received: Vec<[u32; 2]> = Vec::new();
+    let mut turn_start_height: Vec<[u32; 2]> = Vec::new();
     let mut index = 1;
     while index < records.len() {
         match &records[index] {
@@ -435,6 +468,10 @@ pub fn verify_replay_with_options(
                 index += 1;
             }
             ReplayRecord::Turn(turn) => {
+                let start_height = [
+                    engine.players[0].game.board().height() as u32,
+                    engine.players[1].game.board().height() as u32,
+                ];
                 engine.turn = turn.t;
                 engine.begin_turn();
                 report.turns += 1;
@@ -584,6 +621,16 @@ pub fn verify_replay_with_options(
                         packets.len() - packet_index
                     ));
                 }
+                let received = [
+                    engine.players[0].received_total(),
+                    engine.players[1].received_total(),
+                ];
+                turn_received.push([
+                    received[0].saturating_sub(prev_received[0]),
+                    received[1].saturating_sub(prev_received[1]),
+                ]);
+                turn_start_height.push(start_height);
+                prev_received = received;
 
                 match records.get(index) {
                     Some(ReplayRecord::Hash(hash)) => {
@@ -617,6 +664,10 @@ pub fn verify_replay_with_options(
         }
     }
 
+    report.burst = [
+        burst_profile(&turn_received, &turn_start_height, 0),
+        burst_profile(&turn_received, &turn_start_height, 1),
+    ];
     report.ok = report.mismatches.is_empty();
     Ok(report)
 }

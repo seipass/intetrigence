@@ -602,10 +602,24 @@ else                   → forfeit-other    (表現できるのに 0 候補 = �
 >
 > **TETRA LEAGUE との差**: TETRA LEAGUE では切断は負け。我々の forfeit は「相手が合法手を返せない」であり、切断ではない。**この差はレポートで開示する**(§8.5)。
 
+#### 7.1.3.2 プロセスの終了(プロセス死、2026-11-16 追加)
+
+- 相手プロセスの終了(stdout の EOF)は `forfeit`(`cause = other`)として
+  **no contest**(`winner = None`)で記録する。勝ちにも負けにも数えない。
+- **再起動・リトライはしない**。盤面・RNG・コンボが失われた後の続行は
+  **別ゲーム**であり、同じゲームとして数えるのは forfeit を勝ちに数えるのと
+  同じ種類の誤りである。
+- **分母は常に 50**。不成立ゲームを除いた勝率は計算しない(§7.1.1)。
+- 段階 1(CC2)・段階 2(clys)は `no_contest == 0` を要求する。**1 件でも
+  出れば不通過**。
+- clys 戦は常に `CLYS_TBP_LOG` を有効にし、プロセス死の exit code/signal を
+  記録する(次回の原因特定のため)。stderr は空のことが多い。
+
 #### 7.1.4 レポート要件(必須)
 
 1. **決着を種類別に分けて出す**: `wins_topout` / `losses_topout` / `unresolved`(TurnCap)/ `no_contest`(Forfeit)/ `stuck`。`no_contest` は `forfeit_vision` / `forfeit_other` / `forfeit_unknown` に割る。**合計だけを出してはいけない。`draws` という名前を使わない。**
-2. **勝率は `TopOut` + `TurnCap` の勝数で計算する**。`forfeit-vision` を勝ちに含めた数字を「勝率」として出してはいけない。
+2. **勝率は `TopOut` の勝数で計算する**。`TurnCap` は未決着で勝ちに数えない
+   (v1.26)。`forfeit-vision` を勝ちに含めた数字を「勝率」として出してはいけない。
 3. **`forfeit-vision` は件数と理由を別掲**する(ゲート外)。「相手の視野制限により N ゲームが不戦」と書く。
 4. **`forfeit-other` が 1 件でもあればラウンド不成立**。原因を修正して新しい seeds でやり直す(§7.1.2 のアダプタ故障)。
 5. **フル視野相手の推定**を出したいなら、`TopOut` で決着したゲームのみの勝率を別掲し、n と Wilson CI を併記して「参考値」と明記する。

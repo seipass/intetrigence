@@ -38,6 +38,10 @@ cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --note "Tuning smoke vs CC2 (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
 
 echo "tuning smoke: clys ($SEEDS, sheets $CLYS_SHEETS, $TURNS turns)"
+# Always enable the clys adapter log: a clys child exit is a no-contest, and
+# the log records the exit code/signal (the stderr is often empty).
+mkdir -p "$OUT"
+CLYS_TBP_LOG="$(cd "$OUT" && pwd)/tuning-clys-adapter.jsonl" \
 cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --seeds "$SEEDS" --sheets "$CLYS_SHEETS" --turns "$TURNS" --bot search --ms 100 --threads 8 \
   --out "$OUT/tuning-clys" \

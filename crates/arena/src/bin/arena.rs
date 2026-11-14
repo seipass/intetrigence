@@ -662,6 +662,9 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
     let mut forfeit_unknown = 0u32;
     let mut verified = 0u32;
     let mut cause_mismatches = 0u32;
+    let mut burst_max1 = [0u32; 2];
+    let mut burst_max5 = [0u32; 2];
+    let mut burst_over = [0u32; 2];
     let mut game_rows: Vec<serde_json::Value> = Vec::new();
     for file in &files {
         let records = intetrigence_arena::replay::read_replay(file)
@@ -717,6 +720,11 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         } else {
             None
         };
+        for slot in 0..2 {
+            burst_max1[slot] = burst_max1[slot].max(report.burst[slot].max_burst_1);
+            burst_max5[slot] = burst_max5[slot].max(report.burst[slot].max_burst_5);
+            burst_over[slot] += report.burst[slot].burst_over_capacity;
+        }
         game_rows.push(serde_json::json!({
             "seed": report.seed,
             "sheet": report.sheet,
@@ -728,6 +736,7 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
             "turns": result.turns,
             "attax_max_height": attax_max,
             "intetrigence_max_height": intetrigence_max,
+            "burst": [report.burst[0], report.burst[1]],
         }));
         match result.reason.as_str() {
             "TopOut" => {
@@ -766,6 +775,18 @@ fn cmd_reclassify(args: &[String]) -> Result<(), String> {
         "gate_wins": topout_wins,
         "verified": verified,
         "cause_mismatches": cause_mismatches,
+        "burst": {
+            "intetrigence": {
+                "max_burst_1": burst_max1[0],
+                "max_burst_5": burst_max5[0],
+                "burst_over_capacity": burst_over[0],
+            },
+            "opponent": {
+                "max_burst_1": burst_max1[1],
+                "max_burst_5": burst_max5[1],
+                "burst_over_capacity": burst_over[1],
+            },
+        },
         "game_rows": game_rows,
     });
     let out = if path.is_dir() {
