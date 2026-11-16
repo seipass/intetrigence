@@ -1074,3 +1074,35 @@ pub struct SearchConfig { ..., pub deterministic: bool }   // 既定 false
 - **`cargo test --workspace` 3 回連続緑**
 - **`deterministic_mode_repeats_exactly` が `threads: 1/2/8` で緑**
 - **最適化で同じ seed のゲームが変わらないこと**(変わったらバグ)
+
+## 26. `d6 w96` の実力と `d8` への道(2026-11-16)
+
+### 3 方式の比較(CC2、9001–9010 × 両シート)
+
+| 方式 | ゲーム | 勝 | 敗 | depth | `think_ms` max | 100ms 超 | 判定 |
+|---|---|---|---|---|---|---|---|
+| **anytime** | 20 | **19** | 1 | **8.0** | 109.2 | **10 手** | **条件違反** |
+| **決定論 `d6 w96`** | 13 | **11** | 2 | 6 | 72.9 | 0 | 条件遵守 |
+| 決定論 `d6 w128` | – | – | – | 6 | 99.5 | 0 | 余裕なし(不採用) |
+| 決定論 `d8 w96` | – | – | – | 8 | 105.5 | 0(400 手) | **要高速化** |
+
+**`d6 w96` は 84.6%(11/13)。anytime(depth 8)の 95% より弱い。** 負けは 9003-B / 9004-A。**depth が効いている。**
+
+### したがって本命は `d8 w96` を通すこと
+
+**10〜20% の高速化で 105.5 → 85〜95ms になる見込み。** 意味を変えない最適化:
+
+| 処理 | 状態 |
+|---|---|
+| **`best_t_slot` の probe clone** | **削除済み**(`aa490ed`、毎リーフ 1 回) |
+| `t_slot_cutout` の外側 clone | 未(undo が必要) |
+| `apply_placement` の clone | 未(in-place + undo) |
+| `analyse` の差分更新 | 未(重い) |
+
+**意味を変えない最適化は強さの測定を汚さない**(protocol §2.4.13)。**`think_ms` だけ測り直せばよい。**
+
+### 検証条件
+
+- `cargo test --workspace` 3 回連続緑
+- `deterministic_mode_repeats_exactly` が `threads: 1/2/8` で緑
+- **同じ seed で同じゲーム**(最適化は意味を変えないので、`cc2m-det96` の replay と一致するはず。変わったらバグ)
