@@ -99,6 +99,7 @@ async function play(gameIndex) {
   let outcome = null;
   let error = null;
   let locks = 0;
+  let rejectedRoots = 0;
   try {
     while (true) {
       outcome = matchOutcome(
@@ -141,11 +142,20 @@ async function play(gameIndex) {
           const key = `${p.piece}:${p.usedHold}:${p.rotationEvidence.lastInputWasRotation}:${cells}`;
           if (!witnesses.has(key)) witnesses.set(key, p);
         }
+        const witnessKey = (p, usedHold) =>
+          `${p.kind}:${usedHold}:${p.lastSrs > 0}:${cellKey(placementCells(p))}`;
         let reply;
         if (side === ourSide) {
           reply = await ours.decide(decision);
         } else {
-          const searched = attax.decide(decision, () => true);
+          // attax's own runner passes this predicate: without it attax can pick
+          // a root the lab cannot witness, the game dies as an error, and only
+          // attax's games disappear from the record.
+          const searched = attax.decide(decision, (p, usedHold) => {
+            const accepted = witnesses.has(witnessKey(p, usedHold));
+            if (!accepted) rejectedRoots += 1;
+            return accepted;
+          });
           if (searched === null) throw new Error("attax found no move before top-out");
           reply = {
             kind: searched.best.placement.kind,
@@ -215,6 +225,7 @@ async function play(gameIndex) {
             },
       ]),
     ),
+    rejectedRoots,
     wallMs: performance.now() - started,
     logicalFrames: match.clock.logicalFrame,
     error,
@@ -229,6 +240,12 @@ async function play(gameIndex) {
       championProfileSha256: digest,
       bridge: BRIDGE,
       attaxProfile: values["opponent-profile"] ?? "DEFAULT_WEIGHTS",
+      // The opponent's configuration decides whether the number means anything:
+      // the tree, the beam width and whether the stock potential is on.
+      attaxTree: process.env.ATTAX_TREE ?? null,
+      attaxWidth: attax.width ?? null,
+      attaxStockPotential: process.env.ATTAX_S2_STOCK_POTENTIAL ?? "0",
+      attaxSolvency: process.env.ATTAX_S2_SOLVENCY ?? "0",
     },
   };
   await appendFile(values.out, JSON.stringify(record) + "\n");
