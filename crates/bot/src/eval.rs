@@ -734,22 +734,30 @@ fn t_slot_cutout_with_heights(
     if available == 0 {
         return 0.0;
     }
-    let mut board = board.clone();
-    let mut value = 0.0;
-    for _ in 0..available.min(2) {
-        let Some((x, y, lines)) = best_t_slot(&board, heights) else {
-            break;
-        };
-        board
-            .place(PieceKind::T, Rotation::Two, x, y)
-            .expect("the slot scan only returns legal placements");
-        let clear = board.clear_lines();
-        value += weights.t_slot[clear.lines as usize];
-        debug_assert_eq!(clear.lines, lines);
-        if clear.lines == 0 {
-            break;
-        }
+    // The common case is one T available, and `best_t_slot` already reports the
+    // lines that slot would clear, so no board copy is needed at all. Only the
+    // two-T case has to place the first one to find the second, and that is
+    // rare enough to keep the clone.
+    let Some((_, _, first)) = best_t_slot(board, heights) else {
+        return 0.0;
+    };
+    let mut value = weights.t_slot[first as usize];
+    if available < 2 || first == 0 {
+        return value;
     }
+    let mut board = board.clone();
+    let Some((x, y, _)) = best_t_slot(&board, heights) else {
+        return value;
+    };
+    board
+        .place(PieceKind::T, Rotation::Two, x, y)
+        .expect("the slot scan only returns legal placements");
+    let cleared = board.clear_lines();
+    let after = crate::eval::heights(&board);
+    if let Some((_, _, second)) = best_t_slot(&board, &after) {
+        value += weights.t_slot[second as usize];
+    }
+    debug_assert_eq!(cleared.lines, first);
     value
 }
 
