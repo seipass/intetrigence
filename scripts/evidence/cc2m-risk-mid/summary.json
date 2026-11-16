@@ -1,0 +1,3282 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794819505",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9001,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 116,
+      "surge_released": [
+        4,
+        0
+      ],
+      "max_b2b_streak": [
+        5,
+        4
+      ],
+      "turns_with_b2b_ge_4": [
+        7,
+        3
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        76.564,
+        0.109
+      ],
+      "think_p95_ms": [
+        89.341,
+        0.148
+      ],
+      "think_p99_ms": [
+        96.608,
+        0.211
+      ],
+      "think_max_ms": [
+        96.906,
+        0.225
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.733,
+        0.578
+      ],
+      "spin_mismatches": [
+        0,
+        0
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        62,
+        41
+      ],
+      "received_total": [
+        18,
+        36
+      ],
+      "attack_total": [
+        85,
+        67
+      ],
+      "pieces_placed": [
+        116,
+        116
+      ],
+      "start_resends": 14,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 116,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 621.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 657
+        },
+        {
+          "turns": 116,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 85626.0,
+          "nodes_p95": 97693.0,
+          "nodes_max": 114129
+        }
+      ],
+      "net_damage": [
+        44,
+        5
+      ],
+      "final_height": [
+        5,
+        22
+      ],
+      "opener_lines": [
+        4,
+        0
+      ],
+      "lines_cleared": [
+        60,
+        60
+      ],
+      "spin_placements": [
+        14,
+        5
+      ],
+      "burst": [
+        {
+          "max_burst_1": 5,
+          "max_burst_5": 5,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 7
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9001,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 65,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        3,
+        3
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        0
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        72.307,
+        0.102
+      ],
+      "think_p95_ms": [
+        77.617,
+        0.129
+      ],
+      "think_p99_ms": [
+        80.283,
+        1.675
+      ],
+      "think_max_ms": [
+        80.283,
+        1.675
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.954
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.985
+      ],
+      "attack_per_piece": [
+        0.828,
+        0.508
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        40,
+        28
+      ],
+      "received_total": [
+        15,
+        31
+      ],
+      "attack_total": [
+        53,
+        33
+      ],
+      "pieces_placed": [
+        64,
+        65
+      ],
+      "start_resends": 6,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 64,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 647
+        },
+        {
+          "turns": 65,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 64642.0,
+          "nodes_p95": 101566.0,
+          "nodes_max": 113405
+        }
+      ],
+      "net_damage": [
+        25,
+        -3
+      ],
+      "final_height": [
+        1,
+        15
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        39,
+        33
+      ],
+      "spin_placements": [
+        3,
+        7
+      ],
+      "burst": [
+        {
+          "max_burst_1": 5,
+          "max_burst_5": 5,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 8,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9002,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 242,
+      "surge_released": [
+        4,
+        4
+      ],
+      "max_b2b_streak": [
+        5,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        7,
+        20
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.319,
+        0.106
+      ],
+      "think_p95_ms": [
+        77.972,
+        0.134
+      ],
+      "think_p99_ms": [
+        85.853,
+        0.158
+      ],
+      "think_max_ms": [
+        92.068,
+        0.229
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.983
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.727,
+        0.773
+      ],
+      "spin_mismatches": [
+        0,
+        4
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        122,
+        135
+      ],
+      "received_total": [
+        81,
+        69
+      ],
+      "attack_total": [
+        176,
+        187
+      ],
+      "pieces_placed": [
+        242,
+        242
+      ],
+      "start_resends": 26,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9002-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 242,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 624.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 654
+        },
+        {
+          "turns": 242,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 86630.0,
+          "nodes_p95": 104506.0,
+          "nodes_max": 122515
+        }
+      ],
+      "net_damage": [
+        41,
+        66
+      ],
+      "final_height": [
+        4,
+        22
+      ],
+      "opener_lines": [
+        2,
+        2
+      ],
+      "lines_cleared": [
+        168,
+        135
+      ],
+      "spin_placements": [
+        15,
+        22
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 15,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 12,
+          "burst_over_capacity": 13
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9002,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 175,
+      "surge_released": [
+        8,
+        4
+      ],
+      "max_b2b_streak": [
+        5,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        12,
+        13
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.28,
+        0.104
+      ],
+      "think_p95_ms": [
+        77.629,
+        0.127
+      ],
+      "think_p99_ms": [
+        80.091,
+        0.141
+      ],
+      "think_max_ms": [
+        80.13,
+        1.689
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.983
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.816,
+        0.783
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        90,
+        105
+      ],
+      "received_total": [
+        53,
+        58
+      ],
+      "attack_total": [
+        142,
+        137
+      ],
+      "pieces_placed": [
+        174,
+        175
+      ],
+      "start_resends": 26,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9002-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 174,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 648.0,
+          "nodes_max": 655
+        },
+        {
+          "turns": 175,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 88460.0,
+          "nodes_p95": 106229.0,
+          "nodes_max": 112969
+        }
+      ],
+      "net_damage": [
+        37,
+        47
+      ],
+      "final_height": [
+        3,
+        18
+      ],
+      "opener_lines": [
+        4,
+        0
+      ],
+      "lines_cleared": [
+        116,
+        100
+      ],
+      "spin_placements": [
+        17,
+        13
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 10,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 17,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9003,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 205,
+      "surge_released": [
+        0,
+        10
+      ],
+      "max_b2b_streak": [
+        4,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        1,
+        32
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        69.977,
+        0.103
+      ],
+      "think_p95_ms": [
+        76.209,
+        0.13
+      ],
+      "think_p99_ms": [
+        78.101,
+        0.146
+      ],
+      "think_max_ms": [
+        78.978,
+        0.684
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.971
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.639,
+        0.712
+      ],
+      "spin_mismatches": [
+        0,
+        6
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        92,
+        100
+      ],
+      "received_total": [
+        60,
+        44
+      ],
+      "attack_total": [
+        131,
+        146
+      ],
+      "pieces_placed": [
+        205,
+        205
+      ],
+      "start_resends": 17,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9003-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 205,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 646.0,
+          "nodes_max": 651
+        },
+        {
+          "turns": 205,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 92899.0,
+          "nodes_p95": 104692.0,
+          "nodes_max": 114423
+        }
+      ],
+      "net_damage": [
+        32,
+        56
+      ],
+      "final_height": [
+        3,
+        21
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        135,
+        104
+      ],
+      "spin_placements": [
+        17,
+        20
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 12,
+          "burst_over_capacity": 1
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9003,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 185,
+      "surge_released": [
+        0,
+        9
+      ],
+      "max_b2b_streak": [
+        3,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        26
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.603,
+        0.104
+      ],
+      "think_p95_ms": [
+        76.944,
+        0.133
+      ],
+      "think_p99_ms": [
+        78.701,
+        0.158
+      ],
+      "think_max_ms": [
+        83.981,
+        1.574
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.978
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.772,
+        0.757
+      ],
+      "spin_mismatches": [
+        0,
+        4
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        81,
+        112
+      ],
+      "received_total": [
+        50,
+        52
+      ],
+      "attack_total": [
+        142,
+        140
+      ],
+      "pieces_placed": [
+        184,
+        185
+      ],
+      "start_resends": 22,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9003-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 184,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 651
+        },
+        {
+          "turns": 185,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 86462.0,
+          "nodes_p95": 103382.0,
+          "nodes_max": 111300
+        }
+      ],
+      "net_damage": [
+        31,
+        60
+      ],
+      "final_height": [
+        3,
+        22
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        117,
+        102
+      ],
+      "spin_placements": [
+        18,
+        15
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 13,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 1
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9004,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 339,
+      "surge_released": [
+        0,
+        11
+      ],
+      "max_b2b_streak": [
+        3,
+        12
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        63
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        73.697,
+        0.113
+      ],
+      "think_p95_ms": [
+        99.353,
+        0.164
+      ],
+      "think_p99_ms": [
+        104.43,
+        0.736
+      ],
+      "think_max_ms": [
+        116.47,
+        2.781
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.985
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.605,
+        0.693
+      ],
+      "spin_mismatches": [
+        0,
+        5
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        12,
+        0
+      ],
+      "sent_total": [
+        125,
+        172
+      ],
+      "received_total": [
+        92,
+        62
+      ],
+      "attack_total": [
+        205,
+        235
+      ],
+      "pieces_placed": [
+        339,
+        339
+      ],
+      "start_resends": 33,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9004-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 339,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 620.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 339,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 78538.0,
+          "nodes_p95": 98467.0,
+          "nodes_max": 196652
+        }
+      ],
+      "net_damage": [
+        33,
+        110
+      ],
+      "final_height": [
+        3,
+        23
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        217,
+        170
+      ],
+      "spin_placements": [
+        27,
+        25
+      ],
+      "burst": [
+        {
+          "max_burst_1": 6,
+          "max_burst_5": 12,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 14,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9004,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 169,
+      "surge_released": [
+        0,
+        5
+      ],
+      "max_b2b_streak": [
+        4,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        1,
+        19
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.858,
+        0.106
+      ],
+      "think_p95_ms": [
+        78.982,
+        0.134
+      ],
+      "think_p99_ms": [
+        93.797,
+        0.156
+      ],
+      "think_max_ms": [
+        102.661,
+        1.732
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.988
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.893,
+        0.846
+      ],
+      "spin_mismatches": [
+        0,
+        2
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        1,
+        0
+      ],
+      "sent_total": [
+        99,
+        109
+      ],
+      "received_total": [
+        58,
+        65
+      ],
+      "attack_total": [
+        150,
+        143
+      ],
+      "pieces_placed": [
+        168,
+        169
+      ],
+      "start_resends": 18,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9004-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 168,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 625.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 169,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 82929.0,
+          "nodes_p95": 101100.0,
+          "nodes_max": 110113
+        }
+      ],
+      "net_damage": [
+        41,
+        44
+      ],
+      "final_height": [
+        2,
+        19
+      ],
+      "opener_lines": [
+        4,
+        3
+      ],
+      "lines_cleared": [
+        119,
+        106
+      ],
+      "spin_placements": [
+        18,
+        12
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 10,
+          "burst_over_capacity": 8
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9005,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 54,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        3,
+        2
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        0
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        71.236,
+        0.104
+      ],
+      "think_p95_ms": [
+        79.708,
+        0.135
+      ],
+      "think_p99_ms": [
+        84.387,
+        0.148
+      ],
+      "think_max_ms": [
+        84.387,
+        0.148
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.944
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.759,
+        0.463
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        32,
+        17
+      ],
+      "received_total": [
+        8,
+        24
+      ],
+      "attack_total": [
+        41,
+        25
+      ],
+      "pieces_placed": [
+        54,
+        54
+      ],
+      "start_resends": 5,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9005-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 54,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 648.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 54,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 95293.0,
+          "nodes_p95": 107489.0,
+          "nodes_max": 109629
+        }
+      ],
+      "net_damage": [
+        24,
+        -7
+      ],
+      "final_height": [
+        3,
+        17
+      ],
+      "opener_lines": [
+        3,
+        3
+      ],
+      "lines_cleared": [
+        27,
+        23
+      ],
+      "spin_placements": [
+        8,
+        4
+      ],
+      "burst": [
+        {
+          "max_burst_1": 5,
+          "max_burst_5": 5,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 14,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9005,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 88,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        3,
+        3
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        0
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.051,
+        0.102
+      ],
+      "think_p95_ms": [
+        77.044,
+        0.124
+      ],
+      "think_p99_ms": [
+        78.759,
+        1.568
+      ],
+      "think_max_ms": [
+        78.759,
+        1.568
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.966
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.69,
+        0.568
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        42,
+        41
+      ],
+      "received_total": [
+        23,
+        31
+      ],
+      "attack_total": [
+        60,
+        50
+      ],
+      "pieces_placed": [
+        87,
+        88
+      ],
+      "start_resends": 15,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9005-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 87,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 88,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 78932.0,
+          "nodes_p95": 107765.0,
+          "nodes_max": 117663
+        }
+      ],
+      "net_damage": [
+        19,
+        10
+      ],
+      "final_height": [
+        2,
+        20
+      ],
+      "opener_lines": [
+        3,
+        0
+      ],
+      "lines_cleared": [
+        55,
+        44
+      ],
+      "spin_placements": [
+        10,
+        8
+      ],
+      "burst": [
+        {
+          "max_burst_1": 5,
+          "max_burst_5": 7,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 10,
+          "burst_over_capacity": 4
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9006,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 299,
+      "surge_released": [
+        14,
+        4
+      ],
+      "max_b2b_streak": [
+        6,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        21,
+        14
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.151,
+        0.103
+      ],
+      "think_p95_ms": [
+        76.831,
+        0.128
+      ],
+      "think_p99_ms": [
+        79.992,
+        0.165
+      ],
+      "think_max_ms": [
+        81.194,
+        0.341
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.973
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.997
+      ],
+      "attack_per_piece": [
+        0.773,
+        0.699
+      ],
+      "spin_mismatches": [
+        0,
+        8
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        191,
+        120
+      ],
+      "received_total": [
+        80,
+        102
+      ],
+      "attack_total": [
+        231,
+        209
+      ],
+      "pieces_placed": [
+        299,
+        299
+      ],
+      "start_resends": 37,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9006-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 299,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 620.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 650
+        },
+        {
+          "turns": 299,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 66389.0,
+          "nodes_p95": 100634.0,
+          "nodes_max": 109768
+        }
+      ],
+      "net_damage": [
+        111,
+        18
+      ],
+      "final_height": [
+        4,
+        19
+      ],
+      "opener_lines": [
+        5,
+        1
+      ],
+      "lines_cleared": [
+        190,
+        193
+      ],
+      "spin_placements": [
+        31,
+        25
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 12,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 10,
+          "burst_over_capacity": 17
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9006,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 324,
+      "surge_released": [
+        10,
+        13
+      ],
+      "max_b2b_streak": [
+        7,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        14,
+        53
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        71.624,
+        0.105
+      ],
+      "think_p95_ms": [
+        78.221,
+        0.131
+      ],
+      "think_p99_ms": [
+        79.968,
+        0.145
+      ],
+      "think_max_ms": [
+        83.022,
+        1.659
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.985
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.771,
+        0.765
+      ],
+      "spin_mismatches": [
+        0,
+        5
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        150,
+        179
+      ],
+      "received_total": [
+        80,
+        81
+      ],
+      "attack_total": [
+        249,
+        248
+      ],
+      "pieces_placed": [
+        323,
+        324
+      ],
+      "start_resends": 34,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9006-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 323,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 627.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 651
+        },
+        {
+          "turns": 324,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 88866.0,
+          "nodes_p95": 105554.0,
+          "nodes_max": 115855
+        }
+      ],
+      "net_damage": [
+        70,
+        98
+      ],
+      "final_height": [
+        2,
+        22
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        200,
+        184
+      ],
+      "spin_placements": [
+        36,
+        28
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 8,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 14,
+          "burst_over_capacity": 8
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9007,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 141,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        3,
+        4
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        1
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        75.406,
+        0.107
+      ],
+      "think_p95_ms": [
+        89.638,
+        0.139
+      ],
+      "think_p99_ms": [
+        96.685,
+        0.173
+      ],
+      "think_max_ms": [
+        96.904,
+        0.218
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.986
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.567,
+        0.511
+      ],
+      "spin_mismatches": [
+        0,
+        2
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        50,
+        57
+      ],
+      "received_total": [
+        26,
+        31
+      ],
+      "attack_total": [
+        80,
+        72
+      ],
+      "pieces_placed": [
+        141,
+        141
+      ],
+      "start_resends": 15,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9007-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 141,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 646.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 141,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 88893.0,
+          "nodes_p95": 106133.0,
+          "nodes_max": 113941
+        }
+      ],
+      "net_damage": [
+        24,
+        26
+      ],
+      "final_height": [
+        2,
+        17
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        79,
+        63
+      ],
+      "spin_placements": [
+        15,
+        7
+      ],
+      "burst": [
+        {
+          "max_burst_1": 5,
+          "max_burst_5": 5,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 10,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9007,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 320,
+      "surge_released": [
+        9,
+        0
+      ],
+      "max_b2b_streak": [
+        6,
+        4
+      ],
+      "turns_with_b2b_ge_4": [
+        15,
+        3
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        79.384,
+        0.111
+      ],
+      "think_p95_ms": [
+        92.672,
+        0.143
+      ],
+      "think_p99_ms": [
+        97.11,
+        0.228
+      ],
+      "think_max_ms": [
+        97.849,
+        1.987
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.975
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.997
+      ],
+      "attack_per_piece": [
+        0.803,
+        0.741
+      ],
+      "spin_mismatches": [
+        0,
+        8
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        166,
+        189
+      ],
+      "received_total": [
+        97,
+        118
+      ],
+      "attack_total": [
+        256,
+        237
+      ],
+      "pieces_placed": [
+        319,
+        320
+      ],
+      "start_resends": 45,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9007-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 319,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 647
+        },
+        {
+          "turns": 320,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 80391.0,
+          "nodes_p95": 100533.0,
+          "nodes_max": 114514
+        }
+      ],
+      "net_damage": [
+        69,
+        71
+      ],
+      "final_height": [
+        3,
+        21
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        214,
+        215
+      ],
+      "spin_placements": [
+        32,
+        25
+      ],
+      "burst": [
+        {
+          "max_burst_1": 6,
+          "max_burst_5": 13,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 14,
+          "burst_over_capacity": 6
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9008,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 314,
+      "surge_released": [
+        10,
+        22
+      ],
+      "max_b2b_streak": [
+        7,
+        11
+      ],
+      "turns_with_b2b_ge_4": [
+        19,
+        90
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        77.209,
+        0.11
+      ],
+      "think_p95_ms": [
+        90.332,
+        0.145
+      ],
+      "think_p99_ms": [
+        92.454,
+        0.203
+      ],
+      "think_max_ms": [
+        96.645,
+        0.411
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.984
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.701,
+        0.793
+      ],
+      "spin_mismatches": [
+        0,
+        5
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        144,
+        168
+      ],
+      "received_total": [
+        92,
+        63
+      ],
+      "attack_total": [
+        220,
+        249
+      ],
+      "pieces_placed": [
+        314,
+        314
+      ],
+      "start_resends": 29,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9008-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 314,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 650
+        },
+        {
+          "turns": 314,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 83384.0,
+          "nodes_p95": 98065.0,
+          "nodes_max": 109151
+        }
+      ],
+      "net_damage": [
+        52,
+        105
+      ],
+      "final_height": [
+        2,
+        20
+      ],
+      "opener_lines": [
+        4,
+        3
+      ],
+      "lines_cleared": [
+        207,
+        163
+      ],
+      "spin_placements": [
+        28,
+        23
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 10,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9008,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 334,
+      "surge_released": [
+        4,
+        16
+      ],
+      "max_b2b_streak": [
+        5,
+        12
+      ],
+      "turns_with_b2b_ge_4": [
+        7,
+        61
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        76.962,
+        0.108
+      ],
+      "think_p95_ms": [
+        90.143,
+        0.144
+      ],
+      "think_p99_ms": [
+        93.593,
+        0.17
+      ],
+      "think_max_ms": [
+        97.966,
+        1.597
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.991
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.997
+      ],
+      "attack_per_piece": [
+        0.748,
+        0.832
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        128,
+        238
+      ],
+      "received_total": [
+        116,
+        86
+      ],
+      "attack_total": [
+        249,
+        278
+      ],
+      "pieces_placed": [
+        333,
+        334
+      ],
+      "start_resends": 33,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9008-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 333,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 652
+        },
+        {
+          "turns": 334,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 81612.0,
+          "nodes_p95": 95612.0,
+          "nodes_max": 108605
+        }
+      ],
+      "net_damage": [
+        12,
+        152
+      ],
+      "final_height": [
+        2,
+        21
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        236,
+        193
+      ],
+      "spin_placements": [
+        28,
+        28
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 12,
+          "burst_over_capacity": 3
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 10,
+          "burst_over_capacity": 0
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9009,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 491,
+      "surge_released": [
+        4,
+        20
+      ],
+      "max_b2b_streak": [
+        5,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        10,
+        50
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        75.774,
+        0.109
+      ],
+      "think_p95_ms": [
+        88.395,
+        0.142
+      ],
+      "think_p99_ms": [
+        92.206,
+        0.172
+      ],
+      "think_max_ms": [
+        93.973,
+        0.195
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.986
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.733,
+        0.798
+      ],
+      "spin_mismatches": [
+        0,
+        7
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        264,
+        248
+      ],
+      "received_total": [
+        150,
+        118
+      ],
+      "attack_total": [
+        360,
+        392
+      ],
+      "pieces_placed": [
+        491,
+        491
+      ],
+      "start_resends": 54,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9009-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 491,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 653
+        },
+        {
+          "turns": 491,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 80249.0,
+          "nodes_p95": 98161.0,
+          "nodes_max": 110482
+        }
+      ],
+      "net_damage": [
+        114,
+        130
+      ],
+      "final_height": [
+        4,
+        23
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        329,
+        283
+      ],
+      "spin_placements": [
+        38,
+        44
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 11,
+          "burst_over_capacity": 6
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9009,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 165,
+      "surge_released": [
+        7,
+        5
+      ],
+      "max_b2b_streak": [
+        8,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        15,
+        23
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        75.204,
+        0.11
+      ],
+      "think_p95_ms": [
+        87.861,
+        0.149
+      ],
+      "think_p99_ms": [
+        95.55,
+        0.212
+      ],
+      "think_max_ms": [
+        96.22,
+        1.658
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.994
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.884,
+        0.824
+      ],
+      "spin_mismatches": [
+        0,
+        1
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        102,
+        99
+      ],
+      "received_total": [
+        54,
+        58
+      ],
+      "attack_total": [
+        145,
+        136
+      ],
+      "pieces_placed": [
+        164,
+        165
+      ],
+      "start_resends": 17,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9009-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 164,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 624.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 651
+        },
+        {
+          "turns": 165,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 80441.0,
+          "nodes_p95": 97220.0,
+          "nodes_max": 104563
+        }
+      ],
+      "net_damage": [
+        48,
+        41
+      ],
+      "final_height": [
+        2,
+        20
+      ],
+      "opener_lines": [
+        5,
+        2
+      ],
+      "lines_cleared": [
+        113,
+        95
+      ],
+      "spin_placements": [
+        24,
+        13
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 12,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 20,
+          "burst_over_capacity": 6
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9010,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 195,
+      "surge_released": [
+        12,
+        5
+      ],
+      "max_b2b_streak": [
+        9,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        24,
+        19
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        76.655,
+        0.109
+      ],
+      "think_p95_ms": [
+        89.248,
+        0.146
+      ],
+      "think_p99_ms": [
+        95.188,
+        0.23
+      ],
+      "think_max_ms": [
+        96.01,
+        0.271
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.985
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.995
+      ],
+      "attack_per_piece": [
+        0.897,
+        0.831
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        117,
+        112
+      ],
+      "received_total": [
+        54,
+        67
+      ],
+      "attack_total": [
+        175,
+        162
+      ],
+      "pieces_placed": [
+        195,
+        195
+      ],
+      "start_resends": 20,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9010-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 195,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 195,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 83592.0,
+          "nodes_p95": 100094.0,
+          "nodes_max": 107453
+        }
+      ],
+      "net_damage": [
+        63,
+        45
+      ],
+      "final_height": [
+        4,
+        17
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        125,
+        118
+      ],
+      "spin_placements": [
+        31,
+        15
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 12,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 12,
+          "burst_over_capacity": 9
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    },
+    {
+      "seed": 9010,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 66,
+      "surge_released": [
+        0,
+        0
+      ],
+      "max_b2b_streak": [
+        2,
+        4
+      ],
+      "turns_with_b2b_ge_4": [
+        0,
+        4
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        74.931,
+        0.109
+      ],
+      "think_p95_ms": [
+        88.87,
+        0.136
+      ],
+      "think_p99_ms": [
+        91.022,
+        1.514
+      ],
+      "think_max_ms": [
+        91.022,
+        1.514
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.985
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.754,
+        0.606
+      ],
+      "spin_mismatches": [
+        0,
+        1
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        0
+      ],
+      "sent_total": [
+        46,
+        24
+      ],
+      "received_total": [
+        20,
+        29
+      ],
+      "attack_total": [
+        49,
+        40
+      ],
+      "pieces_placed": [
+        65,
+        66
+      ],
+      "start_resends": 6,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9010-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 65,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 623.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 66,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 76783.0,
+          "nodes_p95": 98598.0,
+          "nodes_max": 106915
+        }
+      ],
+      "net_damage": [
+        26,
+        -5
+      ],
+      "final_height": [
+        6,
+        19
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        39,
+        33
+      ],
+      "spin_placements": [
+        8,
+        3
+      ],
+      "burst": [
+        {
+          "max_burst_1": 6,
+          "max_burst_5": 11,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 13,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    }
+  ],
+  "wins": 20,
+  "losses": 0,
+  "unresolved": 0,
+  "no_contest": 0,
+  "stuck": 0,
+  "forfeits": 0,
+  "wins_topout": 20,
+  "wins_turncap": 0,
+  "losses_turncap": 0,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "forfeit_vision": 0,
+  "forfeit_other": 0,
+  "forfeit_unknown": 0,
+  "losses_topout": 0,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "surge_released": [
+    86,
+    128
+  ],
+  "max_b2b_streak": [
+    9,
+    12
+  ],
+  "turns_with_b2b_ge_4": [
+    153,
+    494
+  ],
+  "win_rate": 1.0,
+  "wilson_low": 0.8389,
+  "wilson_high": 1.0,
+  "verified": 20,
+  "verify_failures": 0,
+  "resumed_games": 0,
+  "depth": 8,
+  "width": 96,
+  "threads": 8,
+  "deterministic": true,
+  "load_note": "possible contamination: 13 move(s) over 100 ms in deterministic mode (expected 0)",
+  "build_id": "f46ea492520c06b2",
+  "binary": "C:\\Users\\Hasilan\\Projects\\intetrigence\\target\\release\\arena.exe (1896448 bytes, mtime 1794819167)",
+  "measurement_complete": true,
+  "attax_patch_sha256": null,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "commit": "4206eea",
+      "build_id": "f46ea492520c06b2",
+      "threads": 8,
+      "suggest_delay_ms": null,
+      "retry_empty_suggest_ms": null,
+      "placements": 4277,
+      "spin_checked": 4277,
+      "spin_mismatches": 0,
+      "attack_checked": 4277,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 13,
+      "attack_per_piece": 0.748,
+      "received_per_game": 61.35,
+      "visible_rows": 40,
+      "mean_height": 5.29,
+      "max_height": 16.3,
+      "search_turns": 4277,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 73.4596,
+      "think_p99_max": 104.43,
+      "think_max": 116.47,
+      "depth_median": 8.0,
+      "depth_p95": 8.0,
+      "depth_max": 8,
+      "width_median": 96.0,
+      "width_p95": 96.0,
+      "width_max": 96,
+      "nodes_median": 627.0,
+      "nodes_p95": 645.0,
+      "nodes_max": 657,
+      "net_damage_per_game": 45.8,
+      "negative_net_games": 0,
+      "collapses": 0,
+      "opener_lines_per_game": 4.2,
+      "max_burst_1": 8,
+      "max_burst_5": 15,
+      "burst_over_capacity": 3,
+      "attack_per_line": 1.149,
+      "spin_rate": 0.098,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    },
+    {
+      "slot": 1,
+      "name": "Cold Clear 2",
+      "commit": null,
+      "build_id": null,
+      "threads": null,
+      "suggest_delay_ms": 0,
+      "retry_empty_suggest_ms": 2000,
+      "placements": 4287,
+      "spin_checked": 4287,
+      "spin_mismatches": 76,
+      "attack_checked": 4287,
+      "attack_mismatches": 5,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 0,
+      "attack_per_piece": 0.743,
+      "received_per_game": 61.25,
+      "visible_rows": 40,
+      "mean_height": 10.08,
+      "max_height": 20.75,
+      "search_turns": 4287,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 0.10670000000000002,
+      "think_p99_max": 1.675,
+      "think_max": 2.781,
+      "depth_median": null,
+      "depth_p95": null,
+      "depth_max": null,
+      "width_median": null,
+      "width_p95": null,
+      "width_max": null,
+      "nodes_median": 82958.0,
+      "nodes_p95": 102429.0,
+      "nodes_max": 196652,
+      "net_damage_per_game": 53.45,
+      "negative_net_games": 3,
+      "collapses": 4,
+      "opener_lines_per_game": 1.8,
+      "max_burst_1": 8,
+      "max_burst_5": 20,
+      "burst_over_capacity": 121,
+      "attack_per_line": 1.318,
+      "spin_rate": 0.08,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    }
+  ],
+  "notes": [
+    "The intetrigence side is the bot recorded in each replay header.",
+    "The intetrigence search is non-deterministic (anytime, 8 thread(s), 100 ms): the same seed can produce different games; the replay is the record."
+  ]
+}
