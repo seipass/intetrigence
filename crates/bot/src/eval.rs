@@ -999,6 +999,90 @@ mod tests {
         }
     }
 
+    /// The clone-free line count must agree with placing and clearing.
+    ///
+    /// `best_t_slot` counts the rows a T would fill with two bitmasks instead
+    /// of cloning the board; this pins the two against each other on the
+    /// boards where an off-by-one would show: a 1-line slot, a 2-line slot, no
+    /// slot, the left and right edges, and a stack near the top of the board.
+    #[test]
+    fn the_clone_free_slot_scan_matches_placing_the_piece() {
+        let mut boards = vec![("tsd", tsd_board())];
+        let mut one_line = Board::new();
+        one_line.set_row(0, 0x1FF);
+        one_line.set_row(1, 0x1FF & !(0b111 << 3));
+        one_line.set_row(2, 0x1FF & !(0b010 << 3));
+        boards.push(("one-line", one_line));
+        boards.push(("empty", Board::new()));
+        // A real board never holds a full row: `clear_lines` runs after every
+        // lock, so the fixture must leave a hole or the comparison is against
+        // rows that were already complete.
+        let mut flat = Board::new();
+        for row in 0..6 {
+            flat.set_row(row, Board::FULL_ROW & !(1 << 9));
+        }
+        boards.push(("flat stack", flat));
+        let mut high = Board::new();
+        for row in 0..36 {
+            high.set_row(row, Board::FULL_ROW & !0x0F);
+        }
+        high.set_row(36, 0x1FF);
+        high.set_row(37, 0x3EF);
+        boards.push(("high", high));
+
+        for (name, board) in boards {
+            let heights = heights(&board);
+            // Every legal resting nub-down T placement, counted both ways.
+            // Only `Rotation::Two` is scanned by `best_t_slot`; its cells have
+            // `cy` in {0, 1}, which is what lets the mask count use two rows.
+            for x in 0..COLUMNS as i32 {
+                for rotation in [Rotation::Two] {
+                    // The resting row: the highest y that still sits on the
+                    // stack, then confirmed against the board.
+                    let Some(y) =
+                        PieceKind::T
+                            .cells(rotation)
+                            .iter()
+                            .try_fold(i32::MIN, |acc, (cx, cy)| {
+                                let column = x + cx;
+                                (column >= 0 && column < COLUMNS as i32)
+                                    .then(|| acc.max(heights[column as usize] - cy))
+                            })
+                    else {
+                        continue;
+                    };
+                    if !board.can_place(PieceKind::T, rotation, x, y) {
+                        continue;
+                    }
+                    let mut probe = board.clone();
+                    probe
+                        .place(PieceKind::T, rotation, x, y)
+                        .expect("checked above");
+                    let placed = probe.clear_lines().lines;
+
+                    let mut rows = [0u16; 2];
+                    for (cx, cy) in PieceKind::T.cells(rotation) {
+                        rows[cy as usize] |= 1 << (x + cx);
+                    }
+                    let mut counted = 0u8;
+                    for (offset, mask) in rows.iter().enumerate() {
+                        if *mask == 0 {
+                            continue;
+                        }
+                        let row = y as usize + offset;
+                        if row < Board::HEIGHT && board.row(row) | *mask == Board::FULL_ROW {
+                            counted += 1;
+                        }
+                    }
+                    assert_eq!(
+                        counted, placed,
+                        "{name} x{x} {rotation:?} y{y}: mask count {counted} vs placed {placed}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn flat_board_has_no_t_slot() {
         let mut board = Board::new();
