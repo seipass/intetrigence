@@ -293,6 +293,11 @@ pub struct GameAudit {
     pub first_choice: [FirstChoiceAudit; 2],
     pub scoring: [ScoringAudit; 2],
     pub reachability_rejections: u32,
+    /// Adopted placements reachable only under the alternate I 90-degree kick
+    /// order (S2 spec U1). Zero or a handful means the order ambiguity does
+    /// not affect the match; many means U1 needs pinning.
+    #[serde(default)]
+    pub kick_union_only: u32,
     pub start_resends: Vec<StartResendAudit>,
     pub attax: Option<AttaxAudit>,
     pub bots: [crate::replay::BotRecord; 2],

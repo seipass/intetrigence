@@ -116,6 +116,9 @@ pub struct StageReport {
     pub topout_losses: u32,
     #[serde(default)]
     pub forfeit_vision: u32,
+    /// Placements accepted only under the alternate I 90-degree kick order.
+    #[serde(default)]
+    pub kick_union_only: u32,
     #[serde(default)]
     pub resumed_games: u32,
 }
@@ -139,6 +142,9 @@ pub struct RoundReport {
     pub resumed: bool,
     #[serde(default)]
     pub resumed_games: u32,
+    /// Total alternate-order-only placements accepted in this round.
+    #[serde(default)]
+    pub kick_union_only: u32,
     #[serde(default)]
     pub resume_reason: Option<String>,
     #[serde(default)]
@@ -506,6 +512,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 turncap_wins: 0,
                 topout_losses: 0,
                 forfeit_vision: 0,
+                kick_union_only: 0,
                 resumed_games: 0,
             }
         } else {
@@ -574,6 +581,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
                 turncap_wins: summary.wins_turncap,
                 topout_losses: summary.losses_topout,
                 forfeit_vision: summary.wins_forfeit_vision,
+                kick_union_only: summary.kick_union_only,
                 resumed_games: summary.resumed_games,
             }
         };
@@ -590,6 +598,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
     }
     let completed = stages.len() == spec.max_stages && stopped_at.is_none();
     let resumed_games: u32 = stages.iter().map(|stage| stage.resumed_games).sum();
+    let kick_union_only: u32 = stages.iter().map(|stage| stage.kick_union_only).sum();
     let report = RoundReport {
         schema: "intetrigence/round/1".into(),
         round: spec.round,
@@ -604,6 +613,7 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         stages,
         resumed: spec.resume,
         resumed_games,
+        kick_union_only,
         resume_reason: spec.resume_reason.clone(),
         weights: spec.weights_note.clone(),
         stopped_at,
@@ -775,6 +785,11 @@ fn stage_section(
         "- no-contest record: **{}/{}** (TopOut wins / games without no-contest)",
         summary.wins_topout,
         games - summary.no_contest
+    )?;
+    writeln!(
+        out,
+        "- U1 alternate-order-only placements accepted: **{}**",
+        summary.kick_union_only
     )?;
     writeln!(
         out,

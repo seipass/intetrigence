@@ -37,7 +37,9 @@
 //! [`generate`] and [`reachable_states`] are convenience wrappers that build a
 //! one-shot `Movegen`.
 
-use intetrigence_core::{Action, ActivePiece, Board, PieceKind, Rotation, SpinType, kick};
+use intetrigence_core::{
+    Action, ActivePiece, Board, KickOrder, PieceKind, Rotation, SpinType, kick,
+};
 
 /// How the piece arrived at a BFS state.
 ///
@@ -292,6 +294,8 @@ pub struct Movegen {
     placements: Vec<Placement>,
     /// Whether the modelled engine has a 180-degree rotation.
     supports_180: bool,
+    /// Which I 90-degree kick test order to model (S2 spec U1).
+    kick_order: KickOrder,
 }
 
 impl Default for Movegen {
@@ -311,7 +315,16 @@ impl Movegen {
             resting: Vec::with_capacity(64),
             placements: Vec::with_capacity(64),
             supports_180: true,
+            kick_order: KickOrder::SrsPlus,
         }
+    }
+
+    /// Selects which I 90-degree kick test order to model (S2 spec U1).
+    ///
+    /// The bot always uses [`KickOrder::SrsPlus`]; the referee switches to
+    /// [`KickOrder::Srs`] to accept the union of both orders.
+    pub fn set_kick_order(&mut self, order: KickOrder) {
+        self.kick_order = order;
     }
 
     /// Fills and returns the placements for `kind` from its standard spawn.
@@ -456,7 +469,7 @@ impl Movegen {
                 }
                 // SRS tries the kick candidates in table order and stops at
                 // the first one that fits.
-                for &(dx, dy) in kick::kicks(kind, rotation, to) {
+                for &(dx, dy) in kick::kicks_with_order(kind, rotation, to, self.kick_order) {
                     let (nx, ny) = (x + dx as i32, y + dy as i32);
                     if fits_at(to, nx, ny) {
                         let arrival = if kick::is_fin_or_tst_kick(rotation, to, (dx, dy)) {

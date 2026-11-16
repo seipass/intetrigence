@@ -46,11 +46,13 @@ pub const JLSTZ_KICKS: [[Kick; 5]; 8] = [
     [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
 ];
 
-/// SRS+ kicks for I.
+/// SRS+ kicks for I (S7 / TETR.IO order).
 ///
-/// Index order matches [`JLSTZ_KICKS`]. The T2/T3 order is the spec's SRS+
-/// order (U1); the offset set is the mirrored SRS set.
-pub const I_KICKS: [[Kick; 5]; 8] = [
+/// Index order matches [`JLSTZ_KICKS`]. This is the bot's default and the
+/// primary referee order. The S2 spec pins the offset *set* but not the test
+/// order (U1); [`I_KICKS_SRS`] exposes the standard-SRS order for the referee's
+/// union check.
+pub const I_KICKS_SRS_PLUS: [[Kick; 5]; 8] = [
     // 0 -> R
     [(0, 0), (1, 0), (-2, 0), (-2, -1), (1, 2)],
     // R -> 0
@@ -68,6 +70,44 @@ pub const I_KICKS: [[Kick; 5]; 8] = [
     // 0 -> L
     [(0, 0), (-1, 0), (2, 0), (2, -1), (-1, 2)],
 ];
+
+/// The same I offset sets in **standard SRS** test order.
+///
+/// U1 is unresolved ([単一実装] S7). The bot generates with
+/// [`I_KICKS_SRS_PLUS`]; the referee accepts the union of both orders so it
+/// does not reject the other implementation's legal placements. The union
+/// affects adjudication only, not generation.
+pub const I_KICKS_SRS: [[Kick; 5]; 8] = [
+    // 0 -> R
+    [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+    // R -> 0
+    [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    // R -> 2
+    [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+    // 2 -> R
+    [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    // 2 -> L
+    [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    // L -> 2
+    [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+    // L -> 0
+    [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    // 0 -> L
+    [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+];
+
+/// Default I table: SRS+ (the bot's generation order).
+pub const I_KICKS: [[Kick; 5]; 8] = I_KICKS_SRS_PLUS;
+
+/// Which I 90-degree test order to model (S2 spec U1).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum KickOrder {
+    /// SRS+ mirrored order: the bot's generation order.
+    #[default]
+    SrsPlus,
+    /// Standard SRS order: the other implementation (attax).
+    Srs,
+}
 
 /// S2 180-degree kicks for J, L, S, T, Z and O.
 ///
@@ -136,9 +176,26 @@ pub const fn kick_180_index(from: Rotation, to: Rotation) -> Option<usize> {
 ///
 /// The first entry is always `(0, 0)` for a rotation that changes state.
 pub fn kicks(kind: PieceKind, from: Rotation, to: Rotation) -> &'static [Kick] {
+    kicks_with_order(kind, from, to, KickOrder::SrsPlus)
+}
+
+/// Kick candidates for `from -> to` in the requested I test order.
+///
+/// Only the I 90-degree table differs between orders; every other table is
+/// shared. The bot uses [`KickOrder::SrsPlus`]; the referee unions both orders
+/// for reachability adjudication (S2 spec U1).
+pub fn kicks_with_order(
+    kind: PieceKind,
+    from: Rotation,
+    to: Rotation,
+    order: KickOrder,
+) -> &'static [Kick] {
     if let Some(index) = kick_index(from, to) {
         return match kind {
-            PieceKind::I => &I_KICKS[index],
+            PieceKind::I => match order {
+                KickOrder::SrsPlus => &I_KICKS_SRS_PLUS[index],
+                KickOrder::Srs => &I_KICKS_SRS[index],
+            },
             PieceKind::O => &O_KICKS,
             _ => &JLSTZ_KICKS[index],
         };
@@ -226,6 +283,50 @@ mod tests {
             kicks(PieceKind::I, Rotation::Zero, Rotation::R),
             &[(0, 0), (1, 0), (-2, 0), (-2, -1), (1, 2)]
         );
+    }
+
+    #[test]
+    fn i_kick_orders_have_the_same_offset_sets() {
+        for (plus, srs) in I_KICKS_SRS_PLUS.iter().zip(I_KICKS_SRS.iter()) {
+            let mut a = *plus;
+            let mut b = *srs;
+            a.sort_unstable();
+            b.sort_unstable();
+            assert_eq!(a, b);
+        }
+    }
+
+    #[test]
+    fn i_kick_orders_differ_in_order() {
+        assert_ne!(I_KICKS_SRS_PLUS[0], I_KICKS_SRS[0]);
+        assert_eq!(
+            kicks_with_order(
+                PieceKind::I,
+                Rotation::Zero,
+                Rotation::R,
+                KickOrder::SrsPlus
+            ),
+            &I_KICKS_SRS_PLUS[0][..]
+        );
+        assert_eq!(
+            kicks_with_order(PieceKind::I, Rotation::Zero, Rotation::R, KickOrder::Srs),
+            &I_KICKS_SRS[0][..]
+        );
+    }
+
+    #[test]
+    fn non_i_kicks_ignore_order() {
+        for from in Rotation::ALL {
+            for to in Rotation::ALL {
+                if from == to {
+                    continue;
+                }
+                assert_eq!(
+                    kicks_with_order(PieceKind::T, from, to, KickOrder::SrsPlus),
+                    kicks_with_order(PieceKind::T, from, to, KickOrder::Srs)
+                );
+            }
+        }
     }
 
     #[test]

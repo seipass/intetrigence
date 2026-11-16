@@ -52,7 +52,9 @@ pub use game::{
 };
 pub use garbage::{CancelResult, GarbagePacket, GarbageQueue};
 pub use hold::Hold;
-pub use kick::{Kick, is_fin_or_tst_kick, kicks};
+pub use kick::{
+    I_KICKS_SRS, I_KICKS_SRS_PLUS, Kick, KickOrder, is_fin_or_tst_kick, kicks, kicks_with_order,
+};
 pub use opener::{OPENER_PIECES, OpenerPhase};
 pub use piece::{ALL_PIECES, PieceKind, RotateDirection, Rotation};
 pub use rng::{MinStd, SeedDerivation, SplitMix64, derive_seeds};

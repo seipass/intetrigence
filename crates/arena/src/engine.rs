@@ -289,6 +289,9 @@ pub struct Adopted {
     pub target: PlacementTarget,
     pub claimed_spin: Option<SpinType>,
     pub claimed_attack: Option<u32>,
+    /// The placement is reachable only under the alternate I 90-degree kick
+    /// order (S2 spec U1). Audited, not penalised.
+    pub alternate_order: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -614,6 +617,7 @@ impl Engine {
                     target: PlacementTarget::new(candidate.piece, candidate.cells),
                     claimed_spin: candidate.claimed_spin,
                     claimed_attack: candidate.claimed_attack,
+                    alternate_order: moves.is_alternate_only(&candidate.cells),
                 });
             }
         }

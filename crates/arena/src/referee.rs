@@ -176,6 +176,7 @@ pub fn run_round(
     let mut indices: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
     let mut scoring: [ScoringAudit; 2] = [ScoringAudit::default(), ScoringAudit::default()];
     let mut reachability_rejections = 0u32;
+    let mut kick_union_only = 0u32;
     let mut heights: [Vec<u32>; 2] = [Vec::new(), Vec::new()];
     let mut b2b_turns = [0u32; 2];
 
@@ -282,6 +283,9 @@ pub fn run_round(
                         break 'turns;
                     }
                 };
+            if adopted.alternate_order {
+                kick_union_only += 1;
+            }
             indices[slot].push(adopted.candidate_index as u32);
 
             let applied = match engine.apply(slot, &adopted.target, adopted.claimed_spin) {
@@ -539,6 +543,7 @@ pub fn run_round(
         ],
         scoring,
         reachability_rejections,
+        kick_union_only,
         start_resends,
         attax,
         bots,
@@ -726,6 +731,7 @@ fn forfeit_report(
         first_choice: [FirstChoiceAudit::default(), FirstChoiceAudit::default()],
         scoring: [ScoringAudit::default(), ScoringAudit::default()],
         reachability_rejections: 0,
+        kick_union_only: 0,
         start_resends: Vec::new(),
         attax: None,
         bots,

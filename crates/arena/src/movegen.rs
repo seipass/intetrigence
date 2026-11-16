@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use intetrigence_bot::{Movegen, unique_by_cells};
-use intetrigence_core::{Action, ActivePiece, Board, PieceKind, Rotation, SpinType};
+use intetrigence_core::{Action, ActivePiece, Board, KickOrder, PieceKind, Rotation, SpinType};
 
 thread_local! {
     /// The referee is single-threaded; one reusable generator avoids the
@@ -63,6 +63,9 @@ pub struct MoveSet {
     hold: bool,
     placements: Vec<Placement>,
     by_cells: HashMap<[(i32, i32); 4], usize>,
+    /// Cell sets reachable only under the alternate I 90-degree kick order
+    /// (S2 spec U1). The referee accepts them; the count is audited.
+    alternate_only: std::collections::HashSet<[(i32, i32); 4]>,
 }
 
 impl MoveSet {
@@ -92,6 +95,12 @@ impl MoveSet {
         self.by_cells
             .get(cells)
             .map(|&index| &self.placements[index])
+    }
+
+    /// True when this placement is reachable only under the alternate I
+    /// 90-degree kick order (S2 spec U1).
+    pub fn is_alternate_only(&self, cells: &[(i32, i32); 4]) -> bool {
+        self.alternate_only.contains(cells)
     }
 }
 
@@ -163,9 +172,18 @@ pub fn generate_with_180(
     supports_180: bool,
 ) -> MoveSet {
     let kind = start.kind;
-    let unique = MOVEGEN.with(|cell| {
+    // S2 spec U1: the I 90-degree offset set is fixed but the test order is
+    // not. SRS stops at the first fitting offset, so the orders reach
+    // different placements. The referee accepts the union; the bot keeps
+    // SRS+ only.
+    let (unique, alternate) = MOVEGEN.with(|cell| {
         let mut movegen = cell.borrow_mut();
-        unique_by_cells(movegen.generate_from_with_180(board, start, supports_180))
+        movegen.set_kick_order(KickOrder::SrsPlus);
+        let primary = unique_by_cells(movegen.generate_from_with_180(board, start, supports_180));
+        movegen.set_kick_order(KickOrder::Srs);
+        let alternate = unique_by_cells(movegen.generate_from_with_180(board, start, supports_180));
+        movegen.set_kick_order(KickOrder::SrsPlus);
+        (primary, alternate)
     });
     let mut placements = Vec::with_capacity(unique.len());
     let mut by_cells = HashMap::with_capacity(unique.len());
@@ -174,11 +192,22 @@ pub fn generate_with_180(
         by_cells.insert(converted.cells, placements.len());
         placements.push(converted);
     }
+    let mut alternate_only = std::collections::HashSet::new();
+    for placement in &alternate {
+        let converted = convert(placement, hold);
+        if by_cells.contains_key(&converted.cells) {
+            continue;
+        }
+        alternate_only.insert(converted.cells);
+        by_cells.insert(converted.cells, placements.len());
+        placements.push(converted);
+    }
     MoveSet {
         kind,
         hold,
         placements,
         by_cells,
+        alternate_only,
     }
 }
 
@@ -254,10 +283,11 @@ mod tests {
         // (docs/s2-spec.md U1). Our SRS+ `L -> 2` order is
         // [(0,0),(1,0),(-2,0),(1,2),(-2,-1)]; the attax engine uses the
         // standard SRS order [(0,0),(-2,0),(1,0),(-2,-1),(1,2)]. SRS stops at
-        // the first fitting kick, so ours lands at (1, 2) and the attax lands
-        // at (-2, -1) inside the cavity. The referee then rejects the attax
-        // candidate as unreachable (forfeit). Swapping only this entry to the
-        // attax order makes the placement reachable, which pins the cause.
+        // the first fitting offset, so ours lands at (1, 2) and the attax
+        // lands at (-2, -1) inside the cavity.
+        //
+        // The referee accepts the union of both orders (spec v1.3.23) and
+        // audits the count; the bot keeps SRS+ only.
         let mut board = Board::new();
         board.set_row(0, 0x3F7);
         board.set_row(1, 0x3F7);
@@ -268,13 +298,18 @@ mod tests {
         let moves = generate(&board, spawn_state(PieceKind::I), true);
         let covered_well = [(3, 0), (3, 1), (3, 2), (3, 3)];
         assert!(
-            moves.get(&covered_well).is_none(),
-            "SRS+ order must not reach the covered well (U1)"
+            moves.get(&covered_well).is_some(),
+            "the referee must accept the alternate-order placement"
+        );
+        assert!(
+            moves.is_alternate_only(&covered_well),
+            "the placement is reachable only under the standard SRS order"
         );
         // The placement above the overhang is reachable in both orders.
-        assert!(moves.get(&[(3, 6), (3, 7), (3, 8), (3, 9)]).is_some());
+        let above = [(3, 6), (3, 7), (3, 8), (3, 9)];
+        assert!(moves.get(&above).is_some());
+        assert!(!moves.is_alternate_only(&above));
     }
-
     #[test]
     fn blocked_spawn_has_no_placements() {
         let mut board = Board::new();

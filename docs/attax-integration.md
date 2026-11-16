@@ -738,34 +738,48 @@ summary: 10 games, wins 1 losses 7 unresolved 0 no-contest 2, verified 10/10
 
 ---
 
-## 17. U1: I の 90° kick 順（2026-11-16、manager 決定 A）
+## 17. U1: I の 90° kick 順（2026-11-16、manager 決定 C）
 
 ### 決定
 
-**A: 我々の `I_KICKS` は SRS+ ミラー順のまま。attax の S2 版の I 90° kick 順を SRS+ に合わせる
-プロトコル互換パッチを当てる。** レフェリーは両順序の和集合を取らない（C は不採用）。
+**C（和集合）**:
+
+- **ボットの自手生成**: **SRS+ のみ**（`I_KICKS_SRS_PLUS`）。生成は部分集合のまま。
+- **attax**: **標準 SRS 順のまま**。書き換えない（互換パッチ不要）。
+- **レフェリーの到達可能性判定**: **両順序の和集合**。どちらかで到達できれば合法。
+- **記録**: **`kick_union_only`**（SRS+ では到達できず SRS では到達できる配置の数）。
 
 ### 根拠
 
-- TETR.IO の I 90° kick は **SRS+**。参照実装は S7（`halp1/triangle`）の
-  `src/engine/utils/kicks/data.ts` で、SRS+ ミラー順。
-- attax の S2 版は **標準 SRS 順**。オフセット集合は 8 遷移すべて一致するが、
-  **順序だけが 5/8 遷移で違う**（0→R, R→0, 2→R, L→2, 0→L）。
+- U1 は **[単一実装]**（S7 `halp1/triangle` の `kicks/data.ts`）。TETR.IO の真の順序を
+  一次ソースで確定できない。
 - SRS は「最初に fit した候補で確定」するため、順序の違いは**到達可能な配置の集合**を変える。
-  例: `L→2` の 4 番目が我々 `(1,2)`、attax `(-2,-1)`。attax は空洞内の横 I に到達し、
-  我々の審判は拒否する（seed 9003/9007 の forfeit）。
-- 審判を相手に合わせて寛容にすると **S2 忠実性の主張が崩れる**。我々の movegen を標準 SRS に
-  変えるのも、SRS+ が正しい仕様である以上、自分を仕様から外すことになる。
+  例: `L→2` の 4 番目が我々 `(1,2)`、attax `(-2,-1)`。attax は空洞内の横 I に到達する。
+- 片方の順序で判定すると、他方の実装の合法手を不正扱いする。これは相手のせいではなく、
+  **我々の未確定仕様の問題**。
+- **A（SRS+ 維持 + attax パッチ）は誤差が無界で検出不能**（U1 が覆れば attax 段階が全滅）。
+  **C は件数で有界に測れる**。manager は「誤差を測れること」を優先した。
+- 和集合は**判定にだけ**効かせ、生成には効かせない。どちらにも有利にならない。
 
-### パッチの位置づけ
+### 実装
 
-- **プロトコル互換パッチ**であり、**強さのパッチではない**。視野・spawn のパッチと同じ分類。
-- 変更するのは **I の 90° kick の試行順のみ**。探索・評価・movegen の到達集合の定義には触れない。
-- 対象: attax の S2 版（`1f41806` 以降）。`adapters/` にパッチを置き、round report に SHA を記録する。
-
-### レフェリー / core の状態
-
-- `crates/core/src/kick.rs` の `I_KICKS` は **SRS+ のまま**（変更なし）。
-- レフェリーは **SRS+ のみ**で到達可能性を判定する。両順序の和集合・`alternate_order` 監査は不採用。
+- `crates/core/src/kick.rs`: `I_KICKS_SRS_PLUS`（既定）と `I_KICKS_SRS`、`KickOrder`、
+  `kicks_with_order` を公開。`I_KICKS` は SRS+ のまま。
+- `crates/bot`: 既定 `KickOrder::SrsPlus`。ボットの生成は SRS+ のみ。
+- `crates/arena`: `MoveSet` が両順序を走査して和集合を取り、`alternate_only` を記録。
+- `GameAudit` / `GameSummary` / `MatchSummary` / `StageReport` / `RoundReport` に
+  `kick_union_only` を追加。
 - 180° 6 候補化（`79dfa77`）は S7 のデータに基づく別件の正しい修正であり、維持する。
-- U1 の C（和集合）実装として未コミットだった core/arena/bot の変更は破棄し、SRS+ に戻した。
+
+### しきい値
+
+- 50 ゲームで **0〜2 件**: U1 を確定しない（影響は無視できる）。
+- **3〜4 件**: 記録して続行。
+- **5 件以上**: TETR.IO のリプレイで分岐局面を探し、U1 を確定する。
+
+### 検証
+
+- `i_90_kick_order_changes_reachability`: 和集合で covered well が到達可能、
+  `is_alternate_only` が true。
+- seed 9003 turn 268 の forfeit が消える（同じ配置が受理される）。
+- `cargo test --workspace` 298 passed / clippy / fmt。

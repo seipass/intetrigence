@@ -381,6 +381,9 @@ pub struct GameSummary {
     pub turns_with_b2b_ge_4: [u32; 2],
     pub verified: bool,
     pub verify_mismatches: usize,
+    /// Placements accepted only under the alternate I 90-degree kick order.
+    #[serde(default)]
+    pub kick_union_only: u32,
     pub think_median_ms: [f64; 2],
     pub think_p95_ms: [f64; 2],
     #[serde(default)]
@@ -597,6 +600,9 @@ pub struct MatchSummary {
     pub losses_topout: u32,
     pub losses_forfeit: u32,
     pub turncap: u32,
+    /// Placements accepted only under the alternate I 90-degree kick order.
+    #[serde(default)]
+    pub kick_union_only: u32,
     #[serde(default)]
     pub surge_released: [u32; 2],
     #[serde(default)]
@@ -787,6 +793,7 @@ fn game_summary(audit: &GameAudit) -> GameSummary {
         turns_with_b2b_ge_4: audit.turns_with_b2b_ge_4,
         verified: audit.verify.ok,
         verify_mismatches: audit.verify.mismatches.len(),
+        kick_union_only: audit.kick_union_only,
         think_median_ms: [audit.think[0].median_ms, audit.think[1].median_ms],
         think_p95_ms: [audit.think[0].p95_ms, audit.think[1].p95_ms],
         think_p99_ms: [audit.think[0].p99_ms, audit.think[1].p99_ms],
@@ -1176,6 +1183,7 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         losses_topout,
         losses_forfeit,
         turncap,
+        kick_union_only: games.iter().map(|game| game.kick_union_only).sum(),
         surge_released: [
             games.iter().map(|game| game.surge_released[0]).sum(),
             games.iter().map(|game| game.surge_released[1]).sum(),
@@ -1981,6 +1989,7 @@ mod tests {
             losses_topout: 0,
             losses_forfeit: 0,
             turncap: 0,
+            kick_union_only: 0,
             surge_released: [0, 0],
             max_b2b_streak: [0, 0],
             turns_with_b2b_ge_4: [0, 0],
