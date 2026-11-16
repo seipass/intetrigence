@@ -698,3 +698,40 @@ summary: 1 games, wins 0 losses 1 unresolved 0 no-contest 0, verified 1/1
   ゲームの採点(レフェリー)は S2 で行われるが、attax の読みはその分弱い。
 - エビデンス: `C:/tmp/attax-s2-game1/{summary.json,audit/,replays/,logs/}`(ローカル)。
   `logs/seed-9001-sheet-A-attax.jsonl` が decision log。
+
+---
+
+## 16. S2 attax 10 ゲーム(2026-11-16)
+
+条件: tuning seeds 9001–9010、sheet A、1000 turn、`--ms 100`/8t、
+**決定論 `--deterministic --depth 8 --width 88`**、`ATTAX_TBP_ROWS=40` + `ATTAX_TBP_PROFILE=s2`、
+`--tbp-supports-180 true`、attax `1f41806` + `adapters/attax-s2-tbp.patch`。
+
+```text
+summary: 10 games, wins 1 losses 7 unresolved 0 no-contest 2, verified 10/10
+5 分類: TopOut 勝ち 1 / TopOut 負け 7 / TurnCap 0 / Forfeit 2 / 未決着 0 = 10
+```
+
+| 指標 | intetrigence | Attax(S2) |
+|---|---|---|
+| attack/piece | 0.729 | **0.900** |
+| attack/line | 1.061 | **1.560** |
+| spin rate | 0.086 | **0.151** |
+| net damage / game | +23.4 | **+123.9** |
+| received / game | 105.8 | 60.8 |
+| mean / max height | 6.29 / 19.6 | 5.31 / 17.1 |
+| collapse(最終高さ ≥ 20) | 1 | 0 |
+| collapse 負け / race 負け | 6 / 1 | — |
+| think median(ms) | 63.6 | 44.4 |
+| nodes median | 580 | 10,149 |
+| spin 監査 | 0 / 2814 | 1 / 2806 |
+| attack 監査(same spin) | 0 / 2814 | 0 / 2806 |
+
+- **forfeit 2/10(9003, 9007)は 180° kick 表の不一致**。attax の `KICKS_180_JLSTZ` は 6 候補、
+  レフェリーの S2 `JLSTZ_180_KICKS` は 5 候補。attax の 6 番目が S2 に無いため、
+  attax の 6 候補が 6 番目を使う 180° 配置だと `candidate-unreachable` で forfeit する。
+  `--tbp-supports-180 false` の 1 ゲームでは forfeit 0。**180° を許可したことが原因**で、強さの問題ではない。
+- **`load_note` は null**(`--note` 未指定)。
+- **attax の decision log は未取得**(`--tbp-*` 経路は `decision_log` を渡さず、`ATTAX_TBP_LOG` も未設定)。
+- `createBot` の S2-only フィールド未写像の制約は §2.2.1 / §15 のとおり。
+- エビデンス: `scripts/evidence/attax-s2-10/{REPORT.md,summary.json,summary.md,audit/,replays/,logs/}`。

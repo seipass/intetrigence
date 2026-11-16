@@ -276,3 +276,46 @@ summary: 1 games, wins 0 losses 1 unresolved 0 no-contest 0, verified 1/1
 - 旧 `adapters/attax-vision-40.patch`(`7b38f51` 用)は **削除**。新 pin では `ATTAX_TBP_ROWS=40` が
   グリッドを 40 行にし、`adapters/attax-s2-tbp.patch` が profile と posY を担う。
 - `supports_180`: 新 pin の **S2 profile は true**(`rotate180: true`)、guideline は false。
+
+### 8.4 10 ゲーム(tuning seeds 9001–9010、sheet A)
+
+条件: 1000 turn、`--ms 100`/8t、決定論 `--deterministic --depth 8 --width 88`、
+`ATTAX_TBP_ROWS=40` + `ATTAX_TBP_PROFILE=s2`、`--tbp-supports-180 true`。
+
+```text
+summary: 10 games, wins 1 losses 7 unresolved 0 no-contest 2, verified 10/10
+win breakdown: TopOut 1, forfeit 0; losses: TopOut 7, forfeit 0; turn-cap 0
+```
+
+| 指標 | intetrigence | Attax(S2) |
+|---|---|---|
+| attack/piece | 0.729 | **0.900** |
+| attack/line | 1.061 | **1.560** |
+| spin rate | 0.086 | **0.151** |
+| net damage / game | +23.4 | **+123.9** |
+| received / game | 105.8 | 60.8 |
+| mean / max height | 6.29 / 19.6 | 5.31 / 17.1 |
+| collapse(最終高さ ≥ 20) | 1 | 0 |
+| collapse 負け / race 負け | 6 / 1 | — |
+| think median(ms) | 63.6 | 44.4 |
+| nodes median | 580(depth 8 / width 88) | 10,149 |
+| spin 監査 | 0 / 2814 | 1 / 2806 |
+| attack 監査(same spin) | 0 / 2814 | 0 / 2806 |
+
+**Forfeit 2/10(9003, 9007)の原因**: attax の 180° kick 表が S2 と一致しない。
+
+- attax `KICKS_180_JLSTZ` = **6 候補**(例 0→2: `(0,0),(0,1),(1,1),(-1,1),(1,0),(-1,0)`)。
+- レフェリー `crates/core/src/kick.rs` の `JLSTZ_180_KICKS` = **5 候補**(`(0,0),(0,1),(1,1),(-1,1),(1,0)`)。
+- attax の 6 番目が S2 に無いため、attax の 6 候補がこの 6 番目を使う 180° 配置だと
+  レフェリーの movegen が none になり forfeit する(`detail: "none of the 6 candidates is reachable"`)。
+- `--tbp-supports-180 false` の 1 ゲームでは forfeit 0。**180° を許可したことが原因**で、強さの問題ではない。
+- 修正候補: attax の `KICKS_180_JLSTZ` / `KICKS_180_I` を **S2 の 5 候補**に合わせるパッチ
+  (正しさの修正。SRS+ の 6 番目は S2 ではない)。
+
+**制約**: `createBot` は S2-only フィールド(`b2bChain` / `garbageRows` / `dueThisLock` / `frame`)を
+`SearchInput` に写さない。surge の溜め・GSB・margin multiplier は attax の探索に効かない。
+レフェリーの採点は S2、attax の読みは guideline 相当。
+**完全な S2 attax(`tools/s2-lab/` 経由)との対戦は我々のハーネスでは不可能**で、
+「TBP 経由の S2 attax」が比較対象。主張もそこに限定する。
+
+エビデンス: `scripts/evidence/attax-s2-10/{REPORT.md,summary.json,summary.md,audit/,replays/,logs/}`。
