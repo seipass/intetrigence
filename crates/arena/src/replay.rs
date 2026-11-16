@@ -715,10 +715,14 @@ fn verify_result(
     } else if let Some(&loser) = over.first() {
         (Some(1 - loser as u8), "TopOut".to_string())
     } else if result.reason == "TopOut" {
-        // Stuck top-out (protocol v1.6 §7): the recorded loser has no legal
-        // placement even though the game is not block-out.
+        // Board-first top-out (spec v1.3.18 §2.3.1): the recorded loser's
+        // spawn cells are occupied, so the next spawn must fail. The older
+        // no-legal-move branch is kept for replays recorded before v1.3.18.
         match result.winner.map(|winner| 1 - winner as usize) {
-            Some(loser) if !engine.has_legal_move(loser, supports_180[loser]) => {
+            Some(loser)
+                if engine.spawn_blocked(loser)
+                    || !engine.has_legal_move(loser, supports_180[loser]) =>
+            {
                 (result.winner, "TopOut".to_string())
             }
             _ => (None, "TurnCap".to_string()),

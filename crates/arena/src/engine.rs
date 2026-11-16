@@ -661,6 +661,19 @@ impl Engine {
         false
     }
 
+    /// True when the next piece's spawn cells are occupied: the spawn must
+    /// fail, so the player has topped out (spec v1.3.18 §2.3.1). This is the
+    /// board-first check the referee runs before asking for a suggestion: an
+    /// external bot whose board is pushed above the spawn rows by garbage
+    /// exits, and that is a top-out, not a forfeit.
+    pub fn spawn_blocked(&mut self, slot: usize) -> bool {
+        let player = &mut self.players[slot];
+        let Some(kind) = player.game.preview(1).first().copied() else {
+            return false;
+        };
+        spawn_blocked_on(player.game.board(), kind)
+    }
+
     /// Applies one placement: hold, path replay, lock, scoring, cancellation,
     /// sending and insertion (`docs/s2-referee-protocol.md` §5).
     pub fn apply(
@@ -829,6 +842,16 @@ fn split_players(players: &mut [Player; 2], slot: usize) -> (&mut Player, &mut P
     }
 }
 
+/// True when `kind`'s spawn cells are occupied on `board`: the next spawn must
+/// fail, so the player has topped out (spec v1.3.18 §2.3.1).
+fn spawn_blocked_on(board: &Board, kind: PieceKind) -> bool {
+    let (box_x, box_y) = kind.spawn_position();
+    kind.cells(Rotation::Zero).iter().any(|&(cell_x, cell_y)| {
+        let (x, y) = (box_x + cell_x, box_y + cell_y);
+        x >= 0 && y >= 0 && board.occupied_at(x as usize, y as usize)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -841,6 +864,22 @@ mod tests {
         assert_eq!(Sheet::A.seat_of(1), 2);
         assert_eq!(Sheet::B.seat_of(0), 2);
         assert_eq!(Sheet::B.seat_of(1), 1);
+    }
+
+    #[test]
+    fn a_filled_spawn_area_is_a_top_out() {
+        // Spec v1.3.18 §2.3.1: the spawn cells (row 21, or 21-22 for O) are
+        // part of the board. If they are occupied the next spawn must fail.
+        let kinds = [PieceKind::I, PieceKind::O, PieceKind::T, PieceKind::L];
+        let mut board = Board::new();
+        for kind in kinds {
+            assert!(!spawn_blocked_on(&board, kind));
+        }
+        // Every piece's spawn cells include row 21.
+        board.set_row(21, Board::FULL_ROW);
+        for kind in kinds {
+            assert!(spawn_blocked_on(&board, kind));
+        }
     }
 
     #[test]
