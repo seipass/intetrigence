@@ -642,12 +642,14 @@ pub fn leaf_value(
     // never build a burst. Measured: the TurnCap game sent 373 lines against
     // the opponent's 715 at `attack/line` 0.53, with 53% of clears singles.
     //
-    // The floor is 0.0, not a small constant: scaling by a constant leaves the
-    // ratio between a single and a quad unchanged, so a floor of 0.2 moved
-    // nothing (measured: `attack/line` 1.135 -> 1.12, spin 8.6% -> 8.6%). With
-    // zero, a low stack carries no height preference at all and the attack
-    // terms decide; above `height 12` the penalty ramps back in.
-    let height_risk = ((features.max_height - 12.0) / 6.0).clamp(0.0, 1.0);
+    // The floor is 0.1, not 0.0: with zero the bot stops maintaining a low
+    // stack at all and dies to its own height. Measured with 0.0: 17W-3L and
+    // **all three losses had positive net damage** (+48, +7, +19), i.e. the
+    // opponent was out-damaged and the bot still topped out -- and the median
+    // think time went from ~30 ms to 72 ms because the taller board has more
+    // candidates. A floor of 0.2 was too high (TurnCap 1/20, `attack/line`
+    // 1.12); 0.1 is the middle.
+    let height_risk = ((features.max_height - 12.0) / 6.0).clamp(0.1, 1.0);
     let mut value = height_risk
         * (weights.max_height * features.max_height
             + weights.height_sq * features.height_sq
