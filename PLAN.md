@@ -1634,3 +1634,40 @@ scripts/tuning-smoke.sh:41         --tbp-retry-empty-ms 2000            // 明�
 **pin は `7b38f51` のまま維持**。理由: ①未検証 ②段階 3 は「attax に 48/50」で、相手が強くなるほど難しくなる ③未検証の相手に pin を移すと計測バグの事故が再発する。
 
 **attax-integration に検証を依頼**(S2 対応範囲、TBP I/F、パッチの必要性、差分)。
+
+## 40. 訂正: attax は S2 に完全対応している(2026-11-16)
+
+**私の判定が誤りでした。** 初版の `docs/attax-s2-review.md` は「部分実装(stage 1)」としていましたが、**自分でソースを読んで確認した結果、完全対応**でした。
+
+### 確認した事実(`1f41806`)
+
+`src/core/profile.ts` の `RULES_PROFILE_TABLE.s2`:
+
+```
+boardRows: 40, visibleRows: 20, deathHeight: 21,
+attackRules: "tetrio-s2", surge: true, comboInAttack: true,
+garbageSemantics: "materialized-carried", rotate180: true,
+spinEvidence: true, spinClassifier: "s2", dedupe: "s2", allowRootVeto: true
+```
+
+`src/core/rules.ts::awardLock` の攻撃表: full `[0,2,4,6,10,12]` / mini `[0,0,1,2,10,12]` / none `[0,0,1,2,4,5]` — **S2 と一致**。B2B flat +1、surge(`d>=5 → d-1`)、コンボ、PC +5、GSB +1、margin multiplier まで実装。
+
+### 誤読の原因
+
+1. **`TODO S2-SPEC Unpinned` を「未実装」と読んだ** — 実際は「TETR.IO が公開していない未確定値」の注記
+2. **`opener` の grep 一致を「機能なし」と読んだ** — 実際は `src/core/types.ts` の記録用フィールド
+3. **浅い grep で断定した** — `profile.ts` と `rules.ts` を読めば 5 分で分かった
+
+### 判断の変更
+
+**pin を `1f41806`(S2 版)に更新。段階 3 の相手は S2 対応 attax。**
+
+**これは段階 3 の意味を変える**: これまで attax は「S2 非対応の相手」で、我々の S2 実装が一方的に有利だった。**S2 attax は同じルールセットで戦う相手**なので、**初めての同条件対戦**になる。
+
+**attax の S2 profile は Sold Slear に 16.75%**(400 ゲーム)。**S2 の水準は guideline より遥かに高い。**
+
+### 残る接続作業(attax-integration)
+
+1. **TBP アダプタで S2 profile を選ばせる**(現状 `createBot({name:"attax"})` = guideline 固定)
+2. **posY のずれ**(`FIELD_ROWS - 21` が field40 rig の原点)
+3. **40 行視野パッチが不要になったか確認**(S2 profile は `boardRows: 40`)
