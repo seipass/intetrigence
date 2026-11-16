@@ -1861,3 +1861,46 @@ attax の S2 版は **標準 SRS 順**、我々は **SRS+ ミラー順**(S7 由�
 ### 180° は別件(修正済み)
 
 **core-engine の `79dfa77`(180° を 6 候補に)は正しい修正**。S7 の `kicks/data.ts` は各遷移に明示 5 個 + 暗黙の `(0,0)` = 6 個で、我々は「明示 5 個」を「合計 5 個」と読み違えていた。**ただしこの forfeit は直らない**(90° は別テーブル)。
+
+## 45. s2-bot-lab 対応(2026-11-16)
+
+### なぜ必要だったか
+
+**`souta-lab/attax` の issue #1**:
+
+> こっちは s2-bot-lab 形式に対応したのに、まだこちらの tbp を s2 に変換するとかいう無駄なことをして**ハンデを背負った状態で負けてる**。s2-bot-lab 対応しろ
+
+**TBP が運ばないのはまさに S2 の状態**: `chain.b2b` の正確な値、`incoming.pendingRows` / `dueThisLockRows`、`lockTime.logicalFrame`、ゴミセルの位置。attax はこれで surge の溜め・GSB・margin multiplier を計算するので、**TBP では S2 探索が guideline 相当に退化**していた。
+
+**したがって「TBP 経由の S2 attax」は相手にハンデを負わせた比較であり、1-7 は attax の実力ではない。**
+
+### 実装
+
+| ファイル | 役割 |
+|---|---|
+| `crates/arena/src/bin/s2lab_bridge.rs` | 決定 JSON 1 行 → 配置 JSON 1 行。1 プロセスで 1 試合 |
+| `adapters/s2lab/intetrigence-decider.mjs` | lab の `decide(decision)` 形に合わせる |
+| `adapters/s2lab/run-match.mjs` | 試合ループ(attax の `tools/s2-lab/run-match.mjs` を改変、AGPL-3.0) |
+| `adapters/s2lab/README.md` | 実行方法と制約 |
+
+**lab の `PublicDecision`**: `board.cells`(400 文字、row 0 = 最下段)、`pieces{current, known, hold, holdAvailable}`、`chain{combo, b2b}`(**b2b は数値**)、`incoming{pendingRows, dueThisLockRows}`、`lockTime.logicalFrame`。
+
+**座標**: lab の `y` は**我々と同じく最下段が 0**。ピース原点が違うので、**配置の同定は占有セル集合で行う**(`(kind, rotation, x, y)` では一致しない)。
+
+### 最初の測定(seeds 9001–9005 × 両シート)
+
+| seed | 勝者 | locks | 我々 attack | attax attack |
+|---|---|---|---|---|
+| 9001 | attax | 105 | 82 | 94 |
+| 9002 | attax | 139 | 103 | 124 |
+| 9003 | attax | 98 | 63 | 81 |
+| **9004** | **intetrigence** | 276 | **281** | 274 |
+| 9005 | attax | 287 | 229 | 277 |
+
+**2 勝 3 敗。** ただし **lab は席対称で決定的**なので、`--seat-offset 0` と `1` は**完全に同一のゲーム**。**10 レコード = 5 ゲーム**。README に明記。
+
+### 分かったこと
+
+**TBP 経由(1-7)と lab(2-8)でほぼ同じ。** **ハンデは主因ではなかった。** 5 ゲーム中 4 ゲームで attax の attack が上。**我々は単純に攻撃量で負けている。**
+
+**ただし前進**: attax の作者が要求した条件で測れるようになり、**以後の改善を正しい土台で評価できる**。lab は 1 ゲーム 20〜30 秒なので、TBP(CC2 サブプロセス)より**速い調整環境**でもある。
