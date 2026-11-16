@@ -278,6 +278,35 @@ fn i_180_kick_against_block() {
 }
 
 #[test]
+fn t_180_sixth_kick() {
+    // Block the first five 0->2 candidates; the 6th (-1, 0) is free.
+    let mut board = Board::new();
+    board.set_cell(4, 20, Cell::Block);
+    board.set_cell(3, 22, Cell::Block);
+    board.set_cell(5, 22, Cell::Block);
+    board.set_cell(6, 21, Cell::Block);
+
+    let active = ActivePiece {
+        kind: PieceKind::T,
+        rotation: Rotation::Zero,
+        x: 3,
+        y: 20,
+    };
+    let mut game = game_at(board, active);
+
+    assert!(game.rotate(RotateDirection::Half));
+    assert_eq!(
+        game.active(),
+        Some(ActivePiece {
+            kind: PieceKind::T,
+            rotation: Rotation::Two,
+            x: 2,
+            y: 20,
+        })
+    );
+}
+
+#[test]
 fn o_rotation_is_identity() {
     let active = ActivePiece {
         kind: PieceKind::O,
@@ -354,19 +383,19 @@ fn srs_plus_tables_are_exposed_verbatim() {
 fn jlstz_180_tables_are_exposed_verbatim() {
     assert_eq!(
         kicks(PieceKind::T, Rotation::Zero, Rotation::Two),
-        &[(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0)]
+        &[(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0), (-1, 0)]
     );
     assert_eq!(
         kicks(PieceKind::T, Rotation::Two, Rotation::Zero),
-        &[(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0)]
+        &[(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0), (1, 0)]
     );
     assert_eq!(
         kicks(PieceKind::T, Rotation::R, Rotation::L),
-        &[(0, 0), (1, 0), (1, 2), (1, 1), (0, 2)]
+        &[(0, 0), (1, 0), (1, 2), (1, 1), (0, 2), (0, 1)]
     );
     assert_eq!(
         kicks(PieceKind::T, Rotation::L, Rotation::R),
-        &[(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2)]
+        &[(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2), (0, 1)]
     );
 }
 

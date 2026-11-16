@@ -5,7 +5,7 @@
 //!
 //! `docs/s2-spec.md` §3.1 (SRS+) and §3.2 (180°), v1. J/L/S/T/Z use the
 //! standard SRS 90° table; I uses the SRS+ table (mirrored I kicks). 180° uses
-//! the S2 table: five candidates for J/L/S/T/Z/O and two for I.
+//! the S2 table: six candidates for J/L/S/T/Z/O and two for I.
 //!
 //! The SRS+ I **test order** is marked [単一実装] (U1) in the spec. The offset
 //! sets are fixed, but if U1 resolves differently, change only [`I_KICKS`].
@@ -71,17 +71,21 @@ pub const I_KICKS: [[Kick; 5]; 8] = [
 
 /// S2 180-degree kicks for J, L, S, T, Z and O.
 ///
+/// Six candidates per transition. The 6th entry is the final TETR.IO
+/// priority level (Hard Drop wiki; S7 `kicks["SRS+"].kicks["02"/"20"/"13"/"31"]`
+/// has five explicit entries after the implicit `(0,0)`).
+///
 /// Index order: `0->2`, `2->0`, `R->L`, `L->R`. O uses this general table for
 /// 180s because O has no dedicated 180 table in the spec.
-pub const JLSTZ_180_KICKS: [[Kick; 5]; 4] = [
+pub const JLSTZ_180_KICKS: [[Kick; 6]; 4] = [
     // 0 -> 2
-    [(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0)],
+    [(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0), (-1, 0)],
     // 2 -> 0
-    [(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0)],
+    [(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0), (1, 0)],
     // R -> L
-    [(0, 0), (1, 0), (1, 2), (1, 1), (0, 2)],
+    [(0, 0), (1, 0), (1, 2), (1, 1), (0, 2), (0, 1)],
     // L -> R
-    [(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2)],
+    [(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2), (0, 1)],
 ];
 
 /// S2 180-degree kicks for I (two candidates per transition).
@@ -228,19 +232,19 @@ mod tests {
     fn jlstz_180_table_matches_spec() {
         assert_eq!(
             kicks(PieceKind::T, Rotation::Zero, Rotation::Two),
-            &[(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0)]
+            &[(0, 0), (0, 1), (1, 1), (-1, 1), (1, 0), (-1, 0)]
         );
         assert_eq!(
             kicks(PieceKind::T, Rotation::Two, Rotation::Zero),
-            &[(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0)]
+            &[(0, 0), (0, -1), (-1, -1), (1, -1), (-1, 0), (1, 0)]
         );
         assert_eq!(
             kicks(PieceKind::T, Rotation::R, Rotation::L),
-            &[(0, 0), (1, 0), (1, 2), (1, 1), (0, 2)]
+            &[(0, 0), (1, 0), (1, 2), (1, 1), (0, 2), (0, 1)]
         );
         assert_eq!(
             kicks(PieceKind::T, Rotation::L, Rotation::R),
-            &[(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2)]
+            &[(0, 0), (-1, 0), (-1, 2), (-1, 1), (0, 2), (0, 1)]
         );
     }
 
