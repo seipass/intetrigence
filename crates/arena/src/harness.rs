@@ -234,6 +234,15 @@ pub fn apply_weight_overrides(
             "surge_exponent" => weights.surge_exponent = number(value)?,
             "surge_hold_penalty" => weights.surge_hold_penalty = number(value)?,
             "survival_line" => weights.survival_line = number(value)?,
+            "danger_height" => weights.danger_height = number(value)?,
+            "quad_ready" => weights.quad_ready = number(value)?,
+            "defense" => weights.defense = number(value)?,
+            "opener_clear" => weights.opener_clear = number(value)?,
+            "combo_state" => weights.combo_state = number(value)?,
+            "combo_potential" => weights.combo_potential = number(value)?,
+            "race" => weights.race = number(value)?,
+            "tsd_bonus" => weights.tsd_bonus = number(value)?,
+            "mini_penalty" => weights.mini_penalty = number(value)?,
             "survival" => {
                 weights.survival = match value.as_str() {
                     "1" | "true" | "yes" => true,
