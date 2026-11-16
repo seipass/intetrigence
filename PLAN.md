@@ -1296,3 +1296,68 @@ CC2 の応答:
 **`risk=0.2` は 19-0-1 だが TurnCap 1、`risk=0` は TurnCap 0 だが 17-3-0 + 崩壊 1 + `over100` 13。** どちらもゲート不通過。
 
 **必要なのは「TurnCap 0 かつ負け 0 かつ崩壊 0 かつ `over100` 0」。** 現状は 4 条件のうち 2 つしか同時に満たせていない。
+
+## 32. 既定値が危険側だった: シート B の P0 の真因(2026-11-16)
+
+### 原因
+
+```
+crates/arena/src/bin/arena.rs:81   let mut tbp_retry_empty_ms = 0u64;   // 既定 0
+scripts/tuning-smoke.sh:41         --tbp-retry-empty-ms 2000            // 明示的に渡している
+```
+
+**`tuning-smoke.sh` は渡しているが、`arena match` を直接叩くと既定 0 で `TbpAgent::begin_round` の probe が無効**になる。**シート B(相手が先手)では `start` の処理前に `suggest` が届き、CC2 が `moves: []` / `nodes: 0` を返して turn 1 で forfeit。**
+
+**修正**: `tbp_retry_empty_ms` の既定を **2000** に。`0` は明示的な opt-in。
+
+**教訓**: **「既定値が危険側」というバグの種類**。`supports_180`(既定 `true`、仕様は `false`)も同じ種類。
+
+### 決定論の切り分け(harness-dev、確定)
+
+同一 seed・同一ビルドで 2 回実行し、`placements` を slot 別に比較:
+
+- **turn 0: 両 slot 完全一致**
+- **turn 1, slot 1(CC2): 最初の分岐**(T が `x=7` vs `x=5`)
+- **slot 0(intetrigence)は完全一致**
+
+**我々の手は局面列の純関数。CC2 は別プロセスで独自の時間予算を持つため非決定。**
+
+**protocol の主張を「自手の決定性」に限定**(v1.54)。`verify_replay` は記録された手から再シミュレーションするので**相手の決定性に依存せず**、監査可能性は保たれる。
+
+### 監査の穴の修正(harness-dev)
+
+`crates/arena/build.rs` が `crates/bot` + `crates/core` + `crates/arena` の `.rs` を FNV-1a でハッシュ → `ARENA_BUILD_ID`。replay header / audit / `summary.json` に `build_id` と `binary`(パス・サイズ・mtime)を記録。**`--resume` は bot 名と build id の両方を比較。**
+
+**「git HEAD はソースの状態しか表さず、バイナリがそのソースでビルドされたかを保証しない」**という指摘が正しかった。**stale binary が「最新コミットの結果」として記録される穴**が塞がれた。
+
+### `risk=0.1` の測定(シート A のみ、10 ゲーム)
+
+| 指標 | 値 |
+|---|---|
+| 勝敗 | **8 勝 2 敗** |
+| TurnCap | **0** |
+| `a/line` | 1.11 |
+| `spin` | 9.1% |
+| `net<0` | 2 |
+| **崩壊** | **2** |
+| `over100` | 3(max 115.7) |
+| `think_median` | **34.9**(高さは管理できている) |
+
+**`risk=0.1` は高さ管理が良好で TurnCap 0 だが、崩壊 2 と負け 2。** `risk=0.2`(19-0-1、崩壊 0、`think_median` ~30)の方が安定。
+
+### 公平性監査(core-engine が要約)
+
+`docs/fairness-audit.md`(633 行)。**ゲームルールではなく情報 I/F・思考時間・監査メタデータの 3 層に不公平がある。**
+
+| # | 重要度 | 内容 |
+|---|---|---|
+| **F1** | **高** | **情報非対称**: intetrigence だけが `pending_garbage` / `arrived_garbage` / 正確な `b2b_streak` / `sent_total` / `received_total` を受け取る。TBP は `back_to_back` bool のみ |
+| **F2** | 高 | CC2/clys だけ空候補を最大 2 秒リトライ |
+| **F3** | 高 | `supports_180` の既定が `true`、仕様は `false` |
+| **F4** | 中〜高 | intetrigence 8 threads / 外部ボットは実質 1 thread。threads / suggest_delay / retry が記録されない |
+| F5/F6 | 中 | replay header の版が古い、slot 1 を常に attax と記録、TurnCap を draw と表示、パッチ SHA 欠落 |
+| F7 | 中 | Clutch 時に active 位置がズレる(TBP `start` に active が無い) |
+| F8/F9 | 中 | `--seeds` override の抜け道、`forfeit-other` とゲートの矛盾 |
+| F10-F13 | 低 | RNG の位相違い、文書の誤り |
+
+**core のルールは両者同一で、不公平な分岐は無い。** F1〜F9 は harness/arena 側。
