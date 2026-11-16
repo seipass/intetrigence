@@ -5,6 +5,11 @@
 - **目的**: 「S2 基準で Intetrigence 以外が公式に対応していない」以外に、**対戦基盤そのものが作っている不公平**がないかを調べる。
 - **方法**: コード監査、仕様・プロトコルとの突き合わせ、既存 evidence の再読、`cargo test --workspace`、CC2 sheet B の 1 ゲーム再実行。
 
+> **改訂（manager 決定、2026-11-16）**: F1 は「Intetrigence が情報優位」ではなく
+> 「TBP が運ばない情報を我々の View は持つ」と記述する。View を TBP 相当に制限する
+> 実装は採用しない。主張は「TBP 経由で接続した CC2/clys/attax に 50-0」に限定し、
+> 「フル強度の CC2 に 50-0」とは主張しない。**事実（非対称の存在）は削除しない。**
+
 ---
 
 ## 0. 結論
@@ -14,10 +19,10 @@
 | 層 | 状態 | 主な問題 |
 |---|---|---|
 | **コアルール** | **ほぼ公平** | 攻撃表・採点・B2B・surge・opener・ゴミ・トップアウトは両者に同一。TurnCap の攻撃量勝ち、forfeit 勝ち、Stuck の TopOut 扱いは修正済み |
-| **情報インターフェース** | **不公平** | Intetrigence だけが `pending_garbage` / `arrived_garbage` / 正確な `b2b_streak` / `sent_total` / `received_total` を受け取る。TBP の外部ボットにはこれらのフィールドが無い |
+| **情報インターフェース** | **非対称** | TBP が運ばない情報（`pending_garbage` / `arrived_garbage` / 正確な `b2b_streak` / `sent_total` / `received_total`）を我々の View は持つ。外部ボットは TBP の制約で持てない |
 | **思考時間・能力設定・監査** | **不公平または不透明** | CC2/clys だけ空候補のリトライと 100 ms の遅延を与えられている。`supports_180` の既定値が仕様と逆。リプレイの rules/protocol 版・相手名・能力フラグ・パッチ SHA が不正確または欠落 |
 
-**最重要の指摘**は **F1（情報非対称）** である。これは「相手が S2 を知らない」という相手側の制約ではなく、**プラットフォームが Intetrigence にだけ S2 の防御・surge に必要な状態を渡している**という、こちら側の設計問題である。
+**最重要の指摘**は **F1（情報非対称）** である。ただしこれは「Intetrigence が情報優位」という主張ではない。**TBP が運ばない情報（自分のゴミキュー・正確な B2B streak 等）を我々の View は持っている**。TETR.IO の実プレイヤーも自分のゴミキューを見られるため、**我々の方が現実に近く、外部ボットが TBP の制約で不利**という構造である。主張は「TBP 経由で接続した CC2/clys/attax に 50-0」に限定し、「フル強度の CC2 に 50-0」とは主張しない。
 
 ---
 
@@ -25,7 +30,7 @@
 
 | # | 分類 | 重大度 | 一言 |
 |---|---|---|---|
-| **F1** | 情報 | **高** | Intetrigence だけが受信ゴミ（到着前・到着済み）と正確な B2B streak を見る。外部ボットは見ない |
+| **F1** | 情報 | **高** | TBP が運ばない情報（受信ゴミ・正確な B2B streak 等）を我々の View は持つ。外部ボットは TBP の制約で持てない |
 | **F2** | 思考時間 | **高** | CC2/clys だけ空候補を最大 2 秒リトライする。プロトコルは「1 設置 1 suggest、リトライ禁止」と明記 |
 | **F3** | 能力設定 | **高** | CC2/clys の `supports_180` 既定値が `true`。仕様は `false`。forfeit 分類と verify に影響 |
 | **F4** | 計算資源 | **中〜高** | Intetrigence は 8 threads / 100 ms。外部ボットの thread 数・suggest delay・retry はレポートに記録されない |
@@ -89,7 +94,9 @@
 
 ## 3. 不公平・不整合の詳細
 
-### F1. 情報非対称 — Intetrigence だけが S2 の防御・surge 状態を受け取る（高）
+### F1. TBP が運ばない情報を我々の View は持つ（高）
+
+> **主張の限定（manager 決定）**: 本項は「Intetrigence が情報優位」という主張ではない。TETR.IO の実プレイヤーは自分のゴミキューを見られる。TBP はそれを運ばないため、外部ボットがハーネス制約で不利なのである。我々の View は現実に近い。**主張は「TBP 経由で接続した CC2/clys/attax に 50-0」に限定し、「フル強度の CC2 に 50-0」とは主張しない。** View を TBP 相当に制限する実装は採用しない（manager 決定）。
 
 #### 事実
 
@@ -126,17 +133,17 @@ Intetrigence 側はこの情報を**実際に使っている**。
 - **surge**: S2 の surge は「B2B streak が 4 以上で charge、5 以上で break 時に放出、量は `N_before - 1`」。bool だけでは**いつ・どれだけ放出するか**を計画できない。Intetrigence は正確な streak で探索できる。
 - **レース**: `sent_total - received_total` を評価に入れられる。外部ボットは正確な累計を持たない。
 
-特に **sheet B（Intetrigence が seat 2）** では、seat 1 の攻撃が同じ turn のうちに `pending_garbage` として見える。Intetrigence はそれを見て相殺する手を選べるが、外部ボットは見えない。プロトコルは「seat 2 がわずかに有利」とだけ書いている（`docs/s2-referee-protocol.md:280`）が、**Intetrigence だけがその有利を情報として使える**。シート入れ替えは seat の有利を相殺するが、この情報有利は相殺しない。
+特に **sheet B（Intetrigence が seat 2）** では、seat 1 の攻撃が同じ turn のうちに `pending_garbage` として見える。Intetrigence はそれを見て相殺する手を選べるが、外部ボットは見えない。プロトコルは「seat 2 がわずかに有利」とだけ書いている（`docs/s2-referee-protocol.md:280`）が、**我々の View はその情報を持つが、外部ボットは TBP の制約で持たない**。シート入れ替えは seat の有利を相殺するが、この情報の非対称は相殺しない。
 
 #### 判定
 
-**プラットフォーム起因の不公平。** 「相手が S2 を知らない」こととは別で、**S2 を知っていても TBP では受け取れない状態**を Intetrigence だけが受け取っている。
+**TBP の情報制約。** 「相手が S2 を知らない」こととは別で、**S2 を知っていても TBP では受け取れない状態**を我々の View は持っている。TETR.IO の実プレイヤーは自分のゴミキューを見られるので、我々の方が現実に近い。ただし対戦条件としては非対称であり、主張は TBP 経由の相手に限定する。
 
 #### 修正案
 
-1. **TBP を拡張**して `start` に `pending_garbage` / `arrived_garbage` / `b2b_streak` / `multiplier` / `pieces_placed` / `sent_total` / `received_total` を追加する（外部ボットが無視しても、少なくとも仕様としては同等）。
-2. または、**公式マッチでは Intetrigence の `View` を TBP 相当に制限**する（`pending_garbage` / `arrived_garbage` / 正確な `b2b_streak` / `sent_total` / `received_total` を渡さない）。強さは落ちるが、情報条件は揃う。
-3. どちらを選ぶかをプロトコルに明記し、レポートに「情報条件は同等か、非対称か」を書く。
+1. **TBP を拡張**して `start` に `pending_garbage` / `arrived_garbage` / `b2b_streak` / `multiplier` / `pieces_placed` / `sent_total` / `received_total` を追加する（将来の選択肢。現行の主張には必須ではない）。
+2. **採用しない（manager 決定）**: 公式マッチで Intetrigence の `View` を TBP 相当に制限する。現実のプレイヤーは情報を持つため、制限すると「ハーネス制約で負けた」という別の交絡が生まれる。
+3. **採用（manager 決定）**: 開示と主張の限定。README / protocol / round report に「TBP が運ばない情報を我々は持つ」「TBP 経由の相手に 50-0」「フル強度の CC2 に 50-0 ではない」を明記する。
 
 ---
 
@@ -497,13 +504,13 @@ let garbage_seed_1 = base.next_u32();   // a^2 * seed
 
 ---
 
-### F11. スピン最大ラベルの説明が逆（低）
+### F11. スピン最大ラベルの説明が逆（低・修正済み）
 
 #### 事実
 
 レフェリーはセル集合ごとに**到達可能な経路の最大スピン**を採る（`crates/arena/src/movegen.rs` の `unique_by_cells`、`docs/s2-referee-protocol.md` §4.2.1）。`claimed_spin` は監査用で、採点には使わない（`crates/arena/src/engine.rs::apply`）。
 
-`docs/arena.md:139-140` は「Intetrigence は spin を回転終端の入力列で裏付けるので、寛容さの恩恵を受けるのはセルだけを提出する attax 側で、我々には保守的」と書く。しかし**レフェリーは Intetrigence の claimed spin も使わず、同じ最大スピン規則を適用する**。Intetrigence の cells がスピン経路で到達可能なら、同じようにスピンとして採点される。実際、既存 evidence では Intetrigence の spin mismatch は 0、attax/CC2 は `none → mini` の不一致が出ている（例: `scripts/evidence/cc2m-det8w96/summary.md` の CC2 94/5585）。これは「Intetrigence が保守的」ではなく「CC2/attax の movegen がスピンを過小申告している」という違い。
+旧 `docs/arena.md:139-140` は「Intetrigence は spin を回転終端の入力列で裏付けるので、寛容さの恩恵を受けるのはセルだけを提出する attax 側で、我々には保守的」と書いていた（**現在は修正済み**）。実際は**レフェリーは Intetrigence の claimed spin も使わず、同じ最大スピン規則を適用する**。Intetrigence の cells がスピン経路で到達可能なら、同じようにスピンとして採点される。既存 evidence では Intetrigence の spin mismatch は 0、attax/CC2 は `none → mini` の不一致が出ている（例: `scripts/evidence/cc2m-det8w96/summary.md` の CC2 94/5585）。これは「Intetrigence が保守的」ではなく「CC2/attax の movegen がスピンを過小申告している」という違い。
 
 #### 影響
 
@@ -511,27 +518,27 @@ let garbage_seed_1 = base.next_u32();   // a^2 * seed
 
 #### 判定
 
-**文書の誤り。** 規則自体は両者同一で公平。
+**文書の誤り（修正済み）。** 規則自体は両者同一で公平。
 
-#### 修正案
+#### 修正案（実施済み）
 
-- `docs/arena.md` の「我々には保守的」を削除し、「レフェリーは両者に同じ最大スピン規則を適用する。セルだけを提出するボットは、自分の movegen がスピンを過小評価していると余分に得をする」と書き直す。
+- `docs/arena.md` の「我々には保守的」を削除し、「レフェリーは両者に同じ最大スピン規則を適用する。セルだけを提出するボットは、自分の movegen がスピンを過小評価していると余分に得をする」と書き直した。
 
 ---
 
-### F12. 文書の旧規則・旧実装状態が残っている（低）
+### F12. 文書の旧規則・旧実装状態が残っている（低・主要項目は修正済み）
 
 #### 事実
 
-- `docs/arena.md:72`: 「§6.3 turn cap | 受信ゴミ少 → 送信多 → 引き分け」— **削除済みの旧規則**。現在は `winner = None`。
-- `docs/s2-rule-audit.md:18, 31, 144`: 「`End::Forfeit` は `winner = Some`」「実装は未追随」— 現在は `None`。
-- `docs/s2-referee-protocol.md:23`: 「forfeit を勝ちとして数え、内訳を出す」— 現在は no-contest。
-- `docs/s2-referee-protocol.md:983, 1034`: 「勝ちに数えるのは `TopOut` と `TurnCap` だけ」— 現在は TurnCap も数えない。
-- `README.md:112`: CC2 パッチを「視野・spawn のみ」と要約 — 実際は空 hold も変更。
-- `docs/attax-integration.md:106`: `attax-40-row.patch` — 実際のファイル名は `attax-vision-40.patch`。
-- `docs/cc2-integration.md:65`: `cc2-tbp-empty-hold.patch` — 実際は `cc2-tbp-compat.patch`。
-- `docs/clys-integration.md:68`: `C:UsersHasilanProjects...` — パス区切りが欠落。
-- `docs/s2-referee-protocol.md` v1.23 の履歴: 「attax は 40 行視野、視野拡張パッチは不要」— 現在の §7.3.1 と矛盾。
+- `docs/arena.md:72`: 「§6.3 turn cap | 受信ゴミ少 → 送信多 → 引き分け」— **修正済み**。現在は `winner = None`。
+- `docs/s2-rule-audit.md:18, 31, 144`: 「`End::Forfeit` は `winner = Some`」「実装は未追随」— **修正済み**。現在は `None` / 実装追随済み。
+- `docs/s2-referee-protocol.md:23`: 「forfeit を勝ちとして数え、内訳を出す」— **修正済み**。現在は no-contest。
+- `docs/s2-referee-protocol.md:983, 1034`: 「勝ちに数えるのは `TopOut` と `TurnCap` だけ」— **修正済み**。現在は `TopOut` だけ。
+- `README.md:112`: CC2 パッチを「視野・spawn のみ」と要約 — **担当外（manager）**。実際は空 hold も変更。
+- `docs/attax-integration.md:106`: `attax-40-row.patch` — **担当外（attax-integration）**。実際のファイル名は `attax-vision-40.patch`。
+- `docs/cc2-integration.md:65`: `cc2-tbp-empty-hold.patch` — **担当外（attax-integration）**。実際は `cc2-tbp-compat.patch`。
+- `docs/clys-integration.md:68`: `C:UsersHasilanProjects...` — **担当外（attax-integration）**。パス区切りが欠落。
+- `docs/s2-referee-protocol.md` v1.23 の履歴: 「attax は 40 行視野、視野拡張パッチは不要」— **担当外（spec lead）**。現在の §7.3.1 と矛盾。
 
 #### 影響
 
@@ -539,15 +546,14 @@ let garbage_seed_1 = base.next_u32();   // a^2 * seed
 
 #### 判定
 
-**文書バグ。** コードは修正済みだが、文書が追いついていない。
+**文書バグ。** コードは修正済み。主要な旧 TurnCap・スピン説明は本監査で修正済み。残りは各担当（manager / attax-integration / spec lead）の領域。
 
 #### 修正案
 
-- `docs/arena.md` の旧 TurnCap 行を現在の `winner = None` に直す。
-- `docs/s2-rule-audit.md` の結論に「v1.2 の決定は実装済み。現在の状態はコードを参照」と追記する。
-- プロトコルの TOC / §7.1.3 の「TurnCap を勝ちに数える」を削除する。
-- README の CC2 パッチ要約を直す。パッチファイル名・パスを直す。
-- v1.23 の履歴に「後に §7.3.1 で訂正」と注記する。
+- `docs/arena.md` の旧 TurnCap 行とスピン説明: **修正済み**。
+- `docs/s2-rule-audit.md` の実装追随: **修正済み**。
+- プロトコルの TOC / §7.1.3 の「TurnCap を勝ちに数える」: **修正済み**。
+- README の CC2 パッチ要約、パッチファイル名・パス、v1.23 の履歴: **各担当に依頼**。
 
 ---
 
@@ -608,7 +614,7 @@ let garbage_seed_1 = base.next_u32();   // a^2 * seed
 
 ## 5. 推奨修正（優先順）
 
-1. **F1（情報非対称）**: TBP を拡張するか、公式マッチで Intetrigence の `View` を TBP 相当に制限する。どちらかをプロトコルに明記する。
+1. **F1（TBP の情報制約）**: View は制限しない（manager 決定）。TBP が運ばない情報を我々が持つ構造を README / protocol / round report で開示し、主張を TBP 経由の相手に限定する。TBP 拡張は将来の選択肢。
 2. **F2（リトライ）**: 公式ラウンドではリトライを禁止し、warm-up を全ボット共通にする。残すなら全ボット同一ポリシー + レポート記録。
 3. **F3（supports_180）**: CC2/clys の既定を `false` にし、仕様との一致テストを追加する。
 4. **F4（思考時間）**: 相手の `threads` / `suggest_delay_ms` / `retry_empty_suggest_ms` / `deterministic` を `BotRecord` / `StageReport` / `summary` に記録する。
@@ -626,8 +632,8 @@ let garbage_seed_1 = base.next_u32();   // a^2 * seed
 **「S2 基準で Intetrigence 以外が公式に対応していない」以外の不公平は、ある。**
 
 - **コアルールは公平**。攻撃表・採点・B2B・surge・opener・ゴミ・トップアウトは両者に同じ。TurnCap の攻撃量勝ち、forfeit 勝ち、Stuck の TopOut 扱いは修正済み。
-- **情報インターフェースは不公平**。Intetrigence だけが受信ゴミ（到着前・到着済み）と正確な B2B streak を受け取る。外部ボットは TBP の `back_to_back` bool しか持たない。これは「相手が S2 を知らない」こととは別の、**プラットフォーム側の非対称**。
+- **情報インターフェースは非対称**。TBP が運ばない情報（受信ゴミ・正確な B2B streak 等）を我々の View は持つ。外部ボットは TBP の `back_to_back` bool しか持たない。TETR.IO の実プレイヤーは自分のゴミキューを見られるので、我々の方が現実に近い。**主張は TBP 経由の相手に限定する。**
 - **思考時間・能力設定は不公平または不透明**。CC2/clys だけ空候補リトライと 100 ms 遅延。`supports_180` の既定が仕様と逆。相手の threads / delay / retry はレポートに残らない。
 - **監査メタデータは不正確**。rules/protocol 版が古く、slot 1 を常に `attax` と書き、TurnCap を `draw` と表示する。これでは公平性を検証できない。
 
-したがって、**「不公平は S2 非対応の相手側の制約だけ」という主張は、現状のコードと文書では支持できない**。コアルールの公平性は高いが、情報条件と監査条件を揃えるか、少なくとも非対称を明示する必要がある。
+したがって、**「不公平は S2 非対応の相手側の制約だけ」という主張は、現状のコードと文書では支持できない**。コアルールの公平性は高いが、情報条件と監査条件の非対称を明示し、主張を限定する必要がある（manager 決定: View は制限せず、開示と主張限定で対応）。

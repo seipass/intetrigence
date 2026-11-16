@@ -24,7 +24,8 @@ fn deterministic_schedule_cost() {
         "{:<18} {:>6} {:>8} {:>8} {:>8} {:>7}",
         "schedule", "moves", "median", "p99", "max", "over100"
     );
-    for (depth, width) in [(8usize, 96usize), (6, 96)] {
+    {
+        let (depth, width) = (8usize, 96usize);
         let config = SearchConfig {
             deterministic: true,
             depth,

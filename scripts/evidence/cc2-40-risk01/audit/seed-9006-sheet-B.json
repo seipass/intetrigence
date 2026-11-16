@@ -1,0 +1,772 @@
+{
+  "seed": 9006,
+  "sheet": "B",
+  "started_at": "unix:1794816082",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "forfeit_slot": null,
+  "turns": 35,
+  "surge_released": [
+    0,
+    0
+  ],
+  "max_b2b_streak": [
+    2,
+    3
+  ],
+  "turns_with_b2b_ge_4": [
+    0,
+    0
+  ],
+  "totals": [
+    {
+      "sent_total": 30,
+      "received_total": 13,
+      "attack_total": 32,
+      "pieces_placed": 34,
+      "lines_cleared": 24
+    },
+    {
+      "sent_total": 15,
+      "received_total": 22,
+      "attack_total": 23,
+      "pieces_placed": 35,
+      "lines_cleared": 13
+    }
+  ],
+  "heights": [
+    {
+      "max": 14,
+      "mean": 5.17,
+      "final_height": 2
+    },
+    {
+      "max": 20,
+      "mean": 7.77,
+      "final_height": 20
+    }
+  ],
+  "think": [
+    {
+      "count": 34,
+      "median_ms": 66.359,
+      "p95_ms": 71.802,
+      "p99_ms": 72.077,
+      "max_ms": 72.077,
+      "mean_ms": 65.943,
+      "over_budget": 0,
+      "over_100ms": 0
+    },
+    {
+      "count": 35,
+      "median_ms": 0.099,
+      "p95_ms": 0.138,
+      "p99_ms": 1.688,
+      "max_ms": 1.688,
+      "mean_ms": 0.146,
+      "over_budget": 0,
+      "over_100ms": 0
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 34,
+      "accepted_first": 34,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 35,
+      "accepted_first": 35,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 34,
+      "spin_checked": 34,
+      "spin_matches": 34,
+      "spin_mismatches": 0,
+      "attack_checked": 34,
+      "attack_matches": 34,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 32,
+      "recomputed_total": 32,
+      "examples": []
+    },
+    {
+      "placements": 35,
+      "spin_checked": 35,
+      "spin_matches": 34,
+      "spin_mismatches": 1,
+      "attack_checked": 35,
+      "attack_matches": 35,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 23,
+      "recomputed_total": 23,
+      "examples": [
+        {
+          "turn": 3,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 11986258643656461723,
+      "turn": 16
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2436944787605570393,
+      "turn": 17
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12175592292263146294,
+      "turn": 18
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 18433152695947327330,
+      "turn": 32
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 7591613901856889650,
+      "turn": 33
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "a155876",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40,
+      "supports_180": true
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40,
+      "supports_180": true
+    }
+  ],
+  "replay": "replays/seed-9006-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9006,
+    "sheet": "B",
+    "turns": 35,
+    "placements": 69,
+    "mismatches": [],
+    "forfeit_cause": null,
+    "burst": [
+      {
+        "max_burst_1": 5,
+        "max_burst_5": 10,
+        "burst_over_capacity": 0
+      },
+      {
+        "max_burst_1": 8,
+        "max_burst_5": 18,
+        "burst_over_capacity": 6
+      }
+    ]
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 21151,
+  "search": [
+    [
+      {
+        "turn": 0,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 1,
+        "depth": 8,
+        "width": 96,
+        "nodes": 623,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 2,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 3,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 4,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 5,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 6,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 7,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 8,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 9,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 10,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 11,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 12,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 13,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 14,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 15,
+        "depth": 7,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 16,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 17,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 18,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 19,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 20,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 21,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 22,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 23,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 24,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 25,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 26,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 27,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 28,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 29,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 30,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 31,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 32,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 33,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      }
+    ],
+    [
+      {
+        "turn": 0,
+        "depth": null,
+        "width": null,
+        "nodes": 9081,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 1,
+        "depth": null,
+        "width": null,
+        "nodes": 104233,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 2,
+        "depth": null,
+        "width": null,
+        "nodes": 99375,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 3,
+        "depth": null,
+        "width": null,
+        "nodes": 99751,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 4,
+        "depth": null,
+        "width": null,
+        "nodes": 84591,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 5,
+        "depth": null,
+        "width": null,
+        "nodes": 79569,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 6,
+        "depth": null,
+        "width": null,
+        "nodes": 81376,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 7,
+        "depth": null,
+        "width": null,
+        "nodes": 62360,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 8,
+        "depth": null,
+        "width": null,
+        "nodes": 75738,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 9,
+        "depth": null,
+        "width": null,
+        "nodes": 77308,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 10,
+        "depth": null,
+        "width": null,
+        "nodes": 77673,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 11,
+        "depth": null,
+        "width": null,
+        "nodes": 70668,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 12,
+        "depth": null,
+        "width": null,
+        "nodes": 76487,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 13,
+        "depth": null,
+        "width": null,
+        "nodes": 85626,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 14,
+        "depth": null,
+        "width": null,
+        "nodes": 88005,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 15,
+        "depth": null,
+        "width": null,
+        "nodes": 91996,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 16,
+        "depth": null,
+        "width": null,
+        "nodes": 90949,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 17,
+        "depth": null,
+        "width": null,
+        "nodes": 91667,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 18,
+        "depth": null,
+        "width": null,
+        "nodes": 109633,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 19,
+        "depth": null,
+        "width": null,
+        "nodes": 90852,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 20,
+        "depth": null,
+        "width": null,
+        "nodes": 92530,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 21,
+        "depth": null,
+        "width": null,
+        "nodes": 77577,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 22,
+        "depth": null,
+        "width": null,
+        "nodes": 101530,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 23,
+        "depth": null,
+        "width": null,
+        "nodes": 94533,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 24,
+        "depth": null,
+        "width": null,
+        "nodes": 91249,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 25,
+        "depth": null,
+        "width": null,
+        "nodes": 73057,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 26,
+        "depth": null,
+        "width": null,
+        "nodes": 80277,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 27,
+        "depth": null,
+        "width": null,
+        "nodes": 87653,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 28,
+        "depth": null,
+        "width": null,
+        "nodes": 90675,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 29,
+        "depth": null,
+        "width": null,
+        "nodes": 84900,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 30,
+        "depth": null,
+        "width": null,
+        "nodes": 100596,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 31,
+        "depth": null,
+        "width": null,
+        "nodes": 89825,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 32,
+        "depth": null,
+        "width": null,
+        "nodes": 87749,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 33,
+        "depth": null,
+        "width": null,
+        "nodes": 81247,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 34,
+        "depth": null,
+        "width": null,
+        "nodes": 30258,
+        "fallback": false,
+        "aborted": false
+      }
+    ]
+  ],
+  "opener_lines": [
+    5,
+    2
+  ],
+  "spin_placements": [
+    2,
+    5
+  ],
+  "repeat": 0
+}

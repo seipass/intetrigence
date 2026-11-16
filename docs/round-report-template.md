@@ -83,6 +83,30 @@ turn-cap; no-contest is allowed only if the 50-game total still holds.)
 - The patches only align TBP/S2 protocol details (spawn position, empty hold). They do **not** touch the opponents' search, evaluation, or move legality.
 - Without the patches, CC2 would misread the current piece as held (hold disabled) and both bots would return no moves at a tall stack (vision-style forfeits). The patches remove those handicaps; the matches are therefore real TopOut games, not weakened-opponent wins.
 
+## Conditions and asymmetries (required)
+
+This is **not a same-conditions comparison**. The report must state the following
+asymmetries explicitly; omitting them turns the result into a misleading claim.
+
+- **Information**: intetrigence receives its own S2 state (`pending_garbage`,
+  `arrived_garbage`, exact `b2b_streak`, `sent_total`, `received_total`). TBP
+  `start` carries only the `back_to_back` bool. TETR.IO players can see their own
+  garbage queue, so our View is closer to the real game; TBP-connected bots are
+  constrained by the harness. **Claim only "50-0 vs TBP-connected
+  CC2/clys/attax", not "50-0 vs full-strength CC2".**
+- **Compute**: intetrigence runs 8 threads; CC2/clys/attax are effectively
+  single-threaded. Record both sides' thread counts and think-time policy.
+- **Clutch**: external matches disable Clutch (TBP `start` has no active
+  position) **or** send `start.active`; state which. If Clutch is disabled, do
+  not call the match "S2 complete".
+- **Retry/probe**: no per-move retry. If a single post-`start` probe is used, it
+  must be applied to every TBP bot and recorded; otherwise omit it.
+- **Capabilities**: `supports_180=false` for all three opponents; record it.
+- **Patches**: record each opponent's commit, patch SHA, and purpose.
+
+The report must contain the sentence: **"This is not a same-conditions
+comparison; no equalized-condition measurement was performed."**
+
 ## Claims and caveats
 
 - Only the `official` profile is used; diagnostic profiles are never part of a round.
@@ -107,6 +131,13 @@ turn-cap; no-contest is allowed only if the 50-game total still holds.)
 - [ ] win breakdown: TopOut / unresolved (TurnCap) / no-contest (forfeit) / stuck
 - [ ] TopOut-only record stated separately
 - [ ] no claim of a win rate against a full-vision opponent
+- [ ] information asymmetry stated (TBP does not carry pending/arrived garbage or exact B2B streak)
+- [ ] compute asymmetry stated (8 threads vs single-threaded opponents)
+- [ ] Clutch policy stated (disabled for external matches or `start.active` sent)
+- [ ] no per-move retry; the single post-`start` probe policy is stated if used
+- [ ] "not a same-conditions comparison" stated
+- [ ] "TBP-connected opponent, not full-strength" stated
+- [ ] `supports_180=false` and each patch SHA/commit recorded
 - [ ] both sides' think time (median / p95 / p99 / max) and 200 ms overruns
 - [ ] both sides' attack/piece and received garbage/game
 - [ ] scoring audit per bot: spin mismatches / same-spin attack mismatches

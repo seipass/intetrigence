@@ -86,7 +86,12 @@ fn a_completed_iteration_is_never_thrown_away() {
         hold: Some(intetrigence_core::PieceKind::L),
         context: intetrigence_bot::EvalContext::default(),
     };
+    // Deterministic: the assertion is "a completed iteration is kept", so the
+    // test must not race a wall-clock budget. With `budget` alone a loaded
+    // machine can end the search before level 0 finishes, and the test then
+    // fails on the machine's speed rather than on the behaviour it checks.
     let config = SearchConfig {
+        deterministic: true,
         budget: Duration::from_millis(60),
         ..real_config()
     };
