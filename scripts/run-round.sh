@@ -76,7 +76,7 @@ if [ -n "${CC2_PROGRAM:-}" ]; then
   ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}" --cc2-supports-180 "$CC2_SUPPORTS_180")
 fi
 if [ -n "${CLYS_PROGRAM:-}" ]; then
-  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180" --clys-env "CLYS_TBP_LOG=$(cd "$OUT" && pwd)/round-$ROUND-clys-adapter.jsonl")
+  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180" --clys-retry-empty-ms "${CLYS_RETRY_EMPTY_MS:-2000}" --clys-env "CLYS_TBP_LOG=$(cd "$OUT" && pwd)/round-$ROUND-clys-adapter.jsonl")
 fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
   ARGS+=(--dry-run)

@@ -52,6 +52,7 @@ cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --tbp-program bun \
   --tbp-args "$ADAPTER,--clys-dir,$CLYS_DIR,--think-ms,100" \
   --tbp-cwd C:/Users/Hasilan/Projects/intetrigence --tbp-visible-rows 40 \
+  --tbp-retry-empty-ms 2000 \
   --tbp-name clys \
   --note "Tuning smoke vs clys (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
 

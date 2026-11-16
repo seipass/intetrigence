@@ -1,0 +1,308 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794812262",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9001,
+      "sheet": "B",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 280,
+      "surge_released": [
+        5,
+        13
+      ],
+      "max_b2b_streak": [
+        6,
+        6
+      ],
+      "turns_with_b2b_ge_4": [
+        10,
+        32
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        70.798,
+        100.127
+      ],
+      "think_p95_ms": [
+        78.78,
+        100.144
+      ],
+      "think_p99_ms": [
+        83.689,
+        100.154
+      ],
+      "think_max_ms": [
+        85.241,
+        100.17
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.989
+      ],
+      "attack_match_rate": [
+        1.0,
+        0.996
+      ],
+      "attack_per_piece": [
+        0.792,
+        0.807
+      ],
+      "spin_mismatches": [
+        0,
+        3
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        280
+      ],
+      "sent_total": [
+        127,
+        189
+      ],
+      "received_total": [
+        95,
+        88
+      ],
+      "attack_total": [
+        221,
+        226
+      ],
+      "pieces_placed": [
+        279,
+        280
+      ],
+      "start_resends": 32,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-B.jsonl",
+      "search": [
+        {
+          "turns": 279,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 654
+        },
+        {
+          "turns": 280,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 223765.0,
+          "nodes_p95": 270314.0,
+          "nodes_max": 293913
+        }
+      ],
+      "net_damage": [
+        32,
+        101
+      ],
+      "final_height": [
+        4,
+        20
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        195,
+        172
+      ],
+      "spin_placements": [
+        26,
+        18
+      ],
+      "burst": [
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 12,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 15,
+          "burst_over_capacity": 4
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    }
+  ],
+  "wins": 1,
+  "losses": 0,
+  "unresolved": 0,
+  "no_contest": 0,
+  "stuck": 0,
+  "forfeits": 0,
+  "wins_topout": 1,
+  "wins_turncap": 0,
+  "losses_turncap": 0,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "forfeit_vision": 0,
+  "forfeit_other": 0,
+  "forfeit_unknown": 0,
+  "losses_topout": 0,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "surge_released": [
+    5,
+    13
+  ],
+  "max_b2b_streak": [
+    6,
+    6
+  ],
+  "turns_with_b2b_ge_4": [
+    10,
+    32
+  ],
+  "win_rate": 1.0,
+  "wilson_low": 0.2065,
+  "wilson_high": 1.0,
+  "verified": 1,
+  "verify_failures": 0,
+  "resumed_games": 0,
+  "depth": 8,
+  "width": 96,
+  "threads": 8,
+  "deterministic": true,
+  "load_note": null,
+  "measurement_complete": true,
+  "attax_patch_sha256": null,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "commit": "594b772",
+      "placements": 279,
+      "spin_checked": 279,
+      "spin_mismatches": 0,
+      "attack_checked": 279,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 0,
+      "attack_per_piece": 0.792,
+      "received_per_game": 95.0,
+      "visible_rows": 40,
+      "mean_height": 5.77,
+      "max_height": 15.0,
+      "search_turns": 279,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 70.798,
+      "think_p99_max": 83.689,
+      "think_max": 85.241,
+      "depth_median": 8.0,
+      "depth_p95": 8.0,
+      "depth_max": 8,
+      "width_median": 96.0,
+      "width_p95": 96.0,
+      "width_max": 96,
+      "nodes_median": 628.0,
+      "nodes_p95": 645.0,
+      "nodes_max": 654,
+      "net_damage_per_game": 32.0,
+      "negative_net_games": 0,
+      "collapses": 0,
+      "opener_lines_per_game": 4.0,
+      "max_burst_1": 7,
+      "max_burst_5": 12,
+      "burst_over_capacity": 0,
+      "attack_per_line": 1.133,
+      "spin_rate": 0.093,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    },
+    {
+      "slot": 1,
+      "name": "Cold Clear 2",
+      "commit": null,
+      "placements": 280,
+      "spin_checked": 280,
+      "spin_mismatches": 3,
+      "attack_checked": 280,
+      "attack_mismatches": 1,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 280,
+      "attack_per_piece": 0.807,
+      "received_per_game": 88.0,
+      "visible_rows": 40,
+      "mean_height": 11.44,
+      "max_height": 22.0,
+      "search_turns": 280,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 100.127,
+      "think_p99_max": 100.154,
+      "think_max": 100.17,
+      "depth_median": null,
+      "depth_p95": null,
+      "depth_max": null,
+      "width_median": null,
+      "width_p95": null,
+      "width_max": null,
+      "nodes_median": 223765.0,
+      "nodes_p95": 270314.0,
+      "nodes_max": 293913,
+      "net_damage_per_game": 101.0,
+      "negative_net_games": 0,
+      "collapses": 0,
+      "opener_lines_per_game": 2.0,
+      "max_burst_1": 8,
+      "max_burst_5": 15,
+      "burst_over_capacity": 4,
+      "attack_per_line": 1.314,
+      "spin_rate": 0.064,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    }
+  ],
+  "notes": [
+    "The intetrigence side is the bot recorded in each replay header.",
+    "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
+  ]
+}
