@@ -261,6 +261,17 @@ pub struct Weights {
     /// worth only "one row less height", so the bot stacks instead (the 9004-A
     /// collapse: 26 attack sent, final y 21).
     pub defense: f64,
+    /// Height at which the height terms start to bite, and the span over which
+    /// `risk` ramps from 0 to 1.
+    ///
+    /// Height is a risk, not a cost: at `height 5` a single is the most
+    /// height-efficient clear there is (1 row per piece against a quad's 0.4),
+    /// so pricing height at every level makes the bot farm singles forever.
+    /// The trade-off is measurable: a higher base leaves the early stack
+    /// unpriced and the bot collapses early; a lower base brings the TurnCap
+    /// back.
+    pub risk_base: f64,
+    pub risk_span: f64,
     /// Bonus for clearing at least one line during the opener phase.
     /// S2 doubles the cancellation while the opener is active, but the extra
     /// budget equals the *attack*, not the lines, so a single (attack 0)
@@ -360,6 +371,8 @@ impl Default for Weights {
             danger_height: -12.0,
             race: 1.0,
             defense: 28.0,
+            risk_base: 12.0,
+            risk_span: 6.0,
             quad_ready: 30.0,
             opener_clear: 20.0,
             combo_state: 40.0,
@@ -649,7 +662,8 @@ pub fn leaf_value(
     // think time went from ~30 ms to 72 ms because the taller board has more
     // candidates. A floor of 0.2 was too high (TurnCap 1/20, `attack/line`
     // 1.12); 0.1 is the middle.
-    let height_risk = ((features.max_height - 12.0) / 6.0).clamp(0.1, 1.0);
+    let height_risk =
+        ((features.max_height - weights.risk_base) / weights.risk_span).clamp(0.1, 1.0);
     let mut value = height_risk
         * (weights.max_height * features.max_height
             + weights.height_sq * features.height_sq

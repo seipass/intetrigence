@@ -245,6 +245,8 @@ pub fn apply_weight_overrides(
             "race" => weights.race = number(value)?,
             "tsd_bonus" => weights.tsd_bonus = number(value)?,
             "mini_penalty" => weights.mini_penalty = number(value)?,
+            "risk_base" => weights.risk_base = number(value)?,
+            "risk_span" => weights.risk_span = number(value)?,
             "survival" => {
                 weights.survival = match value.as_str() {
                     "1" | "true" | "yes" => true,
