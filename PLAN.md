@@ -1671,3 +1671,52 @@ spinEvidence: true, spinClassifier: "s2", dedupe: "s2", allowRootVeto: true
 1. **TBP アダプタで S2 profile を選ばせる**(現状 `createBot({name:"attax"})` = guideline 固定)
 2. **posY のずれ**(`FIELD_ROWS - 21` が field40 rig の原点)
 3. **40 行視野パッチが不要になったか確認**(S2 profile は `boardRows: 40`)
+
+## 41. S2 attax との接続成立と初戦(2026-11-16)
+
+### 接続(attax-integration `8b9b248`)
+
+| 項目 | 内容 |
+|---|---|
+| S2 profile の選択 | `adapters/attax-s2-tbp.patch`(28 行、SHA-256 `461e4396…`)で `ATTAX_TBP_PROFILE=s2` のとき `createBot({ profile: "s2" })` |
+| posY | 上流の `FIELD_ROWS - 21` は field40 rig の原点。**`posY = FIELD_ROWS - 22 - maxY`** に修正(S2 spawn の最下段セル = TBP row 21) |
+| 40 行視野 | `ATTAX_TBP_ROWS=40` がグリッドを 40 行にする。**旧 `attax-vision-40.patch` は削除** |
+| `supports_180` | **S2 profile は `true`**、guideline は `false`。レフェリー側を profile で切り替える必要 |
+
+### 初戦(seed 9001 sheet A、1000 turn)
+
+```
+winner=1 reason=TopOut turns=169 verified=true mismatches=0
+```
+
+| 項目 | intetrigence | attax(S2) |
+|---|---|---|
+| 結果 | **TopOut 負け**(169 turn) | **TopOut 勝ち** |
+| `attack/piece` | 0.882 | **0.929** |
+| 受信ゴミ | 69 | 60 |
+| `think` median | 68.5ms | 41.6ms |
+| spin/attack 監査 | — | **168/168 一致** |
+
+**S2 profile は有効**(攻撃表・コンボ・All-Mini+・180°・deathHeight 21 が効いている)。**攻撃量でも負けた。**
+
+### 重要な制約: TBP 経由の S2 は部分適用
+
+`fighter.ts` のコメントどおり、**`createBot` は S2-only フィールド(`b2bChain` / `garbageRows` / `dueThisLock` / `frame`)を `SearchInput` に写さない**。
+
+| 有効 | attax の探索に効かない |
+|---|---|
+| 攻撃表、コンボ、All-Mini+、180°、deathHeight 21、B2B +1、PC +5 | **surge の溜め**(`b2bChain` が bool 0/1)、**GSB**(`garbageRows` なし)、**margin multiplier**(`frame` なし) |
+
+**ゲームの採点はレフェリーの S2 で正しく行われるが、attax の読みはその分弱い。** **我々にとって有利な条件で 0-1 で負けている。**
+
+**完全な S2 attax(`tools/s2-lab/` 経由)は我々のハーネスでは使えない。** **「TBP 経由の S2 attax」が比較対象**であり、主張もそこに限定する。
+
+### 現在地(3 相手)
+
+| 段階 | 相手 | 実測 | ゲート |
+|---|---|---|---|
+| 1 | CC2 | **38-2**(40 ゲーム) | 50-0 |
+| 2 | clys | 5-5(10 ゲーム) | 50-0 |
+| 3 | **attax(S2 profile、TBP 経由)** | **0-1** | 48/50 |
+
+**attax の S2 profile は Sold Slear に 16.75%(400 ゲーム)。S2 の水準は guideline より遥かに高い。**
