@@ -789,8 +789,12 @@ fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)
             continue;
         }
         // Count the lines the T would complete without cloning the board: a
-        // row clears when the T's cells fill its remaining holes. The T spans
-        // two rows in every rotation, so two masks are enough.
+        // row clears when the T's cells fill its remaining holes.
+        //
+        // `best_t_slot` only ever scans `Rotation::Two`, whose cells have `cy`
+        // in {0, 1}, so two masks suffice. `Rotation::R` and `Rotation::L`
+        // span three rows and would index out of bounds here -- widen the mask
+        // array before extending the scan to them.
         let mut rows = [0u16; 2];
         for (cx, cy) in PieceKind::T.cells(Rotation::Two) {
             rows[cy as usize] |= 1 << (bx + cx);
@@ -1080,6 +1084,28 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// The slot scan only looks at nub-down T placements.
+    ///
+    /// The clone-free line count uses two row masks, which is only valid for
+    /// `Rotation::Two` (`cy` in {0, 1}). R and L span three rows, so extending
+    /// the scan to them without widening the masks would panic.
+    #[test]
+    fn the_slot_scan_only_considers_nub_down_t() {
+        let boards = [("tsd", tsd_board()), ("empty", Board::new())];
+        for (name, board) in boards {
+            let columns = heights(&board);
+            let Some((x, y, _)) = best_t_slot(&board, &columns) else {
+                continue;
+            };
+            // The scan places its probe at rotation two; if that ever stops
+            // being legal the scan and the two-row masks have diverged.
+            let mut probe = board.clone();
+            probe
+                .place(PieceKind::T, Rotation::Two, x, y)
+                .unwrap_or_else(|_| panic!("{name}: the slot must be a rotation-2 placement"));
         }
     }
 
