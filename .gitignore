@@ -21,6 +21,12 @@ Thumbs.db
 # Machine-wide measurement lock (scripts/measurement-lock.sh)
 /.measurement-lock/
 
+# Measurement evidence: the summaries are the record; replays, logs and audits
+# are large and reproducible from the game, so they stay local.
+scripts/evidence/*/replays/
+scripts/evidence/*/logs/
+scripts/evidence/*/audit/
+
 # Python
 __pycache__/
 *.pyc
@@ -36,3 +42,4 @@ __pycache__/
 scripts/evidence/*/replays/
 scripts/evidence/*/logs/
 scripts/evidence/*/audit/
+scripts/evidence/*/*.jsonl
