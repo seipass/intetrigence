@@ -714,6 +714,15 @@ fn stage_section(
     }
     writeln!(
         out,
+        "- intetrigence build: `{}`, deterministic **{}**, depth **{}**, width **{}**, threads **{}**",
+        summary.bots[0].commit.as_deref().unwrap_or("unknown"),
+        summary.deterministic,
+        summary.depth,
+        summary.width,
+        summary.threads
+    )?;
+    writeln!(
+        out,
         "- opponent vision: **{} rows**{}",
         summary.bots[1].visible_rows,
         if summary.bots[1].visible_rows < 40 {
@@ -724,8 +733,18 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- raw games: {} W / {} L; unresolved (TurnCap): {}; no-contest (forfeit): {}; stuck: {} (this is **not** a win rate)",
-        summary.wins, summary.losses, summary.unresolved, summary.no_contest, summary.stuck
+        "- outcomes: TopOut wins **{}** / TopOut losses **{}** / unresolved **{}** / no-contest **{}** / stuck **{}** = **{}/{}**",
+        summary.wins_topout,
+        summary.losses_topout,
+        summary.unresolved,
+        summary.no_contest,
+        summary.stuck,
+        summary.wins_topout
+            + summary.losses_topout
+            + summary.unresolved
+            + summary.no_contest
+            + summary.stuck,
+        games
     )?;
     writeln!(
         out,
@@ -742,15 +761,19 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- win breakdown: TopOut **{}**; forfeit-vision **{}** (no contest); forfeit-other **{}** (invalid); turn-cap **{}** (unresolved)",
-        summary.wins_topout, summary.forfeit_vision, summary.forfeit_other, summary.turncap
+        "- win breakdown: TopOut **{}**; unresolved (TurnCap) **{}**; no-contest (forfeit-vision **{}** + forfeit-other **{}**) **{}**; stuck **{}**",
+        summary.wins_topout,
+        summary.turncap,
+        summary.forfeit_vision,
+        summary.forfeit_other,
+        summary.no_contest,
+        summary.stuck
     )?;
-    let non_forfeit_games = games - summary.forfeits;
-    let non_forfeit_wins = summary.wins_topout + summary.turncap;
     writeln!(
         out,
-        "- non-forfeit record: **{}/{}** (TopOut + turn-cap games)",
-        non_forfeit_wins, non_forfeit_games
+        "- no-contest record: **{}/{}** (TopOut wins / games without no-contest)",
+        summary.wins_topout,
+        games - summary.no_contest
     )?;
     writeln!(
         out,
@@ -831,6 +854,13 @@ fn stage_section(
         summary.bots[0].think_over_100ms,
         summary.bots[1].think_over_100ms
     )?;
+    match &summary.load_note {
+        Some(note) => writeln!(out, "- load: **{note}**")?,
+        None => writeln!(
+            out,
+            "- load: clean (no over-100 ms moves in deterministic mode)"
+        )?,
+    }
     writeln!(
         out,
         "- measurement complete: {} (replay + verify + audit + opponent decision log)",
