@@ -29,20 +29,22 @@
 ## Stage 1 — Cold Clear 2
 
 - opponent commit: `<opponent commit>`
+- intetrigence build: `<commit>`, deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
 - games: 50 (25 seeds × sheets A/B)
 - opponent vision: `40` rows (CC2/clys: S2 scoring applied by the referee; attax: 40-row patch)
-- raw games: 50 W / 0 L; unresolved (TurnCap): 0; no-contest (forfeit): 0; stuck: 0
+- outcomes: TopOut wins `<n>` / TopOut losses `<n>` / unresolved `<n>` / no-contest `<n>` / stuck `<n>` = **`<n>`/50**
 - **gate record: 50 TopOut wins / 50 games** — 100.0% (Wilson 95% CI 92.9..100.0%)
 - win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
-- no-contest record: `<wins_topout>/<games - no_contest>` (TopOut games)
+- no-contest record: `<wins_topout>/<games - no_contest>` (TopOut wins / games without no-contest)
 - attack/piece: `<a>` vs `<b>`
 - attack/line: `<a>`, spin rate: `<a>%`
 - losses by type: collapse `<n>`, pending `<n>`, race `<n>`
-- aborted (hard deadline): `<n>/<n>` (`<a>%`)
+- aborted: `0` (deterministic schedule completed every move) or `<n>/<n>` (`<a>%`, depths `<histogram>`) for anytime
 - search schedule: deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
 - received garbage/game: `<a>` vs `<b>`
 - think median / p95 / p99 / max: `<a> / <b> / <c> / <d> ms` vs `<a> / <b> / <c> / <d> ms`
-- think over 200 ms: `<n>` vs `<n>`
+- think over 200 ms: `<n>` vs `<n>`; over 100 ms: `<n>` vs `<n>`
+- load: `clean (no over-100 ms moves in deterministic mode)` or the `load_note` text
 - net damage/game: `<+a>` (negative games `<n>/<n>`); collapses `<n>/<n>`; opener lines/game `<a>`
 - burst (intetrigence received): max 1-turn `<n>`, max 5-turn `<n>`, over capacity `<n>` (overlapping 5-turn windows, not burst events)
 - environment: `<KEY>=<absolute path>` (e.g. `CLYS_TBP_LOG=...` for clys)

@@ -1453,14 +1453,24 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                         if verify.ok {
                             if let Ok(text) = std::fs::read_to_string(&audit_path) {
                                 if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
-                                    audit.verify = verify;
-                                    audit.opener_lines = opener_lines_from_replay(&replay_path);
-                                    audit.spin_placements =
-                                        spin_placements_from_replay(&replay_path);
-                                    println!("{name}: resumed (verified)");
-                                    audits.push(audit);
-                                    resumed_games += 1;
-                                    continue;
+                                    // A replay from a different build is not
+                                    // comparable: re-run the game instead of
+                                    // reusing it.
+                                    if audit.bots[0].commit == build_commit {
+                                        audit.verify = verify;
+                                        audit.opener_lines = opener_lines_from_replay(&replay_path);
+                                        audit.spin_placements =
+                                            spin_placements_from_replay(&replay_path);
+                                        println!("{name}: resumed (verified)");
+                                        audits.push(audit);
+                                        resumed_games += 1;
+                                        continue;
+                                    }
+                                    println!(
+                                        "{name}: not resumed (build {} != {})",
+                                        audit.bots[0].commit.as_deref().unwrap_or("unknown"),
+                                        build_commit.as_deref().unwrap_or("unknown")
+                                    );
                                 }
                             }
                         }

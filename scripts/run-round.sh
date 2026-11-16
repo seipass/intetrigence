@@ -20,6 +20,9 @@
 #   CC2_SUPPORTS_180 / CLYS_SUPPORTS_180  default true (check the bot's movegen)
 #   CLYS_PROGRAM / CLYS_ARGS / CLYS_COMMIT / CLYS_VISIBLE_ROWS
 #   GATE_CC2 / GATE_CLYS / GATE_ATTAX   default 50 / 50 / 48
+#   DEPTH / WIDTH  deterministic schedule. d6 w96 is the interim; once the
+#                  bot's speedup lands, run the same round with DEPTH=8 WIDTH=96
+#                  (the official target: depth 8, max under 100 ms).
 #   Stage order is CC2 -> clys -> attax (new staged goal).
 #   MS / THREADS / TURNS                default 100 / 8 / 1000
 #   MAX_STAGES                          default 3
