@@ -1,0 +1,4459 @@
+{
+  "seed": 9002,
+  "sheet": "B",
+  "started_at": "unix:1794817825",
+  "profile": "official",
+  "winner": 0,
+  "reason": "TopOut",
+  "detail": null,
+  "forfeit_cause": null,
+  "forfeit_slot": null,
+  "turns": 258,
+  "surge_released": [
+    11,
+    4
+  ],
+  "max_b2b_streak": [
+    8,
+    5
+  ],
+  "turns_with_b2b_ge_4": [
+    20,
+    12
+  ],
+  "totals": [
+    {
+      "sent_total": 128,
+      "received_total": 75,
+      "attack_total": 203,
+      "pieces_placed": 257,
+      "lines_cleared": 168
+    },
+    {
+      "sent_total": 152,
+      "received_total": 73,
+      "attack_total": 207,
+      "pieces_placed": 258,
+      "lines_cleared": 150
+    }
+  ],
+  "heights": [
+    {
+      "max": 15,
+      "mean": 5.12,
+      "final_height": 3
+    },
+    {
+      "max": 22,
+      "mean": 9.88,
+      "final_height": 21
+    }
+  ],
+  "think": [
+    {
+      "count": 257,
+      "median_ms": 79.216,
+      "p95_ms": 91.189,
+      "p99_ms": 97.879,
+      "max_ms": 98.359,
+      "mean_ms": 79.061,
+      "over_budget": 0,
+      "over_100ms": 0
+    },
+    {
+      "count": 258,
+      "median_ms": 100.12,
+      "p95_ms": 100.157,
+      "p99_ms": 100.193,
+      "max_ms": 100.203,
+      "mean_ms": 100.124,
+      "over_budget": 0,
+      "over_100ms": 258
+    }
+  ],
+  "first_choice": [
+    {
+      "total": 257,
+      "accepted_first": 257,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    },
+    {
+      "total": 258,
+      "accepted_first": 258,
+      "rate": 1.0,
+      "rejected_index_histogram": {}
+    }
+  ],
+  "scoring": [
+    {
+      "placements": 257,
+      "spin_checked": 257,
+      "spin_matches": 257,
+      "spin_mismatches": 0,
+      "attack_checked": 257,
+      "attack_matches": 257,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 203,
+      "recomputed_total": 203,
+      "examples": []
+    },
+    {
+      "placements": 258,
+      "spin_checked": 258,
+      "spin_matches": 257,
+      "spin_mismatches": 1,
+      "attack_checked": 258,
+      "attack_matches": 258,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "attack_mismatches_spin_diff": 0,
+      "declared_total": 207,
+      "recomputed_total": 207,
+      "examples": [
+        {
+          "turn": 96,
+          "slot": 1,
+          "claimed_spin": "none",
+          "recomputed_spin": "mini",
+          "declared_attack": 0,
+          "recomputed_attack": 0
+        }
+      ]
+    }
+  ],
+  "reachability_rejections": 0,
+  "start_resends": [
+    {
+      "reason": "garbage",
+      "board_hash": 3776755808646571095,
+      "turn": 15
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9726243262135423279,
+      "turn": 40
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 816536368236627501,
+      "turn": 41
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 6542070451037668989,
+      "turn": 54
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 11651269821396028126,
+      "turn": 70
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10852954163238986077,
+      "turn": 79
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3673871258639418954,
+      "turn": 81
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13888846999874197984,
+      "turn": 94
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2899584770719525489,
+      "turn": 115
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 179138065713398701,
+      "turn": 116
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12530927396353844675,
+      "turn": 123
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 193206078877265136,
+      "turn": 127
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14886870453137051646,
+      "turn": 131
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1704650525970034402,
+      "turn": 151
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 4912484544129051044,
+      "turn": 152
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 8663321949496381938,
+      "turn": 163
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 2650091544579635588,
+      "turn": 164
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 13432622859765832914,
+      "turn": 185
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1072623917584169215,
+      "turn": 208
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14331232181172560599,
+      "turn": 210
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 5326102609089567329,
+      "turn": 211
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 3707982240277167061,
+      "turn": 212
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 10953650610317865404,
+      "turn": 213
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14346921688476953994,
+      "turn": 215
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 1244209036894189172,
+      "turn": 229
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 12317996033873852188,
+      "turn": 245
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 9305108659679186216,
+      "turn": 252
+    },
+    {
+      "reason": "garbage",
+      "board_hash": 14963676002298786129,
+      "turn": 254
+    }
+  ],
+  "attax": null,
+  "bots": [
+    {
+      "name": "intetrigence",
+      "version": "0.1.0",
+      "commit": "a35e17c",
+      "args": [
+        "--ms",
+        "100",
+        "--threads",
+        "8"
+      ],
+      "visible_rows": 40,
+      "supports_180": true,
+      "build_id": "e55c3e60088ad793",
+      "threads": 8
+    },
+    {
+      "name": "Cold Clear 2",
+      "version": "0.1.0 ed8b193",
+      "args": [
+        "C:/Users/Hasilan/Projects/cold-clear-2/target/release/cold-clear-2.exe"
+      ],
+      "visible_rows": 40,
+      "supports_180": false,
+      "suggest_delay_ms": 100,
+      "retry_empty_suggest_ms": 2000
+    }
+  ],
+  "replay": "replays/seed-9002-sheet-B.jsonl",
+  "verify": {
+    "ok": true,
+    "seed": 9002,
+    "sheet": "B",
+    "turns": 258,
+    "placements": 515,
+    "mismatches": [],
+    "forfeit_cause": null,
+    "burst": [
+      {
+        "max_burst_1": 7,
+        "max_burst_5": 9,
+        "burst_over_capacity": 0
+      },
+      {
+        "max_burst_1": 8,
+        "max_burst_5": 11,
+        "burst_over_capacity": 5
+      }
+    ]
+  },
+  "queue_invariant_violations": 0,
+  "bot_fallbacks": 0,
+  "bot_nodes_total": 159611,
+  "search": [
+    [
+      {
+        "turn": 0,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 1,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 2,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 3,
+        "depth": 7,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 4,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 5,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 6,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 7,
+        "depth": 8,
+        "width": 96,
+        "nodes": 623,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 8,
+        "depth": 7,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 9,
+        "depth": 7,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 10,
+        "depth": 7,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 11,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 12,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 13,
+        "depth": 8,
+        "width": 96,
+        "nodes": 612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 14,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 15,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 16,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 17,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 18,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 19,
+        "depth": 8,
+        "width": 96,
+        "nodes": 623,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 20,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 21,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 22,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 23,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 24,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 25,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 26,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 27,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 28,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 29,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 30,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 31,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 32,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 33,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 34,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 35,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 36,
+        "depth": 8,
+        "width": 96,
+        "nodes": 633,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 37,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 38,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 39,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 40,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 41,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 42,
+        "depth": 8,
+        "width": 96,
+        "nodes": 606,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 43,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 44,
+        "depth": 8,
+        "width": 96,
+        "nodes": 614,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 45,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 46,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 47,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 48,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 49,
+        "depth": 8,
+        "width": 96,
+        "nodes": 594,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 50,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 51,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 52,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 53,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 54,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 55,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 56,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 57,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 58,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 59,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 60,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 61,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 62,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 63,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 64,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 65,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 66,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 67,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 68,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 69,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 70,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 71,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 72,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 73,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 74,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 75,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 76,
+        "depth": 8,
+        "width": 96,
+        "nodes": 631,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 77,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 78,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 79,
+        "depth": 8,
+        "width": 96,
+        "nodes": 624,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 80,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 81,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 82,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 83,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 84,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 85,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 86,
+        "depth": 8,
+        "width": 96,
+        "nodes": 613,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 87,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 88,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 89,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 90,
+        "depth": 8,
+        "width": 96,
+        "nodes": 631,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 91,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 92,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 93,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 94,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 95,
+        "depth": 8,
+        "width": 96,
+        "nodes": 649,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 96,
+        "depth": 8,
+        "width": 96,
+        "nodes": 623,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 97,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 98,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 99,
+        "depth": 8,
+        "width": 96,
+        "nodes": 614,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 100,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 101,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 102,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 103,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 104,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 105,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 106,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 107,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 108,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 109,
+        "depth": 8,
+        "width": 96,
+        "nodes": 613,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 110,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 111,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 112,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 113,
+        "depth": 8,
+        "width": 96,
+        "nodes": 631,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 114,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 115,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 116,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 117,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 118,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 119,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 120,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 121,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 122,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 123,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 124,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 125,
+        "depth": 8,
+        "width": 96,
+        "nodes": 635,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 126,
+        "depth": 8,
+        "width": 96,
+        "nodes": 612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 127,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 128,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 129,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 130,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 131,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 132,
+        "depth": 8,
+        "width": 96,
+        "nodes": 612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 133,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 134,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 135,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 136,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 137,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 138,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 139,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 140,
+        "depth": 8,
+        "width": 96,
+        "nodes": 612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 141,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 142,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 143,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 144,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 145,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 146,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 147,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 148,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 149,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 150,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 151,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 152,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 153,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 154,
+        "depth": 8,
+        "width": 96,
+        "nodes": 616,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 155,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 156,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 157,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 158,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 159,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 160,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 161,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 162,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 163,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 164,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 165,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 166,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 167,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 168,
+        "depth": 8,
+        "width": 96,
+        "nodes": 654,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 169,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 170,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 171,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 172,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 173,
+        "depth": 8,
+        "width": 96,
+        "nodes": 612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 174,
+        "depth": 8,
+        "width": 96,
+        "nodes": 594,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 175,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 176,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 177,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 178,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 179,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 180,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 181,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 182,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 183,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 184,
+        "depth": 8,
+        "width": 96,
+        "nodes": 586,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 185,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 186,
+        "depth": 8,
+        "width": 96,
+        "nodes": 604,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 187,
+        "depth": 8,
+        "width": 96,
+        "nodes": 605,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 188,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 189,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 190,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 191,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 192,
+        "depth": 8,
+        "width": 96,
+        "nodes": 649,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 193,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 194,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 195,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 196,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 197,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 198,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 199,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 200,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 201,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 202,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 203,
+        "depth": 8,
+        "width": 96,
+        "nodes": 630,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 204,
+        "depth": 8,
+        "width": 96,
+        "nodes": 646,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 205,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 206,
+        "depth": 8,
+        "width": 96,
+        "nodes": 629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 207,
+        "depth": 8,
+        "width": 96,
+        "nodes": 647,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 208,
+        "depth": 8,
+        "width": 96,
+        "nodes": 632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 209,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 210,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 211,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 212,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 213,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 214,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 215,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 216,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 217,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 218,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 219,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 220,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 221,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 222,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 223,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 224,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 225,
+        "depth": 8,
+        "width": 96,
+        "nodes": 594,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 226,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 227,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 228,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 229,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 230,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 231,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 232,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 233,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 234,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 235,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 236,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 237,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 238,
+        "depth": 8,
+        "width": 96,
+        "nodes": 622,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 239,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 240,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 241,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 242,
+        "depth": 8,
+        "width": 96,
+        "nodes": 621,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 243,
+        "depth": 8,
+        "width": 96,
+        "nodes": 631,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 244,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 245,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 246,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 247,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 248,
+        "depth": 8,
+        "width": 96,
+        "nodes": 603,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 249,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 250,
+        "depth": 8,
+        "width": 96,
+        "nodes": 611,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 251,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 252,
+        "depth": 6,
+        "width": 96,
+        "nodes": 456,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 253,
+        "depth": 8,
+        "width": 96,
+        "nodes": 645,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 254,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 255,
+        "depth": 8,
+        "width": 96,
+        "nodes": 628,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 256,
+        "depth": 8,
+        "width": 96,
+        "nodes": 620,
+        "fallback": false,
+        "aborted": false
+      }
+    ],
+    [
+      {
+        "turn": 0,
+        "depth": null,
+        "width": null,
+        "nodes": 164546,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 1,
+        "depth": null,
+        "width": null,
+        "nodes": 233040,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 2,
+        "depth": null,
+        "width": null,
+        "nodes": 231307,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 3,
+        "depth": null,
+        "width": null,
+        "nodes": 200701,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 4,
+        "depth": null,
+        "width": null,
+        "nodes": 190905,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 5,
+        "depth": null,
+        "width": null,
+        "nodes": 201151,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 6,
+        "depth": null,
+        "width": null,
+        "nodes": 202679,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 7,
+        "depth": null,
+        "width": null,
+        "nodes": 196961,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 8,
+        "depth": null,
+        "width": null,
+        "nodes": 207511,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 9,
+        "depth": null,
+        "width": null,
+        "nodes": 204187,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 10,
+        "depth": null,
+        "width": null,
+        "nodes": 218380,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 11,
+        "depth": null,
+        "width": null,
+        "nodes": 207213,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 12,
+        "depth": null,
+        "width": null,
+        "nodes": 217110,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 13,
+        "depth": null,
+        "width": null,
+        "nodes": 207865,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 14,
+        "depth": null,
+        "width": null,
+        "nodes": 216412,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 15,
+        "depth": null,
+        "width": null,
+        "nodes": 214226,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 16,
+        "depth": null,
+        "width": null,
+        "nodes": 203562,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 17,
+        "depth": null,
+        "width": null,
+        "nodes": 214192,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 18,
+        "depth": null,
+        "width": null,
+        "nodes": 189678,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 19,
+        "depth": null,
+        "width": null,
+        "nodes": 152759,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 20,
+        "depth": null,
+        "width": null,
+        "nodes": 164597,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 21,
+        "depth": null,
+        "width": null,
+        "nodes": 188503,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 22,
+        "depth": null,
+        "width": null,
+        "nodes": 202194,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 23,
+        "depth": null,
+        "width": null,
+        "nodes": 196124,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 24,
+        "depth": null,
+        "width": null,
+        "nodes": 201575,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 25,
+        "depth": null,
+        "width": null,
+        "nodes": 192625,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 26,
+        "depth": null,
+        "width": null,
+        "nodes": 186323,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 27,
+        "depth": null,
+        "width": null,
+        "nodes": 193322,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 28,
+        "depth": null,
+        "width": null,
+        "nodes": 202466,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 29,
+        "depth": null,
+        "width": null,
+        "nodes": 207974,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 30,
+        "depth": null,
+        "width": null,
+        "nodes": 226521,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 31,
+        "depth": null,
+        "width": null,
+        "nodes": 238052,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 32,
+        "depth": null,
+        "width": null,
+        "nodes": 190934,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 33,
+        "depth": null,
+        "width": null,
+        "nodes": 176804,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 34,
+        "depth": null,
+        "width": null,
+        "nodes": 188832,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 35,
+        "depth": null,
+        "width": null,
+        "nodes": 203822,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 36,
+        "depth": null,
+        "width": null,
+        "nodes": 208148,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 37,
+        "depth": null,
+        "width": null,
+        "nodes": 219629,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 38,
+        "depth": null,
+        "width": null,
+        "nodes": 206335,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 39,
+        "depth": null,
+        "width": null,
+        "nodes": 184370,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 40,
+        "depth": null,
+        "width": null,
+        "nodes": 179263,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 41,
+        "depth": null,
+        "width": null,
+        "nodes": 171014,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 42,
+        "depth": null,
+        "width": null,
+        "nodes": 215982,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 43,
+        "depth": null,
+        "width": null,
+        "nodes": 203521,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 44,
+        "depth": null,
+        "width": null,
+        "nodes": 203990,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 45,
+        "depth": null,
+        "width": null,
+        "nodes": 195868,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 46,
+        "depth": null,
+        "width": null,
+        "nodes": 188071,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 47,
+        "depth": null,
+        "width": null,
+        "nodes": 173548,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 48,
+        "depth": null,
+        "width": null,
+        "nodes": 165851,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 49,
+        "depth": null,
+        "width": null,
+        "nodes": 219202,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 50,
+        "depth": null,
+        "width": null,
+        "nodes": 190696,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 51,
+        "depth": null,
+        "width": null,
+        "nodes": 202951,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 52,
+        "depth": null,
+        "width": null,
+        "nodes": 197472,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 53,
+        "depth": null,
+        "width": null,
+        "nodes": 202855,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 54,
+        "depth": null,
+        "width": null,
+        "nodes": 196476,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 55,
+        "depth": null,
+        "width": null,
+        "nodes": 173405,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 56,
+        "depth": null,
+        "width": null,
+        "nodes": 205572,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 57,
+        "depth": null,
+        "width": null,
+        "nodes": 194093,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 58,
+        "depth": null,
+        "width": null,
+        "nodes": 208367,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 59,
+        "depth": null,
+        "width": null,
+        "nodes": 207712,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 60,
+        "depth": null,
+        "width": null,
+        "nodes": 190028,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 61,
+        "depth": null,
+        "width": null,
+        "nodes": 191842,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 62,
+        "depth": null,
+        "width": null,
+        "nodes": 189293,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 63,
+        "depth": null,
+        "width": null,
+        "nodes": 184632,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 64,
+        "depth": null,
+        "width": null,
+        "nodes": 186399,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 65,
+        "depth": null,
+        "width": null,
+        "nodes": 200005,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 66,
+        "depth": null,
+        "width": null,
+        "nodes": 208743,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 67,
+        "depth": null,
+        "width": null,
+        "nodes": 197499,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 68,
+        "depth": null,
+        "width": null,
+        "nodes": 194829,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 69,
+        "depth": null,
+        "width": null,
+        "nodes": 182474,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 70,
+        "depth": null,
+        "width": null,
+        "nodes": 211423,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 71,
+        "depth": null,
+        "width": null,
+        "nodes": 121223,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 72,
+        "depth": null,
+        "width": null,
+        "nodes": 195680,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 73,
+        "depth": null,
+        "width": null,
+        "nodes": 218699,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 74,
+        "depth": null,
+        "width": null,
+        "nodes": 196007,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 75,
+        "depth": null,
+        "width": null,
+        "nodes": 181320,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 76,
+        "depth": null,
+        "width": null,
+        "nodes": 150578,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 77,
+        "depth": null,
+        "width": null,
+        "nodes": 156717,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 78,
+        "depth": null,
+        "width": null,
+        "nodes": 178330,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 79,
+        "depth": null,
+        "width": null,
+        "nodes": 211735,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 80,
+        "depth": null,
+        "width": null,
+        "nodes": 84147,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 81,
+        "depth": null,
+        "width": null,
+        "nodes": 83039,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 82,
+        "depth": null,
+        "width": null,
+        "nodes": 72402,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 83,
+        "depth": null,
+        "width": null,
+        "nodes": 88933,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 84,
+        "depth": null,
+        "width": null,
+        "nodes": 87543,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 85,
+        "depth": null,
+        "width": null,
+        "nodes": 129892,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 86,
+        "depth": null,
+        "width": null,
+        "nodes": 115012,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 87,
+        "depth": null,
+        "width": null,
+        "nodes": 101680,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 88,
+        "depth": null,
+        "width": null,
+        "nodes": 83343,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 89,
+        "depth": null,
+        "width": null,
+        "nodes": 81509,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 90,
+        "depth": null,
+        "width": null,
+        "nodes": 94939,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 91,
+        "depth": null,
+        "width": null,
+        "nodes": 161907,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 92,
+        "depth": null,
+        "width": null,
+        "nodes": 118870,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 93,
+        "depth": null,
+        "width": null,
+        "nodes": 115440,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 94,
+        "depth": null,
+        "width": null,
+        "nodes": 123775,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 95,
+        "depth": null,
+        "width": null,
+        "nodes": 58236,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 96,
+        "depth": null,
+        "width": null,
+        "nodes": 69268,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 97,
+        "depth": null,
+        "width": null,
+        "nodes": 68907,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 98,
+        "depth": null,
+        "width": null,
+        "nodes": 82319,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 99,
+        "depth": null,
+        "width": null,
+        "nodes": 88596,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 100,
+        "depth": null,
+        "width": null,
+        "nodes": 85762,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 101,
+        "depth": null,
+        "width": null,
+        "nodes": 95499,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 102,
+        "depth": null,
+        "width": null,
+        "nodes": 106597,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 103,
+        "depth": null,
+        "width": null,
+        "nodes": 111336,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 104,
+        "depth": null,
+        "width": null,
+        "nodes": 197328,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 105,
+        "depth": null,
+        "width": null,
+        "nodes": 199952,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 106,
+        "depth": null,
+        "width": null,
+        "nodes": 206724,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 107,
+        "depth": null,
+        "width": null,
+        "nodes": 213529,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 108,
+        "depth": null,
+        "width": null,
+        "nodes": 212812,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 109,
+        "depth": null,
+        "width": null,
+        "nodes": 189984,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 110,
+        "depth": null,
+        "width": null,
+        "nodes": 200750,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 111,
+        "depth": null,
+        "width": null,
+        "nodes": 179799,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 112,
+        "depth": null,
+        "width": null,
+        "nodes": 205638,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 113,
+        "depth": null,
+        "width": null,
+        "nodes": 196207,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 114,
+        "depth": null,
+        "width": null,
+        "nodes": 222165,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 115,
+        "depth": null,
+        "width": null,
+        "nodes": 199934,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 116,
+        "depth": null,
+        "width": null,
+        "nodes": 184873,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 117,
+        "depth": null,
+        "width": null,
+        "nodes": 61334,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 118,
+        "depth": null,
+        "width": null,
+        "nodes": 75942,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 119,
+        "depth": null,
+        "width": null,
+        "nodes": 98070,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 120,
+        "depth": null,
+        "width": null,
+        "nodes": 98800,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 121,
+        "depth": null,
+        "width": null,
+        "nodes": 95601,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 122,
+        "depth": null,
+        "width": null,
+        "nodes": 115810,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 123,
+        "depth": null,
+        "width": null,
+        "nodes": 202689,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 124,
+        "depth": null,
+        "width": null,
+        "nodes": 155405,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 125,
+        "depth": null,
+        "width": null,
+        "nodes": 121601,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 126,
+        "depth": null,
+        "width": null,
+        "nodes": 110100,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 127,
+        "depth": null,
+        "width": null,
+        "nodes": 98913,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 128,
+        "depth": null,
+        "width": null,
+        "nodes": 87542,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 129,
+        "depth": null,
+        "width": null,
+        "nodes": 91600,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 130,
+        "depth": null,
+        "width": null,
+        "nodes": 98853,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 131,
+        "depth": null,
+        "width": null,
+        "nodes": 103368,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 132,
+        "depth": null,
+        "width": null,
+        "nodes": 97890,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 133,
+        "depth": null,
+        "width": null,
+        "nodes": 144152,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 134,
+        "depth": null,
+        "width": null,
+        "nodes": 136203,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 135,
+        "depth": null,
+        "width": null,
+        "nodes": 145155,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 136,
+        "depth": null,
+        "width": null,
+        "nodes": 195618,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 137,
+        "depth": null,
+        "width": null,
+        "nodes": 179124,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 138,
+        "depth": null,
+        "width": null,
+        "nodes": 169422,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 139,
+        "depth": null,
+        "width": null,
+        "nodes": 194406,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 140,
+        "depth": null,
+        "width": null,
+        "nodes": 196888,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 141,
+        "depth": null,
+        "width": null,
+        "nodes": 184831,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 142,
+        "depth": null,
+        "width": null,
+        "nodes": 206552,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 143,
+        "depth": null,
+        "width": null,
+        "nodes": 191683,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 144,
+        "depth": null,
+        "width": null,
+        "nodes": 200849,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 145,
+        "depth": null,
+        "width": null,
+        "nodes": 199424,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 146,
+        "depth": null,
+        "width": null,
+        "nodes": 210045,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 147,
+        "depth": null,
+        "width": null,
+        "nodes": 183694,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 148,
+        "depth": null,
+        "width": null,
+        "nodes": 180831,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 149,
+        "depth": null,
+        "width": null,
+        "nodes": 202963,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 150,
+        "depth": null,
+        "width": null,
+        "nodes": 203492,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 151,
+        "depth": null,
+        "width": null,
+        "nodes": 177620,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 152,
+        "depth": null,
+        "width": null,
+        "nodes": 159686,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 153,
+        "depth": null,
+        "width": null,
+        "nodes": 193947,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 154,
+        "depth": null,
+        "width": null,
+        "nodes": 172909,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 155,
+        "depth": null,
+        "width": null,
+        "nodes": 189641,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 156,
+        "depth": null,
+        "width": null,
+        "nodes": 183770,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 157,
+        "depth": null,
+        "width": null,
+        "nodes": 156942,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 158,
+        "depth": null,
+        "width": null,
+        "nodes": 154571,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 159,
+        "depth": null,
+        "width": null,
+        "nodes": 194345,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 160,
+        "depth": null,
+        "width": null,
+        "nodes": 200517,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 161,
+        "depth": null,
+        "width": null,
+        "nodes": 198526,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 162,
+        "depth": null,
+        "width": null,
+        "nodes": 205023,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 163,
+        "depth": null,
+        "width": null,
+        "nodes": 200551,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 164,
+        "depth": null,
+        "width": null,
+        "nodes": 182840,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 165,
+        "depth": null,
+        "width": null,
+        "nodes": 199965,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 166,
+        "depth": null,
+        "width": null,
+        "nodes": 196714,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 167,
+        "depth": null,
+        "width": null,
+        "nodes": 182304,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 168,
+        "depth": null,
+        "width": null,
+        "nodes": 182050,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 169,
+        "depth": null,
+        "width": null,
+        "nodes": 184517,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 170,
+        "depth": null,
+        "width": null,
+        "nodes": 194266,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 171,
+        "depth": null,
+        "width": null,
+        "nodes": 200181,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 172,
+        "depth": null,
+        "width": null,
+        "nodes": 179937,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 173,
+        "depth": null,
+        "width": null,
+        "nodes": 192667,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 174,
+        "depth": null,
+        "width": null,
+        "nodes": 192128,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 175,
+        "depth": null,
+        "width": null,
+        "nodes": 218396,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 176,
+        "depth": null,
+        "width": null,
+        "nodes": 196169,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 177,
+        "depth": null,
+        "width": null,
+        "nodes": 213550,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 178,
+        "depth": null,
+        "width": null,
+        "nodes": 194502,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 179,
+        "depth": null,
+        "width": null,
+        "nodes": 185383,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 180,
+        "depth": null,
+        "width": null,
+        "nodes": 193730,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 181,
+        "depth": null,
+        "width": null,
+        "nodes": 188470,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 182,
+        "depth": null,
+        "width": null,
+        "nodes": 211432,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 183,
+        "depth": null,
+        "width": null,
+        "nodes": 191260,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 184,
+        "depth": null,
+        "width": null,
+        "nodes": 207087,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 185,
+        "depth": null,
+        "width": null,
+        "nodes": 186824,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 186,
+        "depth": null,
+        "width": null,
+        "nodes": 174170,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 187,
+        "depth": null,
+        "width": null,
+        "nodes": 178418,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 188,
+        "depth": null,
+        "width": null,
+        "nodes": 174577,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 189,
+        "depth": null,
+        "width": null,
+        "nodes": 172338,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 190,
+        "depth": null,
+        "width": null,
+        "nodes": 151869,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 191,
+        "depth": null,
+        "width": null,
+        "nodes": 157274,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 192,
+        "depth": null,
+        "width": null,
+        "nodes": 175318,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 193,
+        "depth": null,
+        "width": null,
+        "nodes": 161650,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 194,
+        "depth": null,
+        "width": null,
+        "nodes": 178924,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 195,
+        "depth": null,
+        "width": null,
+        "nodes": 181778,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 196,
+        "depth": null,
+        "width": null,
+        "nodes": 188370,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 197,
+        "depth": null,
+        "width": null,
+        "nodes": 185507,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 198,
+        "depth": null,
+        "width": null,
+        "nodes": 198477,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 199,
+        "depth": null,
+        "width": null,
+        "nodes": 189314,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 200,
+        "depth": null,
+        "width": null,
+        "nodes": 177543,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 201,
+        "depth": null,
+        "width": null,
+        "nodes": 157355,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 202,
+        "depth": null,
+        "width": null,
+        "nodes": 171163,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 203,
+        "depth": null,
+        "width": null,
+        "nodes": 195079,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 204,
+        "depth": null,
+        "width": null,
+        "nodes": 201257,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 205,
+        "depth": null,
+        "width": null,
+        "nodes": 190278,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 206,
+        "depth": null,
+        "width": null,
+        "nodes": 201409,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 207,
+        "depth": null,
+        "width": null,
+        "nodes": 206005,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 208,
+        "depth": null,
+        "width": null,
+        "nodes": 206148,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 209,
+        "depth": null,
+        "width": null,
+        "nodes": 155857,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 210,
+        "depth": null,
+        "width": null,
+        "nodes": 196774,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 211,
+        "depth": null,
+        "width": null,
+        "nodes": 190779,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 212,
+        "depth": null,
+        "width": null,
+        "nodes": 225403,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 213,
+        "depth": null,
+        "width": null,
+        "nodes": 171486,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 214,
+        "depth": null,
+        "width": null,
+        "nodes": 108585,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 215,
+        "depth": null,
+        "width": null,
+        "nodes": 129078,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 216,
+        "depth": null,
+        "width": null,
+        "nodes": 136524,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 217,
+        "depth": null,
+        "width": null,
+        "nodes": 132872,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 218,
+        "depth": null,
+        "width": null,
+        "nodes": 169217,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 219,
+        "depth": null,
+        "width": null,
+        "nodes": 201666,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 220,
+        "depth": null,
+        "width": null,
+        "nodes": 179418,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 221,
+        "depth": null,
+        "width": null,
+        "nodes": 165379,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 222,
+        "depth": null,
+        "width": null,
+        "nodes": 129035,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 223,
+        "depth": null,
+        "width": null,
+        "nodes": 182612,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 224,
+        "depth": null,
+        "width": null,
+        "nodes": 193342,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 225,
+        "depth": null,
+        "width": null,
+        "nodes": 179409,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 226,
+        "depth": null,
+        "width": null,
+        "nodes": 205328,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 227,
+        "depth": null,
+        "width": null,
+        "nodes": 197865,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 228,
+        "depth": null,
+        "width": null,
+        "nodes": 191012,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 229,
+        "depth": null,
+        "width": null,
+        "nodes": 191540,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 230,
+        "depth": null,
+        "width": null,
+        "nodes": 158011,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 231,
+        "depth": null,
+        "width": null,
+        "nodes": 194504,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 232,
+        "depth": null,
+        "width": null,
+        "nodes": 161640,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 233,
+        "depth": null,
+        "width": null,
+        "nodes": 157490,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 234,
+        "depth": null,
+        "width": null,
+        "nodes": 185407,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 235,
+        "depth": null,
+        "width": null,
+        "nodes": 168504,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 236,
+        "depth": null,
+        "width": null,
+        "nodes": 195807,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 237,
+        "depth": null,
+        "width": null,
+        "nodes": 187973,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 238,
+        "depth": null,
+        "width": null,
+        "nodes": 196704,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 239,
+        "depth": null,
+        "width": null,
+        "nodes": 192359,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 240,
+        "depth": null,
+        "width": null,
+        "nodes": 200254,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 241,
+        "depth": null,
+        "width": null,
+        "nodes": 181503,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 242,
+        "depth": null,
+        "width": null,
+        "nodes": 183952,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 243,
+        "depth": null,
+        "width": null,
+        "nodes": 189066,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 244,
+        "depth": null,
+        "width": null,
+        "nodes": 189848,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 245,
+        "depth": null,
+        "width": null,
+        "nodes": 202512,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 246,
+        "depth": null,
+        "width": null,
+        "nodes": 179085,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 247,
+        "depth": null,
+        "width": null,
+        "nodes": 217056,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 248,
+        "depth": null,
+        "width": null,
+        "nodes": 207233,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 249,
+        "depth": null,
+        "width": null,
+        "nodes": 177082,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 250,
+        "depth": null,
+        "width": null,
+        "nodes": 172121,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 251,
+        "depth": null,
+        "width": null,
+        "nodes": 173342,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 252,
+        "depth": null,
+        "width": null,
+        "nodes": 179689,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 253,
+        "depth": null,
+        "width": null,
+        "nodes": 81299,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 254,
+        "depth": null,
+        "width": null,
+        "nodes": 73998,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 255,
+        "depth": null,
+        "width": null,
+        "nodes": 68487,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 256,
+        "depth": null,
+        "width": null,
+        "nodes": 68656,
+        "fallback": false,
+        "aborted": false
+      },
+      {
+        "turn": 257,
+        "depth": null,
+        "width": null,
+        "nodes": 72338,
+        "fallback": false,
+        "aborted": false
+      }
+    ]
+  ],
+  "opener_lines": [
+    4,
+    2
+  ],
+  "spin_placements": [
+    28,
+    19
+  ],
+  "repeat": 0
+}
