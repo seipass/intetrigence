@@ -1223,3 +1223,45 @@ pub struct SearchConfig { ..., pub deterministic: bool }   // 既定 false
 1. **`height` / `danger` を `risk(H)` でゲート(下限 0.2)** — 低い盤面では高さの罰則を弱め、攻撃に回る
 2. **測定に `S_us > S_them` を追加** — 決着の必要条件
 3. **burst を優先** — `a/line` 1.79 は現実的でないので「長引かせない」が本命。**19 勝は短いゲームで burst して勝っている**
+
+## 30. 🚨 P0: シート B が turn 1 で forfeit(2026-11-16)
+
+### 症状
+
+`cc2m-risk`(20 ゲーム)の結果: **10 勝 0 敗 0 未決着 10 no-contest**。**シート B の 10 ゲームが全部 `forfeit_other`、turns=1。**
+
+CC2 の応答:
+```
+{"payload":{"move_info":{"extra":"NaN% of selections expanded, overall speed: 0.0 Mnps","nodes":0,"nps":0.0},"moves":[]},"type":"suggestion"}
+```
+
+**空盤面で `moves: []`、`nodes: 0`、`NaN%`** = CC2 の movegen が 0 配置しか見つけていない。
+
+### 切り分け(マネージャが実施)
+
+| 条件 | 結果 |
+|---|---|
+| シート A(我々が seat 1、CC2 が seat 2) | **動く** |
+| **シート B(CC2 が seat 1、我々が seat 2)** | **turn 1 で forfeit** |
+| `--deterministic` なし | 同じく forfeit |
+| `--tbp-visible-rows 20` | 同じく forfeit |
+| **`171eb3c`(前のコミット)のバイナリ** | **同じく forfeit** |
+
+**コードの回帰ではない。環境依存のレース。** `171eb3c` でも再現するので、**以前の `cc2m-det8w96`(19 勝 0 敗 1 未決着)は運が良かった**可能性がある。
+
+### 仮説
+
+**TBP host が `start` を送ってから、CC2 の読み取りスレッドが準備できる前に `suggest` を送っている。**
+
+- シート A では CC2 が後手なので、我々の手番の間に `start` を処理する時間がある
+- シート B では CC2 が先手なので、`start` の直後に `suggest` が来る
+
+### 影響
+
+**シート B が動かないと `no_contest == 0` のゲートが絶対に通れない。** また**過去の「20 ゲーム」の数字が両シートだったか**の再検証が必要。
+
+### `cc2m-risk` の参考値(シート A の 10 ゲームのみ)
+
+- 10 勝 0 敗、`a/p` 0.723、`a/line` **1.12**、`spin` 8.6%、`net<0` 0、**崩壊 0**、`over100` 2、`depth` 8、`fallback` 0%
+
+**`risk` ゲートで `a/line` は 1.135 → 1.12 とほぼ変わらず、spin も 8.6% のまま。** ただしシート A のみなので判断できない。
