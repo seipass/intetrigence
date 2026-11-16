@@ -92,6 +92,9 @@ impl TbpAgent {
             visible_rows: config.visible_rows,
             supports_180: config.supports_180,
             build_id: None,
+            threads: None,
+            suggest_delay_ms: Some(config.suggest_delay_ms),
+            retry_empty_suggest_ms: Some(config.retry_empty_suggest_ms),
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());

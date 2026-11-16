@@ -17,7 +17,8 @@
 #   CC2_ARGS       comma separated CC2 arguments
 #   CC2_COMMIT     CC2 commit
 #   CC2_VISIBLE_ROWS  default 40
-#   CC2_SUPPORTS_180 / CLYS_SUPPORTS_180  default true (check the bot's movegen)
+#   CC2_SUPPORTS_180 / CLYS_SUPPORTS_180  default false (none of the three
+#                                          opponents has 180-degree rotation)
 #   CLYS_PROGRAM / CLYS_ARGS / CLYS_COMMIT / CLYS_VISIBLE_ROWS
 #   GATE_CC2 / GATE_CLYS / GATE_ATTAX   default 50 / 50 / 48
 #   DEPTH / WIDTH  deterministic schedule. d6 w96 is the interim; once the
@@ -42,11 +43,18 @@ ATTAX_PATCH_NOTE="${ATTAX_PATCH_NOTE:-attax-vision-40.patch (68 lines): ROWS 40,
 ATTAX_PATCH_SHA256="${ATTAX_PATCH_SHA256:-e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70}"
 ATTAX_VISIBLE_ROWS="${ATTAX_VISIBLE_ROWS:-0}"
 ATTAX_ENV="${ATTAX_ENV:-}"
+CC2_DIR="${CC2_DIR:-C:/Users/Hasilan/Projects/cold-clear-2}"
+CC2_PATCH_NOTE="${CC2_PATCH_NOTE:-cc2-tbp-compat.patch: spawn position and the empty-hold representation (hold candidate enumeration + eval cutout); no weight changes}"
+CC2_PATCH_SHA256="${CC2_PATCH_SHA256:-0202959a0af3dd77abca4caf4c8cfad6e21a38e70d0b3218ddf14bc3e42e95d5}"
+CLYS_DIR="${CLYS_DIR:-C:/Users/Hasilan/Projects/clys}"
+CLYS_PATCH_NOTE="${CLYS_PATCH_NOTE:-clys-tbp-spawn.patch: spawn row 19 -> 21 in core/move.cpp plus the TBP adapter; no search/evaluation changes}"
+CLYS_PATCH_SHA256="${CLYS_PATCH_SHA256:-f25c138110e2a6a571bf62267477a79f714a6ae16dc2b4c0218df3e72962ddaa}"
+ATTAX_ENV="${ATTAX_ENV:-}"
 GATE_CC2="${GATE_CC2:-50}"
 GATE_CLYS="${GATE_CLYS:-50}"
 GATE_ATTAX="${GATE_ATTAX:-48}"
-CC2_SUPPORTS_180="${CC2_SUPPORTS_180:-true}"
-CLYS_SUPPORTS_180="${CLYS_SUPPORTS_180:-true}"
+CC2_SUPPORTS_180="${CC2_SUPPORTS_180:-false}"
+CLYS_SUPPORTS_180="${CLYS_SUPPORTS_180:-false}"
 MS="${MS:-100}"
 THREADS="${THREADS:-8}"
 TURNS="${TURNS:-1000}"
@@ -73,10 +81,10 @@ if [ -n "$ATTAX_ENV" ]; then
   done
 fi
 if [ -n "${CC2_PROGRAM:-}" ]; then
-  ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}" --cc2-supports-180 "$CC2_SUPPORTS_180")
+  ARGS+=(--cc2-program "$CC2_PROGRAM" --cc2-args "${CC2_ARGS:-}" --cc2-commit "${CC2_COMMIT:-}" --cc2-cwd "$CC2_DIR" --cc2-visible-rows "${CC2_VISIBLE_ROWS:-40}" --cc2-supports-180 "$CC2_SUPPORTS_180" --cc2-patch-note "$CC2_PATCH_NOTE" --cc2-patch-sha256 "$CC2_PATCH_SHA256")
 fi
 if [ -n "${CLYS_PROGRAM:-}" ]; then
-  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180" --clys-retry-empty-ms "${CLYS_RETRY_EMPTY_MS:-2000}" --clys-env "CLYS_TBP_LOG=$(cd "$OUT" && pwd)/round-$ROUND-clys-adapter.jsonl")
+  ARGS+=(--clys-program "$CLYS_PROGRAM" --clys-args "${CLYS_ARGS:-}" --clys-commit "${CLYS_COMMIT:-}" --clys-cwd "$CLYS_DIR" --clys-visible-rows "${CLYS_VISIBLE_ROWS:-40}" --clys-supports-180 "$CLYS_SUPPORTS_180" --clys-retry-empty-ms "${CLYS_RETRY_EMPTY_MS:-2000}" --clys-patch-note "$CLYS_PATCH_NOTE" --clys-patch-sha256 "$CLYS_PATCH_SHA256" --clys-env "CLYS_TBP_LOG=$(cd "$OUT" && pwd)/round-$ROUND-clys-adapter.jsonl")
 fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
   ARGS+=(--dry-run)

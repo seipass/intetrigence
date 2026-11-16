@@ -64,6 +64,21 @@ fn parse_env(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// `git -C <dir> rev-parse HEAD`, or `None` when the directory is not a
+/// checkout. Used to fill an opponent commit the caller did not pass.
+fn git_head(dir: &std::path::Path) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 fn parse_args(text: &str) -> Vec<String> {
     text.split(',')
         .map(str::trim)
@@ -88,8 +103,9 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut cc2_args: Vec<String> = Vec::new();
     let mut cc2_commit: Option<String> = None;
     let mut cc2_patch: Option<String> = None;
+    let mut cc2_patch_sha256: Option<String> = None;
     let mut cc2_visible_rows = 40u32;
-    let mut cc2_supports_180 = true;
+    let mut cc2_supports_180 = false;
     let mut cc2_suggest_delay_ms = 100u64;
     let mut cc2_retry_empty_ms = 2000u64;
     let mut cc2_cwd: Option<PathBuf> = None;
@@ -98,10 +114,11 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let mut clys_args: Vec<String> = Vec::new();
     let mut clys_commit: Option<String> = None;
     let mut clys_patch: Option<String> = None;
+    let mut clys_patch_sha256: Option<String> = None;
     let mut clys_visible_rows = 40u32;
-    let mut clys_supports_180 = true;
+    let mut clys_supports_180 = false;
     let mut clys_suggest_delay_ms = 0u64;
-    let mut clys_retry_empty_ms = 0u64;
+    let mut clys_retry_empty_ms = 2000u64;
     let mut clys_cwd: Option<PathBuf> = None;
     let mut clys_env: Vec<(String, String)> = Vec::new();
     // Stage order is CC2 -> clys -> attax; the gates array follows that order.
@@ -205,6 +222,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 cc2_patch = Some(value(1)?);
                 index += 2;
             }
+            "--cc2-patch-sha256" => {
+                cc2_patch_sha256 = Some(value(1)?);
+                index += 2;
+            }
             "--cc2-supports-180" => {
                 cc2_supports_180 = value(1)?
                     .parse()
@@ -257,6 +278,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             }
             "--clys-patch-note" => {
                 clys_patch = Some(value(1)?);
+                index += 2;
+            }
+            "--clys-patch-sha256" => {
+                clys_patch_sha256 = Some(value(1)?);
                 index += 2;
             }
             "--clys-visible-rows" => {
@@ -426,6 +451,11 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
         })
     });
+    // Detect the opponent's commit from its checkout when the caller did not
+    // pass one: an empty commit makes the stage report unable to say which
+    // build it played.
+    let cc2_commit = cc2_commit.or_else(|| cc2_cwd.as_deref().and_then(git_head));
+    let clys_commit = clys_commit.or_else(|| clys_cwd.as_deref().and_then(git_head));
     let attax = match attax_dir {
         Some(dir) => OpponentSpec {
             key: "attax".into(),
@@ -465,7 +495,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 display: "Cold Clear 2".into(),
                 commit: cc2_commit,
                 patch_note: cc2_patch,
-                patch_sha256: None,
+                patch_sha256: cc2_patch_sha256,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -474,7 +504,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "Cold Clear 2".into(),
             commit: None,
             patch_note: cc2_patch,
-            patch_sha256: None,
+            patch_sha256: cc2_patch_sha256,
             kind: OpponentKind::Missing,
         },
     };
@@ -493,7 +523,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 display: "clys".into(),
                 commit: clys_commit,
                 patch_note: clys_patch,
-                patch_sha256: None,
+                patch_sha256: clys_patch_sha256,
                 kind: OpponentKind::Tbp(config),
             }
         }
@@ -502,7 +532,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             display: "clys".into(),
             commit: None,
             patch_note: clys_patch,
-            patch_sha256: None,
+            patch_sha256: clys_patch_sha256,
             kind: OpponentKind::Missing,
         },
     };

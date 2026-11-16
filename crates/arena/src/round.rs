@@ -761,11 +761,12 @@ fn stage_section(
     )?;
     writeln!(
         out,
-        "- win breakdown: TopOut **{}**; unresolved (TurnCap) **{}**; no-contest (forfeit-vision **{}** + forfeit-other **{}**) **{}**; stuck **{}**",
+        "- win breakdown: TopOut **{}**; unresolved (TurnCap) **{}**; no-contest (forfeit-vision **{}** + forfeit-other **{}** + forfeit-unknown **{}**) **{}**; stuck **{}**",
         summary.wins_topout,
         summary.turncap,
         summary.forfeit_vision,
         summary.forfeit_other,
+        summary.forfeit_unknown,
         summary.no_contest,
         summary.stuck
     )?;
@@ -961,20 +962,31 @@ fn write_markdown_report(spec: &RoundSpec, report: &RoundReport) -> Result<(), S
         )
         .map_err(|e| e.to_string())?;
     }
+    let bun = std::process::Command::new("bun")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .unwrap_or_else(|| "unknown".into());
     writeln!(
         out,
-        "- environment: {} / {} logical CPUs / bun 1.4.0",
+        "- environment: {} / {} logical CPUs / bun {}",
         std::env::consts::OS,
         std::thread::available_parallelism()
             .map(|count| count.get())
-            .unwrap_or(0)
+            .unwrap_or(0),
+        bun
     )
     .map_err(|e| e.to_string())?;
     writeln!(out).map_err(|e| e.to_string())?;
     writeln!(out, "## Gates").map_err(|e| e.to_string())?;
     writeln!(out).map_err(|e| e.to_string())?;
-    writeln!(out, "| stage | opponent | gate | games | W-L-D | result |")
-        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "| stage | opponent | gate | games | W-L (U, NC) | result |"
+    )
+    .map_err(|e| e.to_string())?;
     writeln!(out, "|---|---|---|---|---|---|").map_err(|e| e.to_string())?;
     for (index, stage) in report.stages.iter().enumerate() {
         writeln!(

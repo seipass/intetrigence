@@ -202,6 +202,9 @@ impl Agent for BotAgent {
             visible_rows: 40,
             supports_180: true,
             build_id: Some(crate::BUILD_ID.into()),
+            threads: Some(self.config.search.threads as u32),
+            suggest_delay_ms: None,
+            retry_empty_suggest_ms: None,
         }
     }
 

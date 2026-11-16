@@ -93,7 +93,9 @@ impl TbpOpponentConfig {
             env: Vec::new(),
             commit: None,
             visible_rows: 40,
-            supports_180: true,
+            // CC2, clys and attax do not have 180-degree rotation; an
+            // unknown TBP bot is treated conservatively.
+            supports_180: false,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             timeout: Duration::from_secs(30),
@@ -447,6 +449,18 @@ pub struct BotAggregate {
     /// Build commit recorded in the replay header (captured once per match).
     #[serde(default)]
     pub commit: Option<String>,
+    /// Content hash of the sources that produced the bot (header).
+    #[serde(default)]
+    pub build_id: Option<String>,
+    /// Worker threads the bot was allowed to use (search bots only).
+    #[serde(default)]
+    pub threads: Option<u32>,
+    /// Delay between `start` and the first `suggest` (external TBP bots).
+    #[serde(default)]
+    pub suggest_delay_ms: Option<u64>,
+    /// How long an empty `suggest` is retried (external TBP bots).
+    #[serde(default)]
+    pub retry_empty_suggest_ms: Option<u64>,
     pub placements: u32,
     pub spin_checked: u32,
     pub spin_mismatches: u32,
@@ -924,6 +938,16 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             commit: audits
                 .first()
                 .and_then(|audit| audit.bots[slot].commit.clone()),
+            build_id: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].build_id.clone()),
+            threads: audits.first().and_then(|audit| audit.bots[slot].threads),
+            suggest_delay_ms: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].suggest_delay_ms),
+            retry_empty_suggest_ms: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].retry_empty_suggest_ms),
             placements: audits
                 .iter()
                 .map(|audit| audit.scoring[slot].placements)
@@ -1201,6 +1225,24 @@ impl MatchSummary {
             "- build id: `{}`; binary: `{}`\n",
             self.build_id, self.binary
         ));
+        if let Some(peer) = self.bots.get(1) {
+            text.push_str(&format!(
+                "- opponent: {} (commit {}, build id {}, visible rows {}, threads {}, suggest delay {} ms, empty-suggest retry {} ms)\n",
+                peer.name,
+                peer.commit.as_deref().unwrap_or("unknown"),
+                peer.build_id.as_deref().unwrap_or("unknown"),
+                peer.visible_rows,
+                peer.threads
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+                peer.suggest_delay_ms
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+                peer.retry_empty_suggest_ms
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+            ));
+        }
         text.push_str(&format!(
             "- intetrigence wins / losses / unresolved / no-contest: {} / {} / {} / {}\n",
             self.wins, self.losses, self.unresolved, self.no_contest
@@ -1243,10 +1285,17 @@ impl MatchSummary {
         text.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for game in &self.games {
             let winner = match game.winner {
-                Some(0) => "intetrigence".to_string(),
-                Some(1) => "attax".to_string(),
+                Some(0) => self.bots[0].name.clone(),
+                Some(1) => self.bots[1].name.clone(),
                 Some(slot) => format!("slot {slot}"),
-                None => "draw".to_string(),
+                // `draws` is forbidden by the protocol: an undecided game is
+                // `unresolved`, a forfeit is `no contest`, a stuck top-out is
+                // `stuck`. They are different outcomes and must not merge.
+                None => match game.reason.as_str() {
+                    "Forfeit" => "no contest".to_string(),
+                    "Stuck" => "stuck".to_string(),
+                    _ => "unresolved".to_string(),
+                },
             };
             text.push_str(&format!(
                 "| {} | {} | {} | {} | {} | {} | {} | {:.1} / {:.1} | {:.1} / {:.1} | {:.2} / {:.2} | {:.2} / {:.2} | {} |\n",
@@ -1688,10 +1737,20 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     }
 
     let mut notes = config.notes.clone();
-    notes.push(
-        "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
-            .into(),
-    );
+    match &config.bot {
+        BotChoice::Search(search) if search.deterministic => notes.push(format!(
+            "The intetrigence search is deterministic: depth {} width {} over {} thread(s), no wall-clock deadline. Our moves are a pure function of the position sequence; the opponent is a separate process, so the same seed does not reproduce the same game. The replay is the record.",
+            search.depth, search.width, search.threads
+        )),
+        BotChoice::Search(search) => notes.push(format!(
+            "The intetrigence search is non-deterministic (anytime, {} thread(s), {} ms): the same seed can produce different games; the replay is the record.",
+            search.threads,
+            search.budget.as_millis()
+        )),
+        BotChoice::Baseline => notes.push(
+            "The intetrigence side is the in-process baseline, not the search bot.".into(),
+        ),
+    }
     let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
     summary.deterministic = config.deterministic;

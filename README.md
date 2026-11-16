@@ -119,7 +119,9 @@ cargo run --release -p intetrigence-arena -- render \
 
 外部ボットは TBP(標準入出力の JSON 行)で接続します。attax は `adapters/attax-vision-40.patch`、
 CC2 は `adapters/cc2-tbp-compat.patch`、clys は `adapters/clys-tbp-spawn.patch` + `adapters/clys/tbp/adapter.ts` を適用します。
-いずれも**視野・spawn 位置のプロトコル互換修正のみ**で、探索・評価・重みには触れません。
+いずれも**視野・spawn 位置(CC2 は加えて空 hold の表現)のプロトコル互換修正**で、重みは変えません。
+CC2 のパッチは空 hold を表すために hold 候補の列挙と eval の cutout に触れます(探索・評価の
+該当箇所のみ。重み・探索パラメタは不変)。パッチの SHA-256 はラウンドレポートに記録します。
 
 ## ドキュメント
 

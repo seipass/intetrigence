@@ -33,6 +33,12 @@ pub struct BotDescriptor {
     /// Content hash of the sources that produced this bot (`crate::BUILD_ID`).
     /// `commit` records the checkout, not the binary; this records the code.
     pub build_id: Option<String>,
+    /// Worker threads the bot was allowed to use (search bots only).
+    pub threads: Option<u32>,
+    /// Delay between `start` and the first `suggest` (external TBP bots).
+    pub suggest_delay_ms: Option<u64>,
+    /// How long an empty `suggest` is retried (external TBP bots).
+    pub retry_empty_suggest_ms: Option<u64>,
 }
 
 /// One candidate placement, identified by its absolute cell set.

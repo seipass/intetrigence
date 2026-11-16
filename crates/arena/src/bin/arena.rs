@@ -76,7 +76,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_args: Vec<String> = Vec::new();
     let mut tbp_cwd: Option<PathBuf> = None;
     let mut tbp_visible_rows = 40u32;
-    let mut tbp_supports_180 = true;
+    let mut tbp_supports_180 = false;
     let mut tbp_suggest_delay_ms = 0u64;
     // A TBP opponent needs a moment after `start` before it can suggest: when
     // it moves first (sheet B) the host used to ask for a move before the
@@ -641,7 +641,7 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
 fn cmd_reclassify(args: &[String]) -> Result<(), String> {
     let mut path: Option<PathBuf> = None;
     let mut visible_rows = 40u32;
-    let mut supports_180 = true;
+    let mut supports_180 = false;
     let mut index = 0;
     while index < args.len() {
         let flag = args[index].clone();

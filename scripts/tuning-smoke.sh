@@ -38,7 +38,7 @@ cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --out "$OUT/tuning-cc2" \
   --tbp-program "$CC2_DIR/target/release/cold-clear-2.exe" \
   --tbp-cwd "$CC2_DIR" --tbp-visible-rows 40 \
-  --tbp-suggest-delay-ms 100 --tbp-retry-empty-ms 2000 --tbp-name cc2 \
+  --tbp-suggest-delay-ms 100 --tbp-retry-empty-ms 2000 --tbp-supports-180 false --tbp-name cc2 \
   --note "Tuning smoke vs CC2 (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
 
 echo "tuning smoke: clys ($SEEDS, sheets $CLYS_SHEETS, $TURNS turns)"
@@ -52,7 +52,7 @@ cargo run --offline --release -p intetrigence-arena --bin arena -- match \
   --tbp-program bun \
   --tbp-args "$ADAPTER,--clys-dir,$CLYS_DIR,--think-ms,100" \
   --tbp-cwd C:/Users/Hasilan/Projects/intetrigence --tbp-visible-rows 40 \
-  --tbp-retry-empty-ms 2000 \
+  --tbp-retry-empty-ms 2000 --tbp-supports-180 false \
   --tbp-name clys \
   --note "Tuning smoke vs clys (tuning seeds 9001-9010, sheet A, 1000 turns; evaluation seeds untouched)."
 
