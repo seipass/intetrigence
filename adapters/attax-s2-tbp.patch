@@ -1,0 +1,28 @@
+diff --git a/tbp/attax-tbp.ts b/tbp/attax-tbp.ts
+index db44b48..224b1a2 100644
+--- a/tbp/attax-tbp.ts
++++ b/tbp/attax-tbp.ts
+@@ -186,7 +186,11 @@ function applyPlay(mv: TbpMove) {
+ }
+ 
+ // ---- decision --------------------------------------------------------------------------
+-const bot = createBot({ name: "attax" }); // default preview 5, beam width 48, default weights
++const S2_PROFILE = process.env.ATTAX_TBP_PROFILE === "s2";
++const bot = createBot({
++  name: "attax",
++  ...(S2_PROFILE ? { profile: "s2" as const } : {}),
++}); // default preview 5, beam width 48, default weights
+ 
+ function snapshot(): GameSnapshot | null {
+   // Attax grid: FIELD_ROWS rows, index 0 = top.  At 20 rows, cells above
+@@ -198,7 +202,9 @@ function snapshot(): GameSnapshot | null {
+   if (!kind) return null; // queue ran dry: caller answers with an empty suggestion
+   const shape = cellsFor(kind, 0) as { x: number; y: number }[];
+   const minY = Math.min(0, ...shape.map((c) => c.y));
+-  const posY = FIELD_ROWS > 20 ? FIELD_ROWS - 21 : -minY;
++  const maxY = Math.max(...shape.map((c) => c.y));
++  // 40-row mode: S2 spawn bottom cell at TBP row 21 -> grid row FIELD_ROWS - 22.
++  const posY = FIELD_ROWS > 20 ? FIELD_ROWS - 22 - maxY : -minY;
+   return {
+     board: { cols: 10, rows: FIELD_ROWS, grid },
+     active: {

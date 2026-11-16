@@ -79,36 +79,47 @@ sh C:\Users\Hasilan\Projects\attax\tbp\attax-tbp.sh
 PowerShell から `.sh` を直接実行することはできない(`.sh` は sh スクリプトのため)。我々のレフェリーは
 `bun <attax>/tbp/attax-tbp.ts` を直接 spawn するのが最も移植性が高い。
 
-### 2.2 40 行パッチ(視野)
+### 2.2 S2 profile と 40 行視野(新 pin `1f41806`)
 
-上流 `7b38f51` のアダプタは **TBP の 40 行のうち下 20 行だけ**を attax の 20 行グリッドに写像する:
+**pin は `1f41806cbfe5ed3a5b1df81e6b7aac60f256e9d0`(S2 対応版)に更新済み**。
+旧 `7b38f51` の 20 行切り詰めは、新アダプタでは **`ATTAX_TBP_ROWS=40`** で解消されている。
 
-```ts
-const grid = Array.from({ length: 20 }, (_, r) => (rows[19 - r] ?? []).map(...));
-```
+新アダプタ(`tbp/attax-tbp.ts`)の機能:
 
-S2 のスポーンは **最下段セル = row 21**(可視 20 行の 2 行上)なので、attax の 20 行グリッドでは
-active が最上段(row 19)に置かれ、**row 19 に 1 つでもブロックがあると movegen が 0 候補**になる。
-実際、m5-provisional の forfeit 194 件はすべてこの 20 行切り詰めが原因だった(§13)。
+- `ATTAX_TBP_ROWS=40`: TBP の 40 行を snapshot に載せる(`grid` 40 行、`board.rows = 40`、
+  `attaxCellsToTbp` は `FIELD_ROWS - 1 - ...`)。
+- **空 queue で落ちない**: `snapshot()` が `null` を返し、`suggest` は空 suggestion で生存する。
+- `ATTAX_TBP_PROFILE=s2`: `createBot({ profile: "s2" })` で **S2 profile** を選択する
+  (本 repo の `adapters/attax-s2-tbp.patch` で追加。上流は profile 未指定 = guideline)。
 
-`adapters/attax-vision-40.patch`(68 行、SHA-256 `e22aab7b5a2f9a95efb562e24b3f33da351bb942d6daf6e205475b5871ed3b70`)で 40 行対応にする:
+### 2.2.1 `adapters/attax-s2-tbp.patch`(28 行、SHA-256 `461e4396de5fe046ec908d256df886f9c497faa8fbd7c27d02f46d197ab3049f`)
 
-- `src/ai/bot/movegen.ts`: `ROWS = 20` → `40`、`Y_SPAN = 32` → `48`(BFS の y 範囲を 40 行に拡張)、
-  `spawnPosition()` を S2 spawn(`SPAWN_BOTTOM_ROW = 18`)に
-- `tbp/attax-tbp.ts`:
-  - `snapshot()` の grid を 40 行(`rows[39 - r]`)、`board.rows = 40`
-  - `attaxCellsToTbp()` の `19 - (y + c.y)` → `39 - (y + c.y)`
-  - `snapshot()` の active を **S2 spawn**(grid y = 18)に(`posY = 18 - maxY`)。旧 `posY = -minY` は grid 最上段で、
-    レフェリーの spawn と 18 行ずれていた
+- `createBot` に `profile: "s2"` を渡す(`ATTAX_TBP_PROFILE=s2` のときだけ)。
+- `snapshot()` の `posY` を **S2 spawn** に修正:
+  `FIELD_ROWS > 20 ? FIELD_ROWS - 22 - maxY : -minY`。
+  上流の `FIELD_ROWS - 21` は field40 rig の原点で、我々の S2 spawn(最下段セル row 21)とは
+  ピースにより 2〜3 行ずれていた。
 
 ```powershell
 cd C:\Users\Hasilan\Projects\attax
-git apply C:\Users\Hasilan\Projects\intetrigence\adapters\attax-40-row.patch
+git checkout 1f41806cbfe5ed3a5b1df81e6b7aac60f256e9d0
+git apply C:\Users\Hasilan\Projects\intetrigence\adapters\attax-s2-tbp.patch
 bun run typecheck
 ```
 
-パッチ後、seed 11012 は **1000 turn 完走(forfeit 0)**。`cellsAboveRow20` は情報フラグになり、
-attax は 40 行すべてを見る(`visible_rows = 40` として扱える)。
+起動時の環境変数:
+
+```powershell
+$env:ATTAX_TBP_ROWS = "40"
+$env:ATTAX_TBP_PROFILE = "s2"
+$env:ATTAX_TBP_LOG = "C:\tmp\attax-decisions.jsonl"
+```
+
+> **制約**: `createBot` は `GameSnapshot` の guideline フィールドしか S2 の `SearchInput` に写さない
+> (`fighter.ts` のコメント)。`b2bChain` / `garbageRows` / `dueThisLock` / `frame` は渡らないため、
+> **TBP 経由の S2 profile では surge の「溜め」・GSB・margin multiplier が探索に効かない**。
+> 攻撃表・コンボ・All-Mini+・180°・deathHeight 21 は有効。
+> 完全な S2 は `tools/s2-lab/` の外部ラボ用(`s2-input.ts` が S2-only フィールドを埋める)。
 
 ---
 
@@ -645,8 +656,45 @@ summary: 10 games, wins 8 losses 2 draws 0 forfeits 0, verified 10/10
 
 ## 14. 180° capability
 
-- attax の movegen は **CW/CCW のみ**(`src/ai/bot/movegen.ts:198` の `for (let dir = 0; dir < 2; dir += 1)`)。
-  **180° の kick 遷移は無い**。
-- したがって **`supports_180 = false`**。レフェリーの S2 180° でしか到達できない配置は attax には出せない。
-- レフェリー側は `supports_180` を尊重し、180° 限定の合法手を「ボットの capability 限界」として扱う必要がある
-  (harness-dev に依頼済み)。
+| pin / profile | 180° kick | `supports_180` |
+|---|---|---|
+| 旧 `7b38f51`(guideline) | なし(`dir < 2`、CW/CCW のみ) | **false** |
+| 新 `1f41806` guideline | なし(旧と同じ) | **false** |
+| 新 `1f41806` **S2 profile** | **あり**(`src/ai/bot/movegen.ts` の `KICKS_180_JLSTZ` / `KICKS_180_I`、`rotate180: true`) | **true** |
+
+- **S2 profile(`ATTAX_TBP_PROFILE=s2`)では 180° が使える**。`supports_180 = true`。
+- guideline profile では従来どおり 180° なし(`supports_180 = false`)。
+- レフェリー側は profile に応じて `supports_180` を切り替える必要がある
+  (S2 profile 接続時は true、guideline 接続時は false)。
+
+---
+
+## 15. S2 attax との 1 ゲーム(2026-11-16)
+
+条件: seed 9001 sheet A、1000 turn、`--ms 100`/8t、`ATTAX_TBP_ROWS=40` + `ATTAX_TBP_PROFILE=s2`。
+attax は `1f41806` + `adapters/attax-s2-tbp.patch`。
+
+```text
+seed-9001-sheet-A: winner=1 reason=TopOut turns=169 verified=true mismatches=0
+summary: 1 games, wins 0 losses 1 unresolved 0 no-contest 0, verified 1/1
+```
+
+| 項目 | intetrigence | attax(S2) |
+|---|---|---|
+| 結果 | TopOut 負け | **TopOut 勝ち** |
+| turns | 169 | 169 |
+| attack/piece | 0.882(149/169) | **0.929**(156/168) |
+| 受信ゴミ | 69 | 60 |
+| think median | 68.5 ms | 41.6 ms |
+| 第 1 候補採用 | — | 168/168 |
+| spin/attack 監査 | — | **168/168 一致**(mismatch 0) |
+
+- **forfeit / no-contest / unresolved は 0**、replay 検証 1/1。
+- attax の decision log: 168 決定、nodes median 9,868、depth 6(167/168)。
+- **S2 profile は有効**(攻撃表・コンボ・All-Mini+・180°・deathHeight 21)。
+  attack/piece 0.929 は S2 の攻撃表 + コンボ + B2B +1 + PC +5 による。
+- **制約**: `createBot` は S2-only フィールド(`b2bChain` / `garbageRows` / `dueThisLock` / `frame`)を
+  渡さないため、**surge の溜め・GSB・margin multiplier は attax の探索に効かない**。
+  ゲームの採点(レフェリー)は S2 で行われるが、attax の読みはその分弱い。
+- エビデンス: `C:/tmp/attax-s2-game1/{summary.json,audit/,replays/,logs/}`(ローカル)。
+  `logs/seed-9001-sheet-A-attax.jsonl` が decision log。

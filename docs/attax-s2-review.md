@@ -108,10 +108,12 @@ const table =
 - PC: `+floor(5 * multiplier)`、B2B は PC も difficult として加算。
 - ゴミ込みボーナス(GSB): `stage.garbageCleared > 0 && (spin !== "none" || lines >= 4)` で **+1**。
 - フレーム倍率: `s2GarbageMultiplier(frame)`(60fps、10800 frame 以降 +0.008/60 per frame)。
-- **opener phase(14 設置 ×2 相殺)は実装されていない**(`rules.ts` / `profile.ts` に opener の記述なし)。
-- **S2 の spawn 座標は未 pin**。`src/core/engine.ts` の `spawnY()` は
-  `// TODO S2-SPEC Unpinned #6: pin S2 hidden spawn coordinates; retain legacy spawn for now.`
-  付きで **legacy spawn(盤面最上段)** を返す。S2 の row 21 spawn ではない。
+- **opener phase**: `TODO S2-SPEC Unpinned` の未確定値として保留。TETR.IO が公開していない値の注記で、
+  **機能の欠落ではない**(初版の「未実装」は浅い grep による誤読。manager の訂正済み)。
+- **spawn**: `src/core/engine.ts` の `spawnY()` は **bot 自身のアリーナ用の legacy spawn**
+  (盤面最上段)を返す。`TODO S2-SPEC Unpinned #6` は未確定値の注記。
+  **TBP 接続の spawn はアダプタの `posY` で決まり**、我々の S2 spawn(最下段 row 21)に合わせる
+  パッチを `adapters/attax-s2-tbp.patch` で適用済み(§8)。
 
 ### 2.3 `tools/s2-lab/` — S2 ラボ
 
@@ -222,3 +224,55 @@ PC +5・GSB +1・margin multiplier が実装済み。TBP I/F は S2 状態
 - S2 profile を TBP で使うには、`profile` 指定 + `b2b_streak` / `pending_garbage` / frame の
   TBP 拡張(作者との I/F 合意)が必要。
 - opener phase は `TODO S2-SPEC Unpinned` の未確定値の一部。
+
+## 8. TBP 接続の修正と 1 ゲーム(2026-11-16)
+
+### 8.1 `adapters/attax-s2-tbp.patch`(28 行、SHA-256 `461e4396de5fe046ec908d256df886f9c497faa8fbd7c27d02f46d197ab3049f`)
+
+上流 `1f41806` の TBP アダプタに対する最小パッチ:
+
+1. **S2 profile の選択**: `ATTAX_TBP_PROFILE=s2` のとき `createBot({ profile: "s2" })` を渡す。
+   上流は `createBot({ name: "attax" })` で guideline 固定。
+2. **posY を S2 spawn に**: `FIELD_ROWS > 20 ? FIELD_ROWS - 22 - maxY : -minY`。
+   上流の `FIELD_ROWS - 21` は field40 rig の原点で、我々の S2 spawn(最下段 row 21)とは
+   ピースにより 2〜3 行ずれる。
+
+```powershell
+cd C:\Users\Hasilan\Projects\attax
+git checkout 1f41806cbfe5ed3a5b1df81e6b7aac60f256e9d0
+git apply C:\Users\Hasilan\Projects\intetrigence\adapters\attax-s2-tbp.patch
+bun run typecheck
+```
+
+起動: `ATTAX_TBP_ROWS=40`、`ATTAX_TBP_PROFILE=s2`、`ATTAX_TBP_LOG=<path>`。
+`--tbp-visible-rows` は **40**(S2 profile の bot は 40 行グリッドを見る)。
+
+### 8.2 1 ゲームの結果
+
+条件: seed 9001 sheet A、1000 turn、`--ms 100`/8t。
+
+```text
+seed-9001-sheet-A: winner=1 reason=TopOut turns=169 verified=true mismatches=0
+summary: 1 games, wins 0 losses 1 unresolved 0 no-contest 0, verified 1/1
+```
+
+| 項目 | intetrigence | attax(S2) |
+|---|---|---|
+| 結果 | TopOut 負け | **TopOut 勝ち** |
+| attack/piece | 0.882 | **0.929** |
+| 受信ゴミ | 69 | 60 |
+| think median | 68.5 ms | 41.6 ms |
+| spin/attack 監査 | — | **168/168 一致** |
+
+- **forfeit / no-contest / unresolved 0**、replay 検証 1/1。
+- S2 profile は有効(攻撃表・コンボ・All-Mini+・180°・deathHeight 21)。attack/piece 0.929。
+- **制約**: `createBot` は S2-only フィールド(`b2bChain` / `garbageRows` / `dueThisLock` / `frame`)を
+  渡さない(`fighter.ts` のコメント)。**surge の溜め・GSB・margin multiplier は attax の探索に効かない**。
+  ゲームの採点(レフェリー)は S2。完全な S2 は `tools/s2-lab/` の外部ラボ用。
+- エビデンス: `scripts/evidence/attax-s2-game1/{summary.json,audit/,seed-9001-sheet-A-attax.jsonl}`。
+
+### 8.3 40 行パッチの扱い
+
+- 旧 `adapters/attax-vision-40.patch`(`7b38f51` 用)は **削除**。新 pin では `ATTAX_TBP_ROWS=40` が
+  グリッドを 40 行にし、`adapters/attax-s2-tbp.patch` が profile と posY を担う。
+- `supports_180`: 新 pin の **S2 profile は true**(`rotate180: true`)、guideline は false。
