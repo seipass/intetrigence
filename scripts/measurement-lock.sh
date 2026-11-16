@@ -12,7 +12,17 @@
 # remove the lock directory by hand.
 set -euo pipefail
 
-MEASUREMENT_LOCK_DIR="${MEASUREMENT_LOCK_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.measurement-lock}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The lock must be shared by every worktree: the main checkout owns the git
+# common dir, so put the lock next to it. A per-worktree lock lets two
+# measurements run at once (the CPU contention corrupts the think times).
+COMMON_DIR="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$COMMON_DIR" ]; then
+  SHARED_ROOT="$(dirname "$COMMON_DIR")"
+else
+  SHARED_ROOT="$ROOT"
+fi
+MEASUREMENT_LOCK_DIR="${MEASUREMENT_LOCK_DIR:-$SHARED_ROOT/.measurement-lock}"
 
 acquire_measurement() {
   local name="${1:-measurement}"

@@ -108,6 +108,19 @@ pub struct BotRecord {
     /// v1.28 capability-aware forfeit). Older replays default to true.
     #[serde(default = "default_true")]
     pub supports_180: bool,
+    /// Content hash of the sources that produced this bot. Older replays
+    /// predate the field; the resume check falls back to `commit` for them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_id: Option<String>,
+    /// Worker threads the bot was allowed to use (search bots only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threads: Option<u32>,
+    /// Delay between `start` and the first `suggest` (external TBP bots).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggest_delay_ms: Option<u64>,
+    /// How long an empty `suggest` is retried (external TBP bots).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_empty_suggest_ms: Option<u64>,
 }
 
 fn default_true() -> bool {
@@ -123,6 +136,10 @@ impl From<&BotDescriptor> for BotRecord {
             version: descriptor.version.clone(),
             commit: descriptor.commit.clone(),
             args: descriptor.args.clone(),
+            build_id: descriptor.build_id.clone(),
+            threads: descriptor.threads,
+            suggest_delay_ms: descriptor.suggest_delay_ms,
+            retry_empty_suggest_ms: descriptor.retry_empty_suggest_ms,
         }
     }
 }

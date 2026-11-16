@@ -30,6 +30,15 @@ pub struct BotDescriptor {
     /// Whether the bot's input set includes 180-degree rotations. Attax does
     /// not; the referee's capability-aware forfeit check uses this.
     pub supports_180: bool,
+    /// Content hash of the sources that produced this bot (`crate::BUILD_ID`).
+    /// `commit` records the checkout, not the binary; this records the code.
+    pub build_id: Option<String>,
+    /// Worker threads the bot was allowed to use (search bots only).
+    pub threads: Option<u32>,
+    /// Delay between `start` and the first `suggest` (external TBP bots).
+    pub suggest_delay_ms: Option<u64>,
+    /// How long an empty `suggest` is retried (external TBP bots).
+    pub retry_empty_suggest_ms: Option<u64>,
 }
 
 /// One candidate placement, identified by its absolute cell set.

@@ -93,7 +93,9 @@ impl TbpOpponentConfig {
             env: Vec::new(),
             commit: None,
             visible_rows: 40,
-            supports_180: true,
+            // CC2, clys and attax do not have 180-degree rotation; an
+            // unknown TBP bot is treated conservatively.
+            supports_180: false,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             timeout: Duration::from_secs(30),
@@ -447,6 +449,18 @@ pub struct BotAggregate {
     /// Build commit recorded in the replay header (captured once per match).
     #[serde(default)]
     pub commit: Option<String>,
+    /// Content hash of the sources that produced the bot (header).
+    #[serde(default)]
+    pub build_id: Option<String>,
+    /// Worker threads the bot was allowed to use (search bots only).
+    #[serde(default)]
+    pub threads: Option<u32>,
+    /// Delay between `start` and the first `suggest` (external TBP bots).
+    #[serde(default)]
+    pub suggest_delay_ms: Option<u64>,
+    /// How long an empty `suggest` is retried (external TBP bots).
+    #[serde(default)]
+    pub retry_empty_suggest_ms: Option<u64>,
     pub placements: u32,
     pub spin_checked: u32,
     pub spin_mismatches: u32,
@@ -604,6 +618,13 @@ pub struct MatchSummary {
     /// Load warning (e.g. over-100 ms moves in deterministic mode).
     #[serde(default)]
     pub load_note: Option<String>,
+    /// Content hash of the sources the binary was built from (`crate::BUILD_ID`).
+    /// `git HEAD` only records the checkout; this records the code that played.
+    #[serde(default)]
+    pub build_id: String,
+    /// The running binary's path, size and mtime.
+    #[serde(default)]
+    pub binary: String,
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
@@ -917,6 +938,16 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
             commit: audits
                 .first()
                 .and_then(|audit| audit.bots[slot].commit.clone()),
+            build_id: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].build_id.clone()),
+            threads: audits.first().and_then(|audit| audit.bots[slot].threads),
+            suggest_delay_ms: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].suggest_delay_ms),
+            retry_empty_suggest_ms: audits
+                .first()
+                .and_then(|audit| audit.bots[slot].retry_empty_suggest_ms),
             placements: audits
                 .iter()
                 .map(|audit| audit.scoring[slot].placements)
@@ -1166,6 +1197,8 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         threads: 0,
         deterministic: false,
         load_note: None,
+        build_id: crate::BUILD_ID.into(),
+        binary: crate::binary_info(),
         measurement_complete: false,
         attax_patch_sha256: None,
         attax,
@@ -1188,6 +1221,28 @@ impl MatchSummary {
         let mut text = String::new();
         text.push_str("# S2 match summary\n\n");
         text.push_str(&format!("- games: {}\n", self.games.len()));
+        text.push_str(&format!(
+            "- build id: `{}`; binary: `{}`\n",
+            self.build_id, self.binary
+        ));
+        if let Some(peer) = self.bots.get(1) {
+            text.push_str(&format!(
+                "- opponent: {} (commit {}, build id {}, visible rows {}, threads {}, suggest delay {} ms, empty-suggest retry {} ms)\n",
+                peer.name,
+                peer.commit.as_deref().unwrap_or("unknown"),
+                peer.build_id.as_deref().unwrap_or("unknown"),
+                peer.visible_rows,
+                peer.threads
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+                peer.suggest_delay_ms
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+                peer.retry_empty_suggest_ms
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "n/a".into()),
+            ));
+        }
         text.push_str(&format!(
             "- intetrigence wins / losses / unresolved / no-contest: {} / {} / {} / {}\n",
             self.wins, self.losses, self.unresolved, self.no_contest
@@ -1230,10 +1285,17 @@ impl MatchSummary {
         text.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for game in &self.games {
             let winner = match game.winner {
-                Some(0) => "intetrigence".to_string(),
-                Some(1) => "attax".to_string(),
+                Some(0) => self.bots[0].name.clone(),
+                Some(1) => self.bots[1].name.clone(),
                 Some(slot) => format!("slot {slot}"),
-                None => "draw".to_string(),
+                // `draws` is forbidden by the protocol: an undecided game is
+                // `unresolved`, a forfeit is `no contest`, a stuck top-out is
+                // `stuck`. They are different outcomes and must not merge.
+                None => match game.reason.as_str() {
+                    "Forfeit" => "no contest".to_string(),
+                    "Stuck" => "stuck".to_string(),
+                    _ => "unresolved".to_string(),
+                },
             };
             text.push_str(&format!(
                 "| {} | {} | {} | {} | {} | {} | {} | {:.1} / {:.1} | {:.1} / {:.1} | {:.2} / {:.2} | {:.2} / {:.2} | {} |\n",
@@ -1433,6 +1495,14 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         ),
         BotChoice::Baseline => (0, 0, 0),
     };
+    // The resume check needs the identity the new games will carry: a replay
+    // is only reusable when the same bot (not just the same checkout) played
+    // it, and when the binary was built from the same sources.
+    let expected_bot_name = match &config.bot {
+        BotChoice::Search(_) => "intetrigence",
+        BotChoice::Baseline => "intetrigence-baseline",
+    };
+    let build_id = crate::BUILD_ID;
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
@@ -1465,7 +1535,14 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                                     // A replay from a different build is not
                                     // comparable: re-run the game instead of
                                     // reusing it.
-                                    if audit.bots[0].commit == build_commit {
+                                    let same_bot = audit.bots[0].name == expected_bot_name;
+                                    let same_build = match audit.bots[0].build_id.as_deref() {
+                                        Some(id) => id == build_id,
+                                        // Older replays predate the build id;
+                                        // fall back to the checkout commit.
+                                        None => audit.bots[0].commit == build_commit,
+                                    };
+                                    if same_bot && same_build {
                                         audit.verify = verify;
                                         audit.opener_lines = opener_lines_from_replay(&replay_path);
                                         audit.spin_placements =
@@ -1475,11 +1552,22 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                                         resumed_games += 1;
                                         continue;
                                     }
-                                    println!(
-                                        "{name}: not resumed (build {} != {})",
-                                        audit.bots[0].commit.as_deref().unwrap_or("unknown"),
-                                        build_commit.as_deref().unwrap_or("unknown")
-                                    );
+                                    if !same_bot {
+                                        println!(
+                                            "{name}: not resumed (bot {} != {})",
+                                            audit.bots[0].name, expected_bot_name
+                                        );
+                                    } else {
+                                        println!(
+                                            "{name}: not resumed (build {} != {})",
+                                            audit.bots[0]
+                                                .build_id
+                                                .as_deref()
+                                                .or(audit.bots[0].commit.as_deref())
+                                                .unwrap_or("unknown"),
+                                            build_id
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1649,10 +1737,20 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
     }
 
     let mut notes = config.notes.clone();
-    notes.push(
-        "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
-            .into(),
-    );
+    match &config.bot {
+        BotChoice::Search(search) if search.deterministic => notes.push(format!(
+            "The intetrigence search is deterministic: depth {} width {} over {} thread(s), no wall-clock deadline. Our moves are a pure function of the position sequence; the opponent is a separate process, so the same seed does not reproduce the same game. The replay is the record.",
+            search.depth, search.width, search.threads
+        )),
+        BotChoice::Search(search) => notes.push(format!(
+            "The intetrigence search is non-deterministic (anytime, {} thread(s), {} ms): the same seed can produce different games; the replay is the record.",
+            search.threads,
+            search.budget.as_millis()
+        )),
+        BotChoice::Baseline => notes.push(
+            "The intetrigence side is the in-process baseline, not the search bot.".into(),
+        ),
+    }
     let mut summary = summarize(&audits, notes);
     summary.resumed_games = resumed_games;
     summary.deterministic = config.deterministic;
@@ -1824,6 +1922,8 @@ mod tests {
             threads: 0,
             deterministic: false,
             load_note: None,
+            build_id: "test".into(),
+            binary: "test".into(),
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,

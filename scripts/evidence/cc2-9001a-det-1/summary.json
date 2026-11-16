@@ -1,0 +1,310 @@
+{
+  "schema": "intetrigence/s2-match-summary/1",
+  "started_at": "unix:1794815357",
+  "profile": "official",
+  "games": [
+    {
+      "seed": 9001,
+      "sheet": "A",
+      "winner": 0,
+      "reason": "TopOut",
+      "forfeit_cause": null,
+      "turns": 182,
+      "surge_released": [
+        8,
+        4
+      ],
+      "max_b2b_streak": [
+        5,
+        5
+      ],
+      "turns_with_b2b_ge_4": [
+        4,
+        13
+      ],
+      "verified": true,
+      "verify_mismatches": 0,
+      "think_median_ms": [
+        73.281,
+        100.131
+      ],
+      "think_p95_ms": [
+        82.178,
+        100.151
+      ],
+      "think_p99_ms": [
+        88.46,
+        100.168
+      ],
+      "think_max_ms": [
+        93.017,
+        100.17
+      ],
+      "first_choice_rate": [
+        1.0,
+        1.0
+      ],
+      "spin_match_rate": [
+        1.0,
+        0.962
+      ],
+      "attack_match_rate": [
+        1.0,
+        1.0
+      ],
+      "attack_per_piece": [
+        0.857,
+        0.813
+      ],
+      "spin_mismatches": [
+        0,
+        7
+      ],
+      "attack_mismatches_same_spin": [
+        0,
+        0
+      ],
+      "think_over_budget": [
+        0,
+        0
+      ],
+      "think_over_100ms": [
+        0,
+        182
+      ],
+      "sent_total": [
+        114,
+        98
+      ],
+      "received_total": [
+        56,
+        62
+      ],
+      "attack_total": [
+        156,
+        148
+      ],
+      "pieces_placed": [
+        182,
+        182
+      ],
+      "start_resends": 22,
+      "cells_above_row20": false,
+      "queue_invariant_violations": 0,
+      "replay": "replays/seed-9001-sheet-A.jsonl",
+      "search": [
+        {
+          "turns": 182,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": 8.0,
+          "depth_p95": 8.0,
+          "depth_max": 8,
+          "width_median": 96.0,
+          "width_p95": 96.0,
+          "width_max": 96,
+          "nodes_median": 628.0,
+          "nodes_p95": 645.0,
+          "nodes_max": 649
+        },
+        {
+          "turns": 182,
+          "fallback_turns": 0,
+          "aborted_turns": 0,
+          "aborted_depth_histogram": {},
+          "depth_median": null,
+          "depth_p95": null,
+          "depth_max": null,
+          "width_median": null,
+          "width_p95": null,
+          "width_max": null,
+          "nodes_median": 234026.0,
+          "nodes_p95": 271701.0,
+          "nodes_max": 307843
+        }
+      ],
+      "net_damage": [
+        58,
+        36
+      ],
+      "final_height": [
+        3,
+        19
+      ],
+      "opener_lines": [
+        4,
+        2
+      ],
+      "lines_cleared": [
+        122,
+        108
+      ],
+      "spin_placements": [
+        16,
+        20
+      ],
+      "burst": [
+        {
+          "max_burst_1": 8,
+          "max_burst_5": 10,
+          "burst_over_capacity": 0
+        },
+        {
+          "max_burst_1": 7,
+          "max_burst_5": 10,
+          "burst_over_capacity": 5
+        }
+      ],
+      "loss_type": null,
+      "repeat": 0
+    }
+  ],
+  "wins": 1,
+  "losses": 0,
+  "unresolved": 0,
+  "no_contest": 0,
+  "stuck": 0,
+  "forfeits": 0,
+  "wins_topout": 1,
+  "wins_turncap": 0,
+  "losses_turncap": 0,
+  "wins_forfeit_vision": 0,
+  "wins_forfeit_other": 0,
+  "forfeit_vision": 0,
+  "forfeit_other": 0,
+  "forfeit_unknown": 0,
+  "losses_topout": 0,
+  "losses_forfeit": 0,
+  "turncap": 0,
+  "surge_released": [
+    8,
+    4
+  ],
+  "max_b2b_streak": [
+    5,
+    5
+  ],
+  "turns_with_b2b_ge_4": [
+    4,
+    13
+  ],
+  "win_rate": 1.0,
+  "wilson_low": 0.2065,
+  "wilson_high": 1.0,
+  "verified": 1,
+  "verify_failures": 0,
+  "resumed_games": 0,
+  "depth": 8,
+  "width": 96,
+  "threads": 8,
+  "deterministic": true,
+  "load_note": null,
+  "build_id": "e24cca552047dc43",
+  "binary": "C:\\Users\\Hasilan\\.hasilan-code\\agent\\web-harness\\agent-worktrees\\1cf19499-c382-48a1-89f9-aad965f1bf06\\target\\release\\arena.exe (1888768 bytes, mtime 1794815300)",
+  "measurement_complete": true,
+  "attax_patch_sha256": null,
+  "attax": null,
+  "bots": [
+    {
+      "slot": 0,
+      "name": "intetrigence",
+      "commit": "d7742bc",
+      "placements": 182,
+      "spin_checked": 182,
+      "spin_mismatches": 0,
+      "attack_checked": 182,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 0,
+      "attack_per_piece": 0.857,
+      "received_per_game": 56.0,
+      "visible_rows": 40,
+      "mean_height": 5.32,
+      "max_height": 15.0,
+      "search_turns": 182,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 73.281,
+      "think_p99_max": 88.46,
+      "think_max": 93.017,
+      "depth_median": 8.0,
+      "depth_p95": 8.0,
+      "depth_max": 8,
+      "width_median": 96.0,
+      "width_p95": 96.0,
+      "width_max": 96,
+      "nodes_median": 628.0,
+      "nodes_p95": 645.0,
+      "nodes_max": 649,
+      "net_damage_per_game": 58.0,
+      "negative_net_games": 0,
+      "collapses": 0,
+      "opener_lines_per_game": 4.0,
+      "max_burst_1": 8,
+      "max_burst_5": 10,
+      "burst_over_capacity": 0,
+      "attack_per_line": 1.279,
+      "spin_rate": 0.088,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    },
+    {
+      "slot": 1,
+      "name": "Cold Clear 2",
+      "commit": null,
+      "placements": 182,
+      "spin_checked": 182,
+      "spin_mismatches": 7,
+      "attack_checked": 182,
+      "attack_mismatches": 0,
+      "attack_mismatches_same_spin": 0,
+      "think_over_budget": 0,
+      "think_over_100ms": 182,
+      "attack_per_piece": 0.813,
+      "received_per_game": 62.0,
+      "visible_rows": 40,
+      "mean_height": 10.69,
+      "max_height": 19.0,
+      "search_turns": 182,
+      "fallback_turns": 0,
+      "fallback_rate": 0.0,
+      "aborted_turns": 0,
+      "aborted_rate": 0.0,
+      "aborted_depth_histogram": {},
+      "think_median_ms": 100.131,
+      "think_p99_max": 100.168,
+      "think_max": 100.17,
+      "depth_median": null,
+      "depth_p95": null,
+      "depth_max": null,
+      "width_median": null,
+      "width_p95": null,
+      "width_max": null,
+      "nodes_median": 234026.0,
+      "nodes_p95": 271701.0,
+      "nodes_max": 307843,
+      "net_damage_per_game": 36.0,
+      "negative_net_games": 0,
+      "collapses": 0,
+      "opener_lines_per_game": 2.0,
+      "max_burst_1": 7,
+      "max_burst_5": 10,
+      "burst_over_capacity": 5,
+      "attack_per_line": 1.37,
+      "spin_rate": 0.11,
+      "collapse_losses": 0,
+      "pending_losses": 0,
+      "race_losses": 0
+    }
+  ],
+  "notes": [
+    "The intetrigence side is the bot recorded in each replay header.",
+    "The intetrigence search is non-deterministic (anytime, 8 threads): the same seed can produce different games; the replay is the record."
+  ]
+}

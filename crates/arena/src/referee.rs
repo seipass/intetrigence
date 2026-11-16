@@ -52,8 +52,8 @@ impl RoundConfig {
             sheet,
             turn_cap: 1000,
             frames_per_turn: 12,
-            rules: "docs/s2-spec.md@v1.3.11".into(),
-            protocol: "docs/s2-referee-protocol.md@v1.9".into(),
+            rules: "docs/s2-spec.md@v1.3.17".into(),
+            protocol: "docs/s2-referee-protocol.md@v1.54".into(),
             deterministic: false,
             threads: 8,
             started_at: String::new(),
@@ -542,8 +542,10 @@ pub fn run_round(
 
 fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> Header {
     let mut slots = BTreeMap::new();
-    slots.insert("0".to_string(), "intetrigence".to_string());
-    slots.insert("1".to_string(), "attax".to_string());
+    // The slot name is the bot that actually played: hard-coding `attax` made
+    // every CC2/clys replay lie about its opponent (and the renderer showed it).
+    slots.insert("0".to_string(), bots[0].name.clone());
+    slots.insert("1".to_string(), bots[1].name.clone());
     let mut seats = BTreeMap::new();
     seats.insert("1".to_string(), config.sheet.order()[0] as u8);
     seats.insert("2".to_string(), config.sheet.order()[1] as u8);

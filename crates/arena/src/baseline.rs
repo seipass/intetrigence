@@ -180,6 +180,10 @@ impl Agent for BaselineBot {
             args: vec!["--in-process".into(), "--baseline".into()],
             visible_rows: 40,
             supports_180: true,
+            build_id: Some(crate::BUILD_ID.into()),
+            threads: None,
+            suggest_delay_ms: None,
+            retry_empty_suggest_ms: None,
         }
     }
 
