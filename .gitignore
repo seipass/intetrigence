@@ -30,3 +30,9 @@ __pycache__/
 /videos/*.png
 /videos/.render-log.jsonl
 /videos/*.zip
+
+# Measurement evidence: keep the summaries, not the raw replays/logs/audits.
+# A 40-game run is ~17 MB of JSONL that no reader needs in git.
+scripts/evidence/*/replays/
+scripts/evidence/*/logs/
+scripts/evidence/*/audit/
