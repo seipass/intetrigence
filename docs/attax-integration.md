@@ -727,11 +727,45 @@ summary: 10 games, wins 1 losses 7 unresolved 0 no-contest 2, verified 10/10
 | spin 監査 | 0 / 2814 | 1 / 2806 |
 | attack 監査(same spin) | 0 / 2814 | 0 / 2806 |
 
-- **forfeit 2/10(9003, 9007)は 180° kick 表の不一致**。attax の `KICKS_180_JLSTZ` は 6 候補、
-  レフェリーの S2 `JLSTZ_180_KICKS` は 5 候補。attax の 6 番目が S2 に無いため、
-  attax の 6 候補が 6 番目を使う 180° 配置だと `candidate-unreachable` で forfeit する。
-  `--tbp-supports-180 false` の 1 ゲームでは forfeit 0。**180° を許可したことが原因**で、強さの問題ではない。
+- **forfeit 2/10（9003, 9007）の原因は I の 90° kick の試行順（U1）**。180° 6 候補化は別件で、
+  この forfeit は直らない。attax の S2 版は I の 90° kick を標準 SRS 順で使い、我々は SRS+ ミラー順。
+  オフセット集合は 8 遷移すべて一致するが、順序が 5/8 遷移で違い、SRS は最初に fit した候補で
+  確定するため到達可能な配置が変わる。詳細と決定は §17。
 - **`load_note` は null**(`--note` 未指定)。
 - **attax の decision log は未取得**(`--tbp-*` 経路は `decision_log` を渡さず、`ATTAX_TBP_LOG` も未設定)。
 - `createBot` の S2-only フィールド未写像の制約は §2.2.1 / §15 のとおり。
 - エビデンス: `scripts/evidence/attax-s2-10/{REPORT.md,summary.json,summary.md,audit/,replays/,logs/}`。
+
+---
+
+## 17. U1: I の 90° kick 順（2026-11-16、manager 決定 A）
+
+### 決定
+
+**A: 我々の `I_KICKS` は SRS+ ミラー順のまま。attax の S2 版の I 90° kick 順を SRS+ に合わせる
+プロトコル互換パッチを当てる。** レフェリーは両順序の和集合を取らない（C は不採用）。
+
+### 根拠
+
+- TETR.IO の I 90° kick は **SRS+**。参照実装は S7（`halp1/triangle`）の
+  `src/engine/utils/kicks/data.ts` で、SRS+ ミラー順。
+- attax の S2 版は **標準 SRS 順**。オフセット集合は 8 遷移すべて一致するが、
+  **順序だけが 5/8 遷移で違う**（0→R, R→0, 2→R, L→2, 0→L）。
+- SRS は「最初に fit した候補で確定」するため、順序の違いは**到達可能な配置の集合**を変える。
+  例: `L→2` の 4 番目が我々 `(1,2)`、attax `(-2,-1)`。attax は空洞内の横 I に到達し、
+  我々の審判は拒否する（seed 9003/9007 の forfeit）。
+- 審判を相手に合わせて寛容にすると **S2 忠実性の主張が崩れる**。我々の movegen を標準 SRS に
+  変えるのも、SRS+ が正しい仕様である以上、自分を仕様から外すことになる。
+
+### パッチの位置づけ
+
+- **プロトコル互換パッチ**であり、**強さのパッチではない**。視野・spawn のパッチと同じ分類。
+- 変更するのは **I の 90° kick の試行順のみ**。探索・評価・movegen の到達集合の定義には触れない。
+- 対象: attax の S2 版（`1f41806` 以降）。`adapters/` にパッチを置き、round report に SHA を記録する。
+
+### レフェリー / core の状態
+
+- `crates/core/src/kick.rs` の `I_KICKS` は **SRS+ のまま**（変更なし）。
+- レフェリーは **SRS+ のみ**で到達可能性を判定する。両順序の和集合・`alternate_order` 監査は不採用。
+- 180° 6 候補化（`79dfa77`）は S7 のデータに基づく別件の正しい修正であり、維持する。
+- U1 の C（和集合）実装として未コミットだった core/arena/bot の変更は破棄し、SRS+ に戻した。
