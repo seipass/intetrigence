@@ -497,6 +497,9 @@ pub struct BotAggregate {
     /// Median think time across games.
     #[serde(default)]
     pub think_median_ms: f64,
+    /// Maximum per-game p95 think time.
+    #[serde(default)]
+    pub think_p95_max: f64,
     /// Maximum per-game p99 think time.
     #[serde(default)]
     pub think_p99_max: f64,
@@ -1062,6 +1065,10 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
                     .sum::<f64>()
                     / games.len() as f64
             },
+            think_p95_max: games
+                .iter()
+                .map(|game| game.think_p95_ms[slot])
+                .fold(0.0f64, f64::max),
             think_p99_max: games
                 .iter()
                 .map(|game| game.think_p99_ms[slot])
@@ -1741,7 +1748,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
 
     let mut notes = config.notes.clone();
     match &config.bot {
-        BotChoice::Search(search) if search.deterministic => notes.push(format!(
+        BotChoice::Search(search) if config.deterministic => notes.push(format!(
             "The intetrigence search is deterministic: depth {} width {} over {} thread(s), no wall-clock deadline. Our moves are a pure function of the position sequence; the opponent is a separate process, so the same seed does not reproduce the same game. The replay is the record.",
             search.depth, search.width, search.threads
         )),

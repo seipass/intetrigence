@@ -118,13 +118,16 @@ impl std::fmt::Display for RoundError {
 impl std::error::Error for RoundError {}
 
 enum End {
+    /// A player cannot place the current piece: a real S2 top-out (block-out
+    /// or a dead stack). Detected by the referee's exact movegen before the
+    /// agent is asked, so an external bot that exits on its own top-out is
+    /// recorded as a loss, not a no-contest.
     TopOut {
         loser: usize,
     },
-    /// No legal placement with the current piece or hold (protocol v1.6 §7).
-    /// Not an S2 rule: a live active piece is reachable from its spawn, so this
-    /// branch is defensive and unreachable. Recorded as `Stuck` with
-    /// `winner = None` (unresolved, protocol v1.27 §7.1.3.1).
+    /// The agent returned a placement but the referee's movegen found none.
+    /// The pre-suggest check makes this defensive and unreachable; kept as
+    /// `winner = None` so an unexpected path never invents a win.
     Stuck {
         #[allow(dead_code)]
         loser: usize,
@@ -213,6 +216,24 @@ pub fn run_round(
 
         for seat_index in 0..2 {
             let slot = engine.order[seat_index];
+            // S2: a filled spawn area means the next spawn must fail, so the
+            // player has topped out (spec v1.3.18 §2.3.1). Check the board
+            // before asking the agent: an external bot whose stack garbage
+            // pushed above the spawn rows exits, and that is a top-out, not a
+            // forfeit. Asking first turned a real clys top-out (board height
+            // 24) into a no-contest.
+            if engine.spawn_blocked(slot) {
+                end = Some(End::TopOut { loser: slot });
+                push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
+                break 'turns;
+            }
+            // Spawn cells free but no legal placement is an implementation
+            // anomaly (protocol v1.55 §6.5): unresolved, never a win.
+            if !engine.has_legal_move(slot, agents[slot].descriptor().supports_180) {
+                end = Some(End::Stuck { loser: slot });
+                push_turn_end(&mut records, t, turn_record, garbage_records, &engine);
+                break 'turns;
+            }
             let view = engine.view(slot);
             let suggestion = match agents[slot].suggest(&view) {
                 Ok(suggestion) => suggestion,

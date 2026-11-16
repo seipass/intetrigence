@@ -75,6 +75,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_program: Option<String> = None;
     let mut tbp_args: Vec<String> = Vec::new();
     let mut tbp_cwd: Option<PathBuf> = None;
+    let mut tbp_commit: Option<String> = None;
     let mut tbp_visible_rows = 40u32;
     let mut tbp_supports_180 = false;
     let mut tbp_suggest_delay_ms = 0u64;
@@ -246,6 +247,10 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                 tbp_cwd = Some(PathBuf::from(value(1)?));
                 index += 2;
             }
+            "--tbp-commit" => {
+                tbp_commit = Some(value(1)?);
+                index += 2;
+            }
             "--tbp-visible-rows" => {
                 tbp_visible_rows = value(1)?
                     .parse()
@@ -307,7 +312,11 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     }
 
     if let Some(program) = tbp_program {
+        // Record the opponent's commit even when the caller did not pass one:
+        // the checkout under --tbp-cwd knows it.
+        let tbp_commit = tbp_commit.or_else(|| tbp_cwd.as_deref().and_then(git_commit));
         let mut opponent = TbpOpponentConfig::new(tbp_name, program, tbp_args);
+        opponent.commit = tbp_commit;
         opponent.cwd = tbp_cwd;
         opponent.visible_rows = tbp_visible_rows;
         opponent.supports_180 = tbp_supports_180;
