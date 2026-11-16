@@ -383,7 +383,7 @@ impl Default for Weights {
             opener_clear: 20.0,
             combo_state: 40.0,
             combo_potential: 6.0,
-            holes: -30.0,
+            holes: -20.0,
             hole_cover: -6.0,
             hole_rows: -16.0,
             bumpiness: -3.0,
