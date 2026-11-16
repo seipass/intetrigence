@@ -286,7 +286,7 @@ mod tests {
         // the first fitting offset, so ours lands at (1, 2) and the attax
         // lands at (-2, -1) inside the cavity.
         //
-        // The referee accepts the union of both orders (spec v1.3.23) and
+        // The referee accepts the union of both orders (spec v1.3.24 §3.1.2) and
         // audits the count; the bot keeps SRS+ only.
         let mut board = Board::new();
         board.set_row(0, 0x3F7);

@@ -819,6 +819,41 @@ mod tests {
     }
 
     #[test]
+    fn alternate_kick_order_is_adopted_and_flagged() {
+        // Same board as `movegen::tests::i_90_kick_order_changes_reachability`
+        // (seed 9003, turn 268): column 3 has a four-deep covered well.
+        let mut board = Board::new();
+        board.set_row(0, 0x3F7);
+        board.set_row(1, 0x3F7);
+        board.set_row(2, 0x3F7);
+        board.set_row(3, 0x386);
+        board.set_row(4, 0x10E);
+        board.set_row(5, 0x008);
+        let active = ActivePiece {
+            kind: PieceKind::I,
+            rotation: Rotation::Zero,
+            x: 3,
+            y: 19,
+        };
+        let game = Game::from_position(1, board, active).expect("legal test position");
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.players[0].game = game;
+        let suggestion = crate::agent::Suggestion {
+            candidates: vec![crate::agent::Candidate {
+                piece: PieceKind::I,
+                cells: [(3, 0), (3, 1), (3, 2), (3, 3)],
+                claimed_spin: None,
+                claimed_attack: None,
+            }],
+            ..Default::default()
+        };
+        let adopted = engine
+            .adopt(0, &suggestion, true)
+            .expect("the union must accept the covered well");
+        assert!(adopted.alternate_order);
+    }
+
+    #[test]
     fn full_visible_rows_are_vision() {
         // A tall stack with a diagonal hole per row: no piece fits entirely in
         // rows 0..19, and no row is full (so `from_position` accepts it).
