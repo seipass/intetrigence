@@ -851,6 +851,11 @@ mod tests {
             .adopt(0, &suggestion, true)
             .expect("the union must accept the covered well");
         assert!(adopted.alternate_order);
+        let applied = engine
+            .apply(0, &adopted.target, adopted.claimed_spin)
+            .expect("the alternate-order path must replay");
+        assert_eq!(applied.piece, PieceKind::I);
+        assert_eq!(applied.lines, 3);
     }
 
     #[test]

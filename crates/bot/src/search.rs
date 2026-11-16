@@ -926,7 +926,7 @@ fn state_key(board: &Board, next: usize, hold: Option<PieceKind>, context: &Eval
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intetrigence_core::{ActivePiece, Rotation, SpinType};
+    use intetrigence_core::{ActivePiece, KickOrder, Rotation, SpinType};
 
     fn root(board: Board, current: PieceKind, preview: &[PieceKind]) -> RootState {
         RootState {
@@ -1121,6 +1121,7 @@ mod tests {
             immobile: false,
             spin: SpinType::None,
             actions: crate::movegen::ActionSeq::new(),
+            kick_order: KickOrder::SrsPlus,
         };
         let make = |value: f64| Child {
             parent: 0,

@@ -145,6 +145,8 @@ pub struct Placement {
     /// Inputs that drive `Game` from spawn to this lock, ending in
     /// [`Action::HardDrop`].
     pub actions: ActionSeq,
+    /// The I 90-degree test order used to build `actions` (S2 spec U1).
+    pub kick_order: KickOrder,
 }
 
 impl Placement {
@@ -399,6 +401,7 @@ impl Movegen {
                 immobile: board.is_immobile(kind, rotation, x, y),
                 spin: board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some()),
                 actions,
+                kick_order: self.kick_order,
             });
         }
 

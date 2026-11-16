@@ -13,7 +13,7 @@
 use crate::bag::{Bag, BagState};
 use crate::board::{Board, BoardInvariantError, ClearInfo, GarbageError};
 use crate::hold::Hold;
-use crate::kick::{self, Kick};
+use crate::kick::{self, Kick, KickOrder};
 use crate::piece::{PieceKind, RotateDirection, Rotation};
 
 /// A piece at a concrete board position.
@@ -350,9 +350,22 @@ impl Game {
     /// Returns the applied piece and kick, or `None` when every candidate
     /// collides. [`Self::rotate`] is the boolean convenience wrapper.
     pub fn rotate_with_info(&mut self, direction: RotateDirection) -> Option<RotationResult> {
+        self.rotate_with_info_order(direction, KickOrder::SrsPlus)
+    }
+
+    /// Rotates the active piece using the requested I 90-degree test order.
+    ///
+    /// The referee replays an alternate-order placement with the same order
+    /// that generated its path (S2 spec U1). Every other piece ignores the
+    /// order.
+    pub fn rotate_with_info_order(
+        &mut self,
+        direction: RotateDirection,
+        order: KickOrder,
+    ) -> Option<RotationResult> {
         let piece = self.active?;
         let to = piece.rotation.step(direction);
-        for (kick_index, &(dx, dy)) in kick::kicks(piece.kind, piece.rotation, to)
+        for (kick_index, &(dx, dy)) in kick::kicks_with_order(piece.kind, piece.rotation, to, order)
             .iter()
             .enumerate()
         {
@@ -381,6 +394,11 @@ impl Game {
     /// Rotates the active piece. Returns whether the rotation succeeded.
     pub fn rotate(&mut self, direction: RotateDirection) -> bool {
         self.rotate_with_info(direction).is_some()
+    }
+
+    /// Rotates the active piece with the requested I 90-degree test order.
+    pub fn rotate_with_order(&mut self, direction: RotateDirection, order: KickOrder) -> bool {
+        self.rotate_with_info_order(direction, order).is_some()
     }
 
     /// Drops the active piece to its lowest legal row and locks it.
@@ -495,6 +513,12 @@ impl Game {
 
     /// Applies one replayable input.
     pub fn apply(&mut self, action: Action) -> ActionResult {
+        self.apply_with_order(action, KickOrder::SrsPlus)
+    }
+
+    /// Applies one input, using the requested I 90-degree test order for
+    /// rotations. The referee uses this to replay an alternate-order path.
+    pub fn apply_with_order(&mut self, action: Action, order: KickOrder) -> ActionResult {
         if self.topped_out {
             return ActionResult {
                 accepted: false,
@@ -516,15 +540,15 @@ impl Game {
                 hard_drop: None,
             },
             Action::RotateCw => ActionResult {
-                accepted: self.rotate(RotateDirection::Cw),
+                accepted: self.rotate_with_order(RotateDirection::Cw, order),
                 hard_drop: None,
             },
             Action::RotateCcw => ActionResult {
-                accepted: self.rotate(RotateDirection::Ccw),
+                accepted: self.rotate_with_order(RotateDirection::Ccw, order),
                 hard_drop: None,
             },
             Action::Rotate180 => ActionResult {
-                accepted: self.rotate(RotateDirection::Half),
+                accepted: self.rotate_with_order(RotateDirection::Half, order),
                 hard_drop: None,
             },
             Action::HardDrop => match self.hard_drop() {

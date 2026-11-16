@@ -734,7 +734,9 @@ impl Engine {
             .clone();
 
         for action in &placement.path {
-            let result = self.players[slot].game.apply(*action);
+            let result = self.players[slot]
+                .game
+                .apply_with_order(*action, placement.kick_order);
             if !result.accepted {
                 return Err(RefereeError::PathRejected { action: *action });
             }

@@ -42,6 +42,8 @@ pub struct Placement {
     pub spin: SpinType,
     /// Pre-lock action path from the start state (no hard drop).
     pub path: Vec<Action>,
+    /// The I 90-degree test order used to build `path` (S2 spec U1).
+    pub kick_order: KickOrder,
     /// True when the placement requires a hold first.
     pub hold: bool,
 }
@@ -127,6 +129,7 @@ fn convert(placement: &intetrigence_bot::Placement, hold: bool) -> Placement {
         cells,
         spin: placement.spin,
         path: placement.pre_lock_actions().to_vec(),
+        kick_order: placement.kick_order,
         hold,
     }
 }
