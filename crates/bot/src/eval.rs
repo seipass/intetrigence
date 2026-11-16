@@ -272,6 +272,8 @@ pub struct Weights {
     /// back.
     pub risk_base: f64,
     pub risk_span: f64,
+    /// Floor of `risk`: how much of the height penalty survives a low stack.
+    pub risk_floor: f64,
     /// Bonus for clearing at least one line during the opener phase.
     /// S2 doubles the cancellation while the opener is active, but the extra
     /// budget equals the *attack*, not the lines, so a single (attack 0)
@@ -371,8 +373,12 @@ impl Default for Weights {
             danger_height: -12.0,
             race: 1.0,
             defense: 28.0,
-            risk_base: 12.0,
-            risk_span: 6.0,
+            // Measured A/B over 20 games each: 8/8 gives 20W-0L with TurnCap 0,
+            // no-contest 0 and no collapses; 10/6 also goes 20-0 but costs more
+            // time; 8/6 gives 18-1 with one no-contest, so the span matters.
+            risk_base: 8.0,
+            risk_span: 8.0,
+            risk_floor: 0.1,
             quad_ready: 30.0,
             opener_clear: 20.0,
             combo_state: 40.0,
@@ -662,8 +668,8 @@ pub fn leaf_value(
     // think time went from ~30 ms to 72 ms because the taller board has more
     // candidates. A floor of 0.2 was too high (TurnCap 1/20, `attack/line`
     // 1.12); 0.1 is the middle.
-    let height_risk =
-        ((features.max_height - weights.risk_base) / weights.risk_span).clamp(0.1, 1.0);
+    let height_risk = ((features.max_height - weights.risk_base) / weights.risk_span)
+        .clamp(weights.risk_floor, 1.0);
     let mut value = height_risk
         * (weights.max_height * features.max_height
             + weights.height_sq * features.height_sq
