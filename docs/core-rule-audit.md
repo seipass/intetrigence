@@ -247,12 +247,13 @@ core には **勝者を選ぶロジックは無い**。core が持つのは「�
 
 - TBP `start` は active 位置を運ばないため、referee は挿入後に active を標準スポーンへ戻す。S2 のルールではなく、TBP 同期のための取り決め。
 - 公式レフェリー経路はロック後挿入。再スポーン後の spawn 衝突は S2 の block-out として扱う。
-- レポートで開示する。
+- 両者に同じ規則なので勝敗の公平性には影響しない。S2 忠実性の差としてレポートで開示する。
 
 ### F3 [我々の取り決め] — `derive_seeds`（U7）
 
 - TETR.IO の seed 導出は非公開。§11-U7 のレフェリープロトコルとして `piece_seed` / `garbage_seed(0/1)` を MINSTD 前進で導出する。S2 のルールではない。
 - レポートで開示する。
+- 注意: `garbage_seed(0)` と `garbage_seed(1)` は同じ MINSTD 列の位相違いであり、独立ではない（`docs/fairness-audit.md` F10）。「独立な RNG」とは主張しない。
 
 ### F4 [我々の取り決め] — bag の初期配列順
 

@@ -26,9 +26,9 @@
 | # | 経路 | 実装 | 分類 | 判定 |
 |---|---|---|---|---|
 | W1 | `End::TopOut { loser }` | `winner = Some(1 - loser)` | **[S2 準拠]** | TETR.IO の top-out(block-out)で相手の勝ち。正しい |
-| W2 | `End::Stuck { loser }` | `winner = Some(1 - loser)`, `reason = "TopOut"`, `detail = "no legal placement"` | **[誤り]** | **「合法手なし」は S2 の top-out ではない**。S2 の top-out は block-out(スポーン衝突)と lock-out(設置不能)。`Stuck` は**ボットが置けない**状態であり、ルール上の決着ではない |
+| W2 | `End::Stuck { loser }` | `winner = None`, `reason = "Stuck"`, `detail = "no legal placement"` | **[誤り（修正済み）]** | **「合法手なし」は S2 の top-out ではない**。S2 の top-out は block-out(スポーン衝突)と lock-out(設置不能)。`Stuck` は**ボットが置けない**状態であり、ルール上の決着ではない。修正済み |
 | W3 | `End::TurnCap` | `winner = None`, `detail = "unresolved: turn cap reached"` | **[我々のプロトコル]** | 修正済み(以前は攻撃量で勝者を決めていた)。S2 に時間切れの規則は無い |
-| W4 | `End::Forfeit { slot }` | `winner = Some(1 - slot)`, `reason = "Forfeit"` | **[我々のプロトコル]** | **決定: `winner = None`(no contest)**。protocol §7.1.3.1。実装は未追随 |
+| W4 | `End::Forfeit { slot }` | `winner = None`, `reason = "Forfeit"` | **[我々のプロトコル]** | **決定: `winner = None`(no contest)**。protocol §7.1.3.1。修正済み |
 
 ### 1.1 集計側の勝者判定
 
@@ -42,7 +42,7 @@
 | A4 | `wins_topout` | `winner == 0 && reason == "TopOut"` | **[S2 準拠]** | 正しい |
 | A5 | `wins_forfeit_vision` | `cause == Some("vision")` | **[S2 準拠]** | 正しい |
 | A6 | `wins_forfeit_other` | `cause != Some("vision")` | **[誤り]** | **`cause == None` も other に数える**。`Some("other")` のみにすべき |
-| A7 | `wins_turncap` | **存在しない** | **[誤り]** | ゲートは `wins_topout + wins_turncap >= 45` を要求するが、`wins_turncap` が無い |
+| A7 | `wins_turncap` | 集計フィールドとして残るが常に 0 | **[誤り（修正済み）]** | ゲートを `wins_topout == 50` に変更して解消。`wins_turncap` は追加しない |
 | A8 | `losses_topout` | `winner == 1 && reason == "TopOut"` | **[S2 準拠]** | 正しい |
 | A9 | `losses_forfeit` | `winner == 1 && reason == "Forfeit"` | [我々のプロトコル] | 正しい(forfeit 負け) |
 | A10 | `turncap` | `reason == "TurnCap"` | [我々のプロトコル] | 正しい |
@@ -137,11 +137,11 @@
 
 | # | 誤り | 影響 | 修正案 | 優先度 |
 |---|---|---|---|---|
-| **F1** | `End::Stuck` を `reason = "TopOut"` で記録 | 「合法手なし」が top-out として集計され、`wins_topout` に混入し得る | `reason = "Stuck"` を新設し、**ゲートでは未決着扱い**。到達不能なので実害は無いが、ラベルを正す | 中 |
-| **F2** | `draws = winner.is_none()` | 未決着(TurnCap)と引き分けが混ざる | `draws` を「両者 top-out 同時」(S2 では到達不能)に限定し、**`unresolved` を別カウント** | **高** |
-| **F3** | `wins_forfeit_other = cause != Some("vision")` | `cause == None` が other に数えられる | `cause == Some("other")` のみに。`None` は `unknown` として別カウント | **高** |
-| **F4** | `wins_turncap` が存在しない | ゲート(`wins_topout + wins_turncap >= 45`)が計算できない | 追加 | **高** |
-| **F5** | `End::Forfeit` が `winner = Some(1 - slot)` | 相手の 0 候補が「勝ち」として記録される | **決定: B(`winner = None`)**。protocol §7.1.3.1 に明文化。実装は未追随 | **高** |
+| **F1** | `End::Stuck` を `reason = "TopOut"` で記録 | 「合法手なし」が top-out として集計され、`wins_topout` に混入し得る | `reason = "Stuck"` を新設し、**ゲートでは未決着扱い**。到達不能なので実害は無いが、ラベルを正す | 中（修正済み） |
+| **F2** | `draws = winner.is_none()` | 未決着(TurnCap)と引き分けが混ざる | `draws` を「両者 top-out 同時」(S2 では到達不能)に限定し、**`unresolved` を別カウント** | **高（修正済み）** |
+| **F3** | `wins_forfeit_other = cause != Some("vision")` | `cause == None` が other に数えられる | `cause == Some("other")` のみに。`None` は `unknown` として別カウント | **高（修正済み）** |
+| **F4** | `wins_turncap` が存在しない | ゲート(`wins_topout + wins_turncap >= 45`)が計算できない | ゲートを `wins_topout == 50` に変更して解消（`wins_turncap` は追加しない） | **高（修正済み）** |
+| **F5** | `End::Forfeit` が `winner = Some(1 - slot)` | 相手の 0 候補が「勝ち」として記録される | **決定: B(`winner = None`)**。protocol §7.1.3.1 に明文化。実装は修正済み | **高（修正済み）** |
 | **F6** | 文書 §8.5 の `draws` の記述 | 実装と食い違う | 文書を実装に合わせる(または実装を文書に合わせる) | 中 |
 | **F7** | **仕様 §6.3 / §6.8 の combo 乗数**(spec 側の誤り) | 0 ライン設置で直前の combo が残り、`ln` 項が攻撃を作る | **修正済み**: `lines > 0` ガードを追加。fixture に `no-clear-combo5-no-attack` を追加 | **高(修正済)** |
 | **F8** | `crates/core` の F1(0 ライン combo) | 同上の実装側 | **修正済み**(core-engine) | **高(修正済)** |
@@ -174,7 +174,7 @@
 | 1(attax) | `wins_topout == 50` かつ `losses_topout == 0` かつ `turncap == 0` かつ `forfeit == 0` |
 | 2・3 | `wins_topout >= 48` かつ `turncap == 0` |
 
-**`TurnCap` は勝ちに数えない**(決定 A)。`wins_turncap` という集計項目は存在しない。
+**`TurnCap` は勝ちに数えない**(決定 A)。ゲートには `wins_turncap` を使わない（集計フィールドは互換のため残るが常に 0）。
 
 ### 7.4 `turn_cap` / `frames_per_turn` の文書分離 — **未着手**
 
@@ -196,5 +196,6 @@ protocol §1 の表を **「S2 のルール」と「計測プロトコル」の 
 | 版 | 日付 | 変更 |
 |---|---|---|
 | v1.1 | 2026-11-15 | `docs/core-rule-audit.md` への参照を追加。**F7 / F8(0 ライン設置の combo ln 攻撃)** を追加(仕様・実装とも修正済み)。fixture を 19 件に。 |
-| v1.2 | 2026-11-15 | **決定を反映**。F5 = B(`winner = None`、no contest)、`Stuck` = `reason = "Stuck"`、`TurnCap` = 勝ちに数えない(A)、ゲート = `wins_topout == 50`(段階 1)/ `>= 48`(段階 2・3)。§7 を「判断が必要な点」から「決定済みの項目」に変更。実装(`crates/arena`)は未追随。 |
+| v1.2 | 2026-11-15 | **決定を反映**。F5 = B(`winner = None`、no contest)、`Stuck` = `reason = "Stuck"`、`TurnCap` = 勝ちに数えない(A)、ゲート = `wins_topout == 50`(段階 1)/ `>= 48`(段階 2・3)。§7 を「判断が必要な点」から「決定済みの項目」に変更。**実装は v1.27 時点で追随済み**。 |
+| v1.3 | 2026-11-16 | 実装追随を反映(Stuck / Forfeit / TurnCap / ゲート)。F11(最大スピン説明)と F12(旧 TurnCap 記述)の文書修正を反映。 |
 | v1 | 2026-11-15 | 初版。勝者決定 4 経路 + 集計 10 項目 + 終了条件 7 項目 + レフェリー 12 項目 + core 24 項目 + 文書 5 項目を 3 分類。誤り 6 件(うち勝者決定に関わるもの 3 件)を特定。forfeit の `winner` について A/B の判断を依頼。 |

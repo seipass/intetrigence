@@ -69,7 +69,7 @@ cargo run --release -p intetrigence-arena --bin arena -- reclassify scripts/evid
 | §4.3 第 1 候補採用 | `Engine::adopt`。`moves` を先頭から走査し、自前の到達可能集合に入る最初のもの |
 | §5.1〜5.4 解決 | `Engine::apply`(core の `S2Scoring` / `GarbageQueue` / `OpenerPhase` を使用) |
 | §6.1 トップアウト | `Game::lock` / `insert_garbage` の後 `Game::is_over()`。seat 1 が死んだらその turn の seat 2 は打たない |
-| §6.3 turn cap | 受信ゴミ少 → 送信多 → 引き分け |
+| §6.3 turn cap | 未決着(`winner = None`、`reason = "TurnCap"`)。攻撃量・被ゴミ量で勝者を決めない |
 | §7 エラー | bot のエラーは forfeit、レフェリーの不変条件違反はマッチ中断(`RoundError::Referee`) |
 | §8.1 replay | `replay.rs`。header / turn / garbage / hash / result。`placement.piece` 必須(v1.1 以降) |
 | §8.2 盤面ハッシュ | 各 turn の終わりに両者の盤面(occupied + garbage)の FNV-1a |
@@ -134,10 +134,11 @@ protocol v1.1(2026-11-14、s2-spec-lead)で §2.2 が per-player bag に改訂�
   **寛容**。回転せずに置いた配置でも、回転経由の経路が存在すればスピンとして採点され得る。
   両者に同じ規則を適用するので**強さの比較は公平**だが、**TETR.IO のスコアとは一致しない**。
   最終レポートにはこの解釈差を明記する(protocol v1.7 §4.2.1)。
-- **どちらに不利か**: intetrigence(bot-dev)側は `placement.spin != None ⇒ spin_entry` を
-  テストで固定しており(`assert_spin_flags`)、提出する spin ラベルは常に回転終端の入力列に
-  裏付けられている。したがって**寛容さを利用するのはセルだけを提出する相手(attax)側**で、
-  我々には保守的な方向に働く。この非対称も最終レポートに書く。
+- **どちらに不利か**: レフェリーは両者に同じ最大スピン規則を適用する。intetrigence は
+  `placement.spin != None ⇒ spin_entry` をテストで固定しており、提出する spin ラベルは常に
+  回転終端の入力列に裏付けられている。したがって「Intetrigence には保守的」なのではなく、
+  **セルだけを提出する相手(attax 等)が、自分の movegen でスピンを過小申告すると余分に得をする**。
+  既存 evidence の spin mismatch は、この過小申告の方向に出ている。この解釈差も最終レポートに書く。
 
 ### D3. TBP の hold 推論
 
@@ -344,5 +345,6 @@ scripts/m0-match.sh
 8. **スピン判定は TETR.IO より寛容**(protocol v1.7 §4.2.1)。セル集合に到達する経路のうち
    最大の spin ラベルを採るため、回転せずに置いた配置もスピンになり得る。両者に同じ規則なので
    強さの比較は公平だが、TETR.IO のリプレイ・スコアとは一致しない。intetrigence 側は spin を
-   常に回転終端の入力列で裏付ける(bot-dev の `assert_spin_flags`)ので、寛容さの恩恵を受けるのは
-   セルだけを提出する attax 側であり、我々には保守的。
+   常に回転終端の入力列で裏付ける(bot-dev の `assert_spin_flags`)。レフェリーは両者に同じ規則を
+   適用するので、「Intetrigence に保守的」ではなく、セルだけを提出する相手がスピンを過小申告すると
+   余分に得をする方向。
