@@ -1822,7 +1822,43 @@ pub fn verify_all(dir: &Path) -> Result<Vec<(String, VerifyReport)>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agent::BotDescriptor;
+    use crate::replay::BotRecord;
 
+    #[test]
+    fn tbp_opponent_defaults_are_conservative() {
+        // None of CC2, clys or attax has 180-degree rotation. The default must
+        // be the conservative side: a 180-only placement the opponent cannot
+        // make would otherwise be accepted and change the forfeit class.
+        let config = TbpOpponentConfig::new("cc2", "cold-clear-2.exe", Vec::new());
+        assert!(!config.supports_180);
+        assert_eq!(config.visible_rows, 40);
+        // A generic TBP bot gets no empty-suggest retry; the CLI sets the
+        // probe for opponents that need it.
+        assert_eq!(config.retry_empty_suggest_ms, 0);
+    }
+
+    #[test]
+    fn bot_record_keeps_the_build_and_conditions() {
+        let record = BotRecord::from(&BotDescriptor {
+            name: "Cold Clear 2".into(),
+            version: Some("0.1.0".into()),
+            commit: Some("ed8b193".into()),
+            args: vec!["cold-clear-2.exe".into()],
+            visible_rows: 40,
+            supports_180: false,
+            build_id: Some("0123456789abcdef".into()),
+            threads: None,
+            suggest_delay_ms: Some(100),
+            retry_empty_suggest_ms: Some(2000),
+        });
+        let json = serde_json::to_string(&record).unwrap();
+        let back: BotRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.build_id.as_deref(), Some("0123456789abcdef"));
+        assert_eq!(back.suggest_delay_ms, Some(100));
+        assert_eq!(back.retry_empty_suggest_ms, Some(2000));
+        assert!(!back.supports_180);
+    }
     #[test]
     fn opponent_log_content_check_rejects_truncated_transcripts() {
         let dir = std::env::temp_dir().join(format!("arena-log-{}", std::process::id()));
