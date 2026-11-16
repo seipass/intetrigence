@@ -247,6 +247,7 @@ pub fn apply_weight_overrides(
             "mini_penalty" => weights.mini_penalty = number(value)?,
             "risk_base" => weights.risk_base = number(value)?,
             "risk_span" => weights.risk_span = number(value)?,
+            "risk_floor" => weights.risk_floor = number(value)?,
             "survival" => {
                 weights.survival = match value.as_str() {
                     "1" | "true" | "yes" => true,
