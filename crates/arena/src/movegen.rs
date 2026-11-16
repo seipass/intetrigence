@@ -245,6 +245,37 @@ mod tests {
     }
 
     #[test]
+    fn i_90_kick_order_changes_reachability() {
+        // Board from the S2 attax 10-game run, seed 9003, turn 268
+        // (row 0 = bottom). Column 3 has a four-deep covered well: rows 0-3
+        // are free, row 4 is blocked.
+        //
+        // TETR.IO S2 pins the I 90-degree offset *set* but not the test order
+        // (docs/s2-spec.md U1). Our SRS+ `L -> 2` order is
+        // [(0,0),(1,0),(-2,0),(1,2),(-2,-1)]; the attax engine uses the
+        // standard SRS order [(0,0),(-2,0),(1,0),(-2,-1),(1,2)]. SRS stops at
+        // the first fitting kick, so ours lands at (1, 2) and the attax lands
+        // at (-2, -1) inside the cavity. The referee then rejects the attax
+        // candidate as unreachable (forfeit). Swapping only this entry to the
+        // attax order makes the placement reachable, which pins the cause.
+        let mut board = Board::new();
+        board.set_row(0, 0x3F7);
+        board.set_row(1, 0x3F7);
+        board.set_row(2, 0x3F7);
+        board.set_row(3, 0x386);
+        board.set_row(4, 0x10E);
+        board.set_row(5, 0x008);
+        let moves = generate(&board, spawn_state(PieceKind::I), true);
+        let covered_well = [(3, 0), (3, 1), (3, 2), (3, 3)];
+        assert!(
+            moves.get(&covered_well).is_none(),
+            "SRS+ order must not reach the covered well (U1)"
+        );
+        // The placement above the overhang is reachable in both orders.
+        assert!(moves.get(&[(3, 6), (3, 7), (3, 8), (3, 9)]).is_some());
+    }
+
+    #[test]
     fn blocked_spawn_has_no_placements() {
         let mut board = Board::new();
         for y in 20..=23 {
