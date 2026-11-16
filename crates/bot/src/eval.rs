@@ -636,9 +636,18 @@ pub fn leaf_value(
     let wait_pieces =
         (SURVIVAL_PROJECTED as i32 - board.height() as i32 - context.incoming as i32).max(0);
     let readiness_scale = (f64::from(wait_pieces) / 4.0).min(1.0);
-    let mut value = weights.max_height * features.max_height
-        + weights.height_sq * features.height_sq
-        + weights.danger_height * features.danger_height
+    // Height is a *risk*, not a cost: at `height 5` a single is the most
+    // height-efficient clear there is (1 row per piece against a quad's 0.4),
+    // so pricing height linearly at every level makes the bot farm singles
+    // forever and never build a burst. The floor of 0.2 keeps a mild pull
+    // toward a flat board while letting the attack terms dominate when the
+    // stack is low. Measured: the TurnCap game sent 373 lines against the
+    // opponent's 715 at `attack/line` 0.53, with 53% of clears being singles.
+    let height_risk = ((features.max_height - 12.0) / 6.0).clamp(0.2, 1.0);
+    let mut value = height_risk
+        * (weights.max_height * features.max_height
+            + weights.height_sq * features.height_sq
+            + weights.danger_height * features.danger_height)
         + readiness_scale * weights.quad_ready * features.quad_ready
         + weights.holes * features.holes
         + weights.hole_cover * features.hole_cover
