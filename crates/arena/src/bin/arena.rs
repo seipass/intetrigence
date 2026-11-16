@@ -78,7 +78,13 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_visible_rows = 40u32;
     let mut tbp_supports_180 = true;
     let mut tbp_suggest_delay_ms = 0u64;
-    let mut tbp_retry_empty_ms = 0u64;
+    // A TBP opponent needs a moment after `start` before it can suggest: when
+    // it moves first (sheet B) the host used to ask for a move before the
+    // opponent had parsed the board, and it answered with no candidates. The
+    // probe in `TbpAgent::begin_round` waits this long. Defaulting to 0 made
+    // every sheet B game a turn-1 forfeit unless the caller remembered the
+    // flag, so the safe value is the default and `0` is opt-in.
+    let mut tbp_retry_empty_ms = 2000u64;
     let mut tbp_name = "tbp-bot".to_string();
     let mut attax_visible_rows = 0u32;
     let mut attax_supports_180 = false;
