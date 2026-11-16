@@ -29,12 +29,13 @@
 ## Stage 1 — Cold Clear 2
 
 - opponent commit: `<opponent commit>`
-- intetrigence build: `<commit>`, deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
+- intetrigence build: `<commit>`, build id `<ARENA_BUILD_ID>`, binary `<path (size, mtime)>`, deterministic `<true|false>`, depth `<n>`, width `<n>`, threads `<n>`
+- opponent conditions: threads `<n|n/a>`, suggest delay `<n> ms`, empty-suggest retry `<n> ms`, visible rows `<n>`, supports 180 `<true|false>`
 - games: 50 (25 seeds × sheets A/B)
 - opponent vision: `40` rows (CC2/clys: S2 scoring applied by the referee; attax: 40-row patch)
 - outcomes: TopOut wins `<n>` / TopOut losses `<n>` / unresolved `<n>` / no-contest `<n>` / stuck `<n>` = **`<n>`/50**
 - **gate record: 50 TopOut wins / 50 games** — 100.0% (Wilson 95% CI 92.9..100.0%)
-- win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>`) `<n>`; stuck `<n>`
+- win breakdown: TopOut `<n>`; unresolved (TurnCap) `<n>`; no-contest (forfeit-vision `<n>` + forfeit-other `<n>` + forfeit-unknown `<n>`) `<n>`; stuck `<n>`
 - no-contest record: `<wins_topout>/<games - no_contest>` (TopOut wins / games without no-contest)
 - attack/piece: `<a>` vs `<b>`
 - attack/line: `<a>`, spin rate: `<a>%`
