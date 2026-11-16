@@ -1590,3 +1590,47 @@ scripts/tuning-smoke.sh:41         --tbp-retry-empty-ms 2000            // 明�
 **`risk_base=8` / `risk_span=8` / `risk_floor=0.1`、`width 88`、決定論 `depth 8`、既定の重み → 38-2。**
 
 **ゲート 4 条件のうち 3 つ達成**(TurnCap 0、no-contest 0、`over100` 0)。**残るは「負け 0」だけ。**
+
+## 38. `attack=34` も 40 ゲームで悪化(2026-11-16)
+
+33/40 まで実行して打ち切り(残り 7 ゲームで TurnCap が出たため、基準より悪いと判断):
+
+| 腕 | 勝 | 敗 | TurnCap | 判定 |
+|---|---|---|---|---|
+| **基準**(既定の重み、`risk` 8/8、`w88`) | **38** | **2** | **0** | **最良** |
+| `attack=34` | 30 | 2 | **1** | 不採用 |
+| D(`quad_ready=45,defense=22,b2b_break=-32,surge_charge=2.2,surge_exponent=1.3`) | 35 | 5 | 0 | 不採用 |
+| A(`quad_ready=45,b2b_break=-32,wasted_t=-30`) | 20-0(20 ゲームのみ) | – | 0 | 未確定(40 ゲーム必要) |
+| E(`surge_charge=3.0,surge_exponent=1.6`) | 8-2(10 ゲームで中止) | – | 0 | 不採用 |
+
+**重みの A/B は 3 腕すべてで基準を超えられませんでした。** **`a/line` 1.12 は重みでは動かない**という結論が補強されました。
+
+### 現在の最良構成(確定)
+
+| 項目 | 値 |
+|---|---|
+| モード | 決定論 |
+| スケジュール | `depth 8` / `width 88` |
+| `risk_base` / `risk_span` / `risk_floor` | 8 / 8 / 0.1 |
+| 重み | 既定(`defense 28`、`quad_ready 30`、`attack 28`、`b2b_break -20`、`surge_charge 1.5`) |
+| **40 ゲーム** | **38 勝 2 敗** |
+| TurnCap / no-contest / `over100` | **0 / 0 / 0** |
+| 崩壊 / `net<0` | 0 / 1 |
+| `a/line` / `spin` | 1.121 / 9.3% |
+
+### 残る課題
+
+**「負け 0」だけ。** 2 敗は**攻撃レースの負け**(9008-B: net −20 対 96、9017-A: 60 対 74)。
+
+**`a/line` を上げるには構造変更が必要**(重みでは動かない)。候補:
+- `defense` を `min(pending, 4)` に clamp
+- `quad_ready` を well の深さに比例させる
+- B2B チェーンを評価する項(CC2 は B2B≥4 が 21.9 turn/ゲーム、我々は 10.5)
+
+## 39. 新 attax の S2 対応(2026-11-16 情報)
+
+**`souta-lab/attax` の `1f41806cbfe5`(PR #40)に `tetrio-s2` profile が同梱**。ただし README は **「no S2 results」** と明記。
+
+**pin は `7b38f51` のまま維持**。理由: ①未検証 ②段階 3 は「attax に 48/50」で、相手が強くなるほど難しくなる ③未検証の相手に pin を移すと計測バグの事故が再発する。
+
+**attax-integration に検証を依頼**(S2 対応範囲、TBP I/F、パッチの必要性、差分)。
