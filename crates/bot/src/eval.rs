@@ -788,11 +788,23 @@ fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)
         if board.can_place(PieceKind::T, Rotation::Two, bx, y - 1) {
             continue;
         }
-        let mut probe = board.clone();
-        probe
-            .place(PieceKind::T, Rotation::Two, bx, y)
-            .expect("checked above");
-        let lines = probe.clear_lines().lines;
+        // Count the lines the T would complete without cloning the board: a
+        // row clears when the T's cells fill its remaining holes. The T spans
+        // two rows in every rotation, so two masks are enough.
+        let mut rows = [0u16; 2];
+        for (cx, cy) in PieceKind::T.cells(Rotation::Two) {
+            rows[cy as usize] |= 1 << (bx + cx);
+        }
+        let mut lines = 0u8;
+        for (offset, mask) in rows.iter().enumerate() {
+            if *mask == 0 {
+                continue;
+            }
+            let row = y as usize + offset;
+            if row < Board::HEIGHT && board.row(row) | *mask == Board::FULL_ROW {
+                lines += 1;
+            }
+        }
         if lines == 0 {
             continue;
         }
