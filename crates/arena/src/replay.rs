@@ -108,6 +108,10 @@ pub struct BotRecord {
     /// v1.28 capability-aware forfeit). Older replays default to true.
     #[serde(default = "default_true")]
     pub supports_180: bool,
+    /// Content hash of the sources that produced this bot. Older replays
+    /// predate the field; the resume check falls back to `commit` for them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_id: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -123,6 +127,7 @@ impl From<&BotDescriptor> for BotRecord {
             version: descriptor.version.clone(),
             commit: descriptor.commit.clone(),
             args: descriptor.args.clone(),
+            build_id: descriptor.build_id.clone(),
         }
     }
 }

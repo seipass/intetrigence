@@ -201,6 +201,7 @@ impl Agent for BotAgent {
             args: self.config.args.clone(),
             visible_rows: 40,
             supports_180: true,
+            build_id: Some(crate::BUILD_ID.into()),
         }
     }
 

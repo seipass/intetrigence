@@ -34,6 +34,31 @@ pub mod replay;
 pub mod round;
 pub mod tbp_agent;
 
+/// Content hash of the sources that decide a game (`crates/bot`, `crates/core`
+/// and `crates/arena`), embedded by `build.rs`. `git HEAD` only says what the
+/// checkout contains; this says what the running binary was built from.
+pub const BUILD_ID: &str = env!("ARENA_BUILD_ID");
+
+/// The running binary's path, size and mtime, for the audit trail.
+pub fn binary_info() -> String {
+    let Ok(path) = std::env::current_exe() else {
+        return "unknown".into();
+    };
+    let Ok(metadata) = std::fs::metadata(&path) else {
+        return path.display().to_string();
+    };
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|delta| delta.as_secs())
+        .unwrap_or(0);
+    format!(
+        "{} ({} bytes, mtime {modified})",
+        path.display(),
+        metadata.len()
+    )
+}
 pub use agent::{Agent, AgentAudit, AgentError, BotDescriptor, Candidate, Commit, Suggestion};
 pub use audit::{GameAudit, ThinkStats, wilson_interval};
 pub use baseline::BaselineBot;

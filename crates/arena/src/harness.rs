@@ -604,6 +604,13 @@ pub struct MatchSummary {
     /// Load warning (e.g. over-100 ms moves in deterministic mode).
     #[serde(default)]
     pub load_note: Option<String>,
+    /// Content hash of the sources the binary was built from (`crate::BUILD_ID`).
+    /// `git HEAD` only records the checkout; this records the code that played.
+    #[serde(default)]
+    pub build_id: String,
+    /// The running binary's path, size and mtime.
+    #[serde(default)]
+    pub binary: String,
     /// Every game has replay + audit + opponent decision log (v1.21 §8.3.1).
     #[serde(default)]
     pub measurement_complete: bool,
@@ -1166,6 +1173,8 @@ pub fn summarize(audits: &[GameAudit], notes: Vec<String>) -> MatchSummary {
         threads: 0,
         deterministic: false,
         load_note: None,
+        build_id: crate::BUILD_ID.into(),
+        binary: crate::binary_info(),
         measurement_complete: false,
         attax_patch_sha256: None,
         attax,
@@ -1188,6 +1197,10 @@ impl MatchSummary {
         let mut text = String::new();
         text.push_str("# S2 match summary\n\n");
         text.push_str(&format!("- games: {}\n", self.games.len()));
+        text.push_str(&format!(
+            "- build id: `{}`; binary: `{}`\n",
+            self.build_id, self.binary
+        ));
         text.push_str(&format!(
             "- intetrigence wins / losses / unresolved / no-contest: {} / {} / {} / {}\n",
             self.wins, self.losses, self.unresolved, self.no_contest
@@ -1433,6 +1446,14 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         ),
         BotChoice::Baseline => (0, 0, 0),
     };
+    // The resume check needs the identity the new games will carry: a replay
+    // is only reusable when the same bot (not just the same checkout) played
+    // it, and when the binary was built from the same sources.
+    let expected_bot_name = match &config.bot {
+        BotChoice::Search(_) => "intetrigence",
+        BotChoice::Baseline => "intetrigence-baseline",
+    };
+    let build_id = crate::BUILD_ID;
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
@@ -1465,7 +1486,14 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                                     // A replay from a different build is not
                                     // comparable: re-run the game instead of
                                     // reusing it.
-                                    if audit.bots[0].commit == build_commit {
+                                    let same_bot = audit.bots[0].name == expected_bot_name;
+                                    let same_build = match audit.bots[0].build_id.as_deref() {
+                                        Some(id) => id == build_id,
+                                        // Older replays predate the build id;
+                                        // fall back to the checkout commit.
+                                        None => audit.bots[0].commit == build_commit,
+                                    };
+                                    if same_bot && same_build {
                                         audit.verify = verify;
                                         audit.opener_lines = opener_lines_from_replay(&replay_path);
                                         audit.spin_placements =
@@ -1475,11 +1503,22 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                                         resumed_games += 1;
                                         continue;
                                     }
-                                    println!(
-                                        "{name}: not resumed (build {} != {})",
-                                        audit.bots[0].commit.as_deref().unwrap_or("unknown"),
-                                        build_commit.as_deref().unwrap_or("unknown")
-                                    );
+                                    if !same_bot {
+                                        println!(
+                                            "{name}: not resumed (bot {} != {})",
+                                            audit.bots[0].name, expected_bot_name
+                                        );
+                                    } else {
+                                        println!(
+                                            "{name}: not resumed (build {} != {})",
+                                            audit.bots[0]
+                                                .build_id
+                                                .as_deref()
+                                                .or(audit.bots[0].commit.as_deref())
+                                                .unwrap_or("unknown"),
+                                            build_id
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1824,6 +1863,8 @@ mod tests {
             threads: 0,
             deterministic: false,
             load_note: None,
+            build_id: "test".into(),
+            binary: "test".into(),
             wins_topout: 0,
             wins_turncap: 0,
             losses_turncap: 0,

@@ -30,6 +30,9 @@ pub struct BotDescriptor {
     /// Whether the bot's input set includes 180-degree rotations. Attax does
     /// not; the referee's capability-aware forfeit check uses this.
     pub supports_180: bool,
+    /// Content hash of the sources that produced this bot (`crate::BUILD_ID`).
+    /// `commit` records the checkout, not the binary; this records the code.
+    pub build_id: Option<String>,
 }
 
 /// One candidate placement, identified by its absolute cell set.

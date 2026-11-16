@@ -91,6 +91,7 @@ impl TbpAgent {
             commit: config.commit.clone(),
             visible_rows: config.visible_rows,
             supports_180: config.supports_180,
+            build_id: None,
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());
