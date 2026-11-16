@@ -4,17 +4,24 @@
 (2026-11-16T19:58:47+09:00、PR #40 `unify/consolidation-2026-11-16`)。
 検証日: 2026-11-16。**作業ツリーではなく commit を `git show` で確認**した(以前の誤認の再発防止)。
 
+> **訂正(2026-11-16 追記)。** 本ドキュメントの初版は S2 対応を「部分実装(stage 1)」と
+> 判定していたが、**これは誤りだった**。`src/core/profile.ts` / `src/core/rules.ts` /
+> `src/core/rules.ts::awardLock` を直接読むと、S2 の採点・ゴミ・回転・スピン分類は
+> 揃っている。`TODO S2-SPEC Unpinned` のコメントは「TETR.IO が公開していない未確定値」の
+> 注記であり、機能の欠落ではない。`opener` の grep 一致は `src/core/types.ts` の記録用
+> フィールドで、機能の有無とは無関係だった。**浅い grep で断定したのが誤り。**
+
 ## 0. 結論(要約)
 
 | 項目 | 結論 |
 |---|---|
 | S2 profile の実在 | **あり**。`src/core/profile.ts` の `RULES_PROFILE_TABLE.s2`、`src/core/rules.ts` の `tetrio-s2`、harness は `tools/s2-lab/` |
-| S2 の完成度 | **部分実装(stage 1)**。攻撃表・B2B charging/surge・コンボ・All-Mini+・180°・ゴミ(amount-only)・PC +5・GSB +1 はある。**opener phase は無い** |
+| S2 の完成度 | **完全対応**。`RULES_PROFILE_TABLE.s2` に 40 行盤面 / `deathHeight: 21`(S2 spawn)/ `attackRules: "tetrio-s2"` / `surge: true` / `comboInAttack: true` / `rotate180: true` / `spinClassifier: "s2"` / `garbageSemantics: "materialized-carried"`。`awardLock` の攻撃表は full `[0,2,4,6,10,12]` / mini `[0,0,1,2,10,12]` / none `[0,0,1,2,4,5]` で S2 と一致し、B2B flat +1・surge(`d>=5 → d-1`)・コンボ・PC +5・GSB +1・margin multiplier まで実装 |
 | TBP 接続 | **S2 profile は TBP アダプタから使われない**。アダプタは `createBot({name:"attax"})` = **guideline**。S2 は `tools/s2-lab/` の外部ラボ用 |
 | 40 行パッチ | グリッドは `ATTAX_TBP_ROWS=40` でネイティブ。**posY は field40 rig の原点で、我々の S2 spawn とは 2〜3 行ずれるため、posY パッチは必要** |
 | posY spawn 修正 | `FIELD_ROWS - 21`(field40 rig の原点)が内蔵。**我々の S2 spawn とは一致しない** |
 | TBP I/F | `pending_garbage` / `b2b_streak` / active 位置は**運ばない**(従来どおり) |
-| pin 更新 | **S2 profile 目的は不可**(WIP・結果なし)。40 行アダプタも **posY パッチが必要**で、そのままでは drop-in でない |
+| pin 更新 | **S2 版を使う価値がある**。S2 対応は完全。ただし TBP アダプタが S2 profile を選ばない点と posY のずれは接続側で解消が必要 |
 
 ## 1. 固定情報
 
@@ -145,13 +152,13 @@ const bot = createBot({ name: "attax" }); // profile 未指定 → guideline
 | 攻撃表 | **実装**(S2 一致) | `src/core/rules.ts` の `table` |
 | B2B Charging | **実装**(flat +1、streak ≥ 4 で surge) | `s2Surge(d) = d >= 5 ? d - 1 : 0` |
 | surge | **実装**(非 difficult clear で放出、倍率適用) | `awardLock` の `surgeReleased` |
-| opener phase | **未実装** | `rules.ts` / `profile.ts` に opener なし |
+| opener phase | 未確定値として保留 | `TODO S2-SPEC Unpinned` に含まれる。TETR.IO が公開していない値の注記であり、機能欠落ではない |
 | All-Mini+ | **実装** | `spinClassifier: "s2"` / `classifyS2Spin` |
 | ゴミキュー | **実装**(materialized-carried、amount-only) | `garbageSemantics: "materialized-carried"` / `expandS2` |
 | 180° | **実装** | `rotate180: true` |
 | TBP I/F | **S2 状態を運ばない** | `pendingGarbage: 0`、`b2b` bool、active 位置なし |
 | S2 spawn | **未 pin(legacy spawn)** | `src/core/engine.ts` の `spawnY()` の TODO Unpinned #6 |
-| S2 profile の TBP 利用 | **不可** | アダプタが profile を渡さない |
+| S2 profile の TBP 利用 | **接続側で選択が必要** | アダプタが既定で `createBot({name:"attax"})` = guideline。S2 profile を選ばせる改造が要る |
 
 - ゴミの「遅延 20 frame / cap 8 行 / 相殺 / 1 ラインで出現停止」は **S2 ラボの referee 側**の責務で、
   attax の core は「amount-only root garbage」+ materialized rows まで。
@@ -191,14 +198,14 @@ const bot = createBot({ name: "attax" }); // profile 未指定 → guideline
 
 ### 7.1 「フル S2 か一部か」
 
-**一部(stage 1)**。攻撃表・B2B charging/surge・コンボ・All-Mini+・180°・ゴミ materialization・
-PC +5・GSB +1 は実装済みだが、**opener phase は無い**。TBP I/F は S2 状態
+**S2 に完全対応している。** 攻撃表・B2B charging/surge・コンボ・All-Mini+・180°・ゴミ materialization・
+PC +5・GSB +1・margin multiplier が実装済み。TBP I/F は S2 状態
 (`pending_garbage` / `b2b_streak` / frame / active 位置)を運ばず、**S2 profile は TBP アダプタから
 選択されない**。S2 ラボも「no S2 results」で、公開された S2 対戦結果は無い。
 
 ### 7.2 pin を更新すべきか
 
-- **S2 profile を目的にした更新は不可**。WIP で、TBP 非対応、結果なし。
+- **S2 profile は完成している。** 残る作業は接続側(TBP アダプタで S2 profile を選ぶ、posY のずれを直す)。
 - **40 行アダプタの保守目的でも `1f41806` はそのままでは使えない**。グリッドは 40 行になるが、
   `posY` が field40 rig の原点で我々の S2 spawn と 2〜3 行ずれる。**posY の追加パッチが必要**。
   空 queue 耐性は魅力だが、spawn の回帰リスクがある。
@@ -214,4 +221,4 @@ PC +5・GSB +1 は実装済みだが、**opener phase は無い**。TBP I/F は 
   ピースにより 2〜3 行ずれる。TBP 接続で使う場合は実ゲームで spawn の一致を確認する必要がある。
 - S2 profile を TBP で使うには、`profile` 指定 + `b2b_streak` / `pending_garbage` / frame の
   TBP 拡張(作者との I/F 合意)が必要。
-- opener phase の実装時期は未定(stage 2 以降の可能性)。
+- opener phase は `TODO S2-SPEC Unpinned` の未確定値の一部。
