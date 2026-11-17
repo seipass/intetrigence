@@ -199,7 +199,7 @@ impl Board {
 
     /// True when every one-cell move (left, right, up, down) is illegal.
     ///
-    /// Used for non-T All-Mini+ spins (`docs/s2-spec.md` §4.2). The board is
+    /// Used for All-Mini+ spins (`docs/s2-spec.md` §4.2–4.3). The board is
     /// the pre-lock board; the piece itself is not placed on it.
     pub fn is_immobile(&self, kind: PieceKind, rotation: Rotation, x: i32, y: i32) -> bool {
         !self.can_place(kind, rotation, x - 1, y)
@@ -260,14 +260,15 @@ impl Board {
 
         if kind == PieceKind::T {
             let (corners, front) = self.t_spin_corners(rotation, x, y);
-            if corners < 3 {
-                SpinType::None
-            } else if front == 2 || fin_or_tst {
-                SpinType::Full
-            } else {
-                SpinType::Mini
+            if corners >= 3 {
+                return if front == 2 || fin_or_tst {
+                    SpinType::Full
+                } else {
+                    SpinType::Mini
+                };
             }
-        } else if self.is_immobile(kind, rotation, x, y) {
+        }
+        if self.is_immobile(kind, rotation, x, y) {
             SpinType::Mini
         } else {
             SpinType::None

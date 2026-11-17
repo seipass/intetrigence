@@ -24,9 +24,12 @@ pub mod attax_log;
 pub mod audit;
 pub mod baseline;
 pub mod bot_agent;
+mod build_fingerprint;
 pub mod engine;
+mod evaluation_seeds;
 pub mod font;
 pub mod harness;
+pub mod measurement_lock;
 pub mod movegen;
 pub mod referee;
 pub mod render;
@@ -34,9 +37,8 @@ pub mod replay;
 pub mod round;
 pub mod tbp_agent;
 
-/// Content hash of the sources that decide a game (`crates/bot`, `crates/core`
-/// and `crates/arena`), embedded by `build.rs`. `git HEAD` only says what the
-/// checkout contains; this says what the running binary was built from.
+/// Content hash of the workspace's Rust sources and dependency manifests,
+/// embedded by `build.rs`.
 pub const BUILD_ID: &str = env!("ARENA_BUILD_ID");
 
 /// The running binary's path, size and mtime, for the audit trail.

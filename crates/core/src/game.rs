@@ -31,6 +31,20 @@ pub struct ActivePiece {
 }
 
 impl ActivePiece {
+    /// Find the legal spawn, allowing a Clutch push-up after a line clear.
+    pub fn spawn_on(board: &Board, kind: PieceKind, clutch: bool) -> Option<Self> {
+        let (x, y) = kind.spawn_position();
+        let last_y = if clutch { Board::HEIGHT as i32 - 1 } else { y };
+        (y..=last_y)
+            .find(|&y| board.can_place(kind, Rotation::Zero, x, y))
+            .map(|y| Self {
+                kind,
+                rotation: Rotation::Zero,
+                x,
+                y,
+            })
+    }
+
     /// Occupied cells in board coordinates.
     pub fn cells(self) -> [(i32, i32); 4] {
         let mut cells = self.kind.cells(self.rotation);
@@ -210,40 +224,11 @@ impl Game {
     /// time until a legal position is found (`docs/s2-spec.md` §2.3). If none
     /// exists, the game tops out.
     fn spawn(&mut self, kind: PieceKind, clutch: bool) -> bool {
-        let (x, y) = kind.spawn_position();
-        let mut piece = ActivePiece {
-            kind,
-            rotation: Rotation::Zero,
-            x,
-            y,
-        };
-
-        if self
-            .board
-            .can_place(piece.kind, piece.rotation, piece.x, piece.y)
-        {
-            self.active = Some(piece);
-            return true;
+        self.active = ActivePiece::spawn_on(&self.board, kind, clutch);
+        if self.active.is_none() {
+            self.topped_out = true;
         }
-
-        if clutch {
-            let mut y = piece.y + 1;
-            while y < Board::HEIGHT as i32 {
-                piece.y = y;
-                if self
-                    .board
-                    .can_place(piece.kind, piece.rotation, piece.x, piece.y)
-                {
-                    self.active = Some(piece);
-                    return true;
-                }
-                y += 1;
-            }
-        }
-
-        self.active = None;
-        self.topped_out = true;
-        false
+        self.active.is_some()
     }
 
     pub fn board(&self) -> &Board {
@@ -491,22 +476,7 @@ impl Game {
 
         self.stats.garbage_lines_received += count as u32;
         if let Some(piece) = self.active {
-            let (x, y) = piece.kind.spawn_position();
-            let spawn = ActivePiece {
-                kind: piece.kind,
-                rotation: Rotation::Zero,
-                x,
-                y,
-            };
-            if self
-                .board
-                .can_place(spawn.kind, spawn.rotation, spawn.x, spawn.y)
-            {
-                self.active = Some(spawn);
-            } else {
-                self.active = None;
-                self.topped_out = true;
-            }
+            self.spawn(piece.kind, false);
         }
         Ok(())
     }

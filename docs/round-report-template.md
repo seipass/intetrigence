@@ -77,7 +77,7 @@ turn-cap; no-contest is allowed only if the 50-game total still holds.)
 
 | opponent | upstream commit | patch | purpose | direction |
 |---|---|---|---|---|
-| CC2 | `ed8b193...` | `adapters/cc2-tbp-compat.patch` (116 lines) | empty-hold representation + spawn row 21 | removes a handicap (opponent stronger) |
+| CC2 | `ed8b193...` | `adapters/cc2-tbp-compat.patch` | first use of empty hold in search + spawn row 21 | allows the legal empty-hold branch |
 | clys | `ccae45f...` | `adapters/clys-tbp-spawn.patch` (38 lines) | spawn row 21 | removes a handicap (opponent stronger) |
 
 - The patches only align TBP/S2 protocol details (spawn position, empty hold). They do **not** touch the opponents' search, evaluation, or move legality.

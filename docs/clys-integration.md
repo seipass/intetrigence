@@ -61,16 +61,19 @@ clys の `core/move.cpp` は **全ピースを `(x=4, y=19)` からスポーン*
 **最下段セルが row 21** なので、2 行ずれている。高スタック(高さ 21 以上)では clys の movegen が
 スポーン位置で衝突して 0 candidates を返し、`suggest` が空 plan → `return -1`(exit 255)になる。
 
-`adapters/clys-tbp-spawn.patch`(38 行)を適用する:
+`adapters/clys-tbp-spawn.patch` をビルド前に適用する。
 
 ```powershell
-cd C:UsersHasilanProjectsclys
-git apply C:UsersHasilanProjectsintetrigenceadaptersclys-tbp-spawn.patch
+cd C:\Users\Hasilan\Projects\clys
+git apply C:\Users\Hasilan\Projects\intetrigence\adapters\clys-tbp-spawn.patch
 ```
 
 変更内容:
 - `Placement init = Placement(4, 19, ...)` → `(4, 21, ...)`
 - スポーン衝突チェックの `1ULL << 19` → `1ULL << 21`(2 箇所)、`1ULL << 20` → `1ULL << 22`
+- 公式ラウンドでは `INTETRIGENCE_TBP_THINK_MS=100` に応じ、`suggest` を受けてから探索を開始し、同じ100 ms枠で停止を要求する。join と入出力の時間も計測に含む。アダプター自身の従来の待機はこのモードで無効になる。
+
+回帰テストは Intetrigence のルートで `node adapters/tbp-request-window-smoke.mjs bun adapters/clys/tbp/adapter.ts --clys-dir <clysルート>` を実行する。相手の機能申告、探索結果、待機時間、正常終了を確認する。
 
 パッチ後、seed 9002 の 2 ゲームは **両方 TopOut で完走**(forfeit 0)。
 

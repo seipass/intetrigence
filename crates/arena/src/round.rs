@@ -1,13 +1,14 @@
 //! Staged round runner (`docs/s2-referee-protocol.md` v1.13 §1.4/§1.5).
 //!
-//! A round is: attax 50 games (25 seeds x both sheets) -> CC2 50 -> clys 50,
+//! A round is: CC2 50 games (25 seeds x both sheets) -> clys 50,
 //! all with the same build and the same pre-committed evaluation seeds. A stage
 //! only runs when the previous gate passed; a failed gate stops the round.
 //!
 //! The runner also owns the seed-discipline checks: the seeds file must be
-//! committed, its `build:` must match the running build, and the seeds commit
-//! must be an ancestor of the build commit.
+//! committed after the declared build, and executable sources must remain
+//! unchanged between the declared build and HEAD.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -21,7 +22,7 @@ use crate::harness::{
 };
 
 /// The three stages, in order.
-pub const STAGE_KEYS: [&str; 3] = ["attax", "cc2", "clys"];
+pub const STAGE_KEYS: [&str; 3] = ["cc2", "clys", "attax"];
 
 /// How to start an opponent.
 #[derive(Clone, Debug)]
@@ -229,8 +230,9 @@ pub fn read_seeds_file(path: &Path) -> Result<SeedsFile, String> {
 
 /// Git commit that last touched `path`, if it is committed.
 pub fn file_commit(path: &Path) -> Option<String> {
-    let root = crate::harness::repo_root();
-    let relative = path.strip_prefix(&root).unwrap_or(path);
+    let root = crate::harness::repo_root().canonicalize().ok()?;
+    let path = path.canonicalize().ok()?;
+    let relative = path.strip_prefix(&root).ok()?;
     let output = std::process::Command::new("git")
         .arg("-C")
         .arg(&root)
@@ -330,10 +332,35 @@ pub fn check_seed_discipline(
             file.seeds.len()
         ));
     }
+    let distinct = file.seeds.iter().copied().collect::<HashSet<_>>();
+    if distinct.len() != file.seeds.len() {
+        return Err("evaluation seeds contain duplicates".into());
+    }
+    reject_reserved_seeds(
+        &distinct,
+        include_str!("../../../docs/evaluation-seed-exclusions.txt"),
+    )?;
+    reject_other_seed_allocations(path, &distinct)?;
     if !is_ancestor(build, head) {
         return Err(format!(
             "seeds file build `{build}` is not an ancestor of HEAD `{head}`"
         ));
+    }
+    let frozen_paths = [
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates",
+        "adapters",
+        "scripts/run-round.sh",
+        "docs/evaluation-seed-exclusions.txt",
+    ];
+    let build_unchanged = std::process::Command::new("git")
+        .args(["diff", "--quiet", build, head, "--"])
+        .args(frozen_paths)
+        .status()
+        .is_ok_and(|status| status.success());
+    if !build_unchanged {
+        return Err("the declared build differs from HEAD in executable sources".into());
     }
     let Some(seeds_commit) = file_commit(path) else {
         return Err(format!(
@@ -365,6 +392,85 @@ pub fn check_seed_discipline(
         }
     }
     Ok(Some(seeds_commit))
+}
+
+fn reject_reserved_seeds(seeds: &HashSet<u64>, registry: &str) -> Result<(), String> {
+    for (index, line) in registry.lines().enumerate() {
+        let range = line.split('#').next().unwrap_or_default().trim();
+        if range.is_empty() {
+            continue;
+        }
+        let parse_range = || -> Option<(u64, u64)> {
+            let (start, end) = range.split_once('-')?;
+            Some((start.parse().ok()?, end.parse().ok()?))
+        };
+        let (start, end) = parse_range()
+            .filter(|(start, end)| start <= end)
+            .ok_or_else(|| format!("invalid seed exclusion on line {}", index + 1))?;
+        if let Some(seed) = seeds
+            .iter()
+            .copied()
+            .filter(|seed| (start..=end).contains(seed))
+            .min()
+        {
+            return Err(format!(
+                "evaluation seed {seed} overlaps excluded range {range}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn reject_other_seed_allocations(path: &Path, seeds: &HashSet<u64>) -> Result<(), String> {
+    let canonical = |path: &Path| {
+        path.canonicalize()
+            .map_err(|error| format!("{}: {error}", path.display()))
+    };
+    let selected = canonical(path)?;
+    let output = std::process::Command::new("git")
+        .args([
+            "ls-files",
+            "--full-name",
+            "-z",
+            "--",
+            ":/docs/seeds-round-*.md",
+        ])
+        .output()
+        .map_err(|error| format!("list registered seed allocations: {error}"))?;
+    if !output.status.success() {
+        return Err("cannot list registered seed allocations".into());
+    }
+    let root = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|error| format!("locate seed allocations: {error}"))?;
+    if !root.status.success() {
+        return Err("cannot locate repository for seed allocations".into());
+    }
+    let directory = Path::new(
+        std::str::from_utf8(&root.stdout)
+            .map_err(|error| error.to_string())?
+            .trim_end(),
+    );
+    let names = std::str::from_utf8(&output.stdout).map_err(|error| error.to_string())?;
+    let mut registered = false;
+    for name in names.split('\0').filter(|name| !name.is_empty()) {
+        let other = directory.join(name);
+        if canonical(&other)? == selected {
+            registered = true;
+            continue;
+        }
+        let allocation = read_seeds_file(&other)?;
+        if let Some(seed) = allocation.seeds.iter().find(|seed| seeds.contains(seed)) {
+            return Err(format!(
+                "evaluation seed {seed} is already allocated in {name}"
+            ));
+        }
+    }
+    if !registered {
+        return Err("evaluation seeds must be registered as docs/seeds-round-*.md".into());
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +505,7 @@ fn gate_check(
     }
     // TurnCap is not a win: every game must be decided by TopOut (user rule,
     // protocol v1.26 §1.4).
-    if turncap > 0 {
+    if turncap > 0 || stuck > 0 {
         return false;
     }
     // Every game must be accounted for (five outcomes, including Stuck).
@@ -425,7 +531,12 @@ fn stage_gate(index: usize, summary: &MatchSummary, gate: u32) -> bool {
         summary.turncap,
         summary.no_contest,
         summary.stuck,
-        summary.measurement_complete,
+        summary.measurement_complete
+            && summary.bots[0].think_over_100ms == 0
+            && summary
+                .games
+                .iter()
+                .all(|game| game.queue_invariant_violations == 0),
         summary.verified,
         summary.games.len() as u32,
         gate,
@@ -448,6 +559,22 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
     }
     if summary.verify_failures > 0 {
         return format!("{} replay verification failure(s)", summary.verify_failures);
+    }
+    if summary.bots[0].think_over_100ms > 0 {
+        return format!(
+            "gate failed: {} intetrigence moves exceeded 100 ms",
+            summary.bots[0].think_over_100ms
+        );
+    }
+    if summary.stuck > 0 {
+        return format!("gate failed: {} Stuck result(s)", summary.stuck);
+    }
+    if summary
+        .games
+        .iter()
+        .any(|game| game.queue_invariant_violations > 0)
+    {
+        return "gate failed: external bot queue did not match the referee".into();
     }
     if summary.turncap > 0 {
         return format!(
@@ -475,8 +602,29 @@ fn stage_reason(index: usize, summary: &MatchSummary, gate: u32, passed: bool) -
 
 /// Runs the stages in order, stopping at the first failed gate.
 pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
+    let _measurement = spec
+        .seeds_commit
+        .as_ref()
+        .map(|_| crate::measurement_lock::MeasurementLock::acquire("round run"))
+        .transpose()?;
     if spec.resume {
         check_resume_compatibility(spec)?;
+    }
+    if spec.seeds_commit.is_some() && !matches!(spec.opponents[0].kind, OpponentKind::Missing) {
+        check_evaluation_binary()?;
+        for opponent in spec.opponents.iter().take(spec.max_stages) {
+            if let OpponentKind::Tbp(tbp) = &opponent.kind {
+                let mut host = crate::tbp_agent::spawn_with_request_window(
+                    tbp.host_config(),
+                    tbp.request_window_ms,
+                )
+                .map_err(|error| format!("{} timing preflight: {error}", opponent.key))?;
+                host.quit().map_err(|error| {
+                    format!("{} timing preflight shutdown: {error}", opponent.key)
+                })?;
+            }
+        }
+        claim_evaluation_allocation(spec)?;
     }
     let mut stages = Vec::new();
     let mut stopped_at = None;
@@ -630,6 +778,84 @@ pub fn run_round(spec: &RoundSpec) -> Result<RoundReport, String> {
         .map_err(|error| format!("write round.json: {error}"))?;
     write_markdown_report(spec, &report)?;
     Ok(report)
+}
+
+fn check_evaluation_binary() -> Result<(), String> {
+    let manifest = crate::harness::repo_root().join("crates/arena");
+    let source_id = crate::build_fingerprint::fingerprint(&manifest)
+        .map_err(|error| format!("fingerprint evaluation checkout: {error}"))?;
+    if source_id != crate::BUILD_ID {
+        return Err(format!(
+            "arena binary was built from different sources (binary {}, checkout {source_id}); rebuild with cargo build --release --locked",
+            crate::BUILD_ID
+        ));
+    }
+    Ok(())
+}
+
+fn claim_evaluation_allocation(spec: &RoundSpec) -> Result<(), String> {
+    let allocation = Path::new(&spec.seeds_source)
+        .file_stem()
+        .ok_or("evaluation seeds are missing their registered filename")?;
+    let git = std::process::Command::new("git")
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .output()
+        .map_err(|error| format!("locate evaluation ledger: {error}"))?;
+    if !git.status.success() {
+        return Err("cannot locate the evaluation ledger in Git's common directory".into());
+    }
+    let directory = Path::new(
+        std::str::from_utf8(&git.stdout)
+            .map_err(|error| error.to_string())?
+            .trim_end(),
+    )
+    .join("intetrigence-evaluations");
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("create evaluation ledger: {error}"))?;
+    std::fs::create_dir_all(&spec.out_root)
+        .map_err(|error| format!("create round output: {error}"))?;
+    let output = spec
+        .out_root
+        .canonicalize()
+        .map_err(|error| format!("resolve round output: {error}"))?;
+    let identity = serde_json::json!({
+        "round": spec.round,
+        "output": output,
+        "seeds": spec.seeds,
+        "seeds_commit": spec.seeds_commit,
+        "build_commit": spec.build_commit,
+    });
+    let path = directory.join(allocation).with_extension("json");
+    let local_claim_exists = path
+        .try_exists()
+        .map_err(|error| format!("inspect evaluation claim: {error}"))?;
+    if local_claim_exists {
+        check_legacy_allocation(&path, &identity.to_string(), spec.resume)?;
+    }
+    crate::evaluation_seeds::claim_round(
+        &crate::evaluation_seeds::SeedClaim {
+            seeds: spec.seeds.clone(),
+            kind: "round".into(),
+            identity,
+        },
+        spec.resume,
+        local_claim_exists,
+    )
+}
+
+fn check_legacy_allocation(path: &Path, identity: &str, resume: bool) -> Result<(), String> {
+    if !resume {
+        return Err(format!(
+            "evaluation allocation is already claimed at {}; resume the original run or use fresh seeds",
+            path.display()
+        ));
+    }
+    let seen =
+        std::fs::read_to_string(path).map_err(|error| format!("read evaluation claim: {error}"))?;
+    if seen != identity {
+        return Err("the evaluation allocation belongs to a different round or output".into());
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -813,7 +1039,7 @@ fn stage_section(
     };
     writeln!(
         out,
-        "- think median / p95 / p99 / max: **{:.1} / {:.1} / {:.1} / {:.1} ms** vs **{:.1} / {:.1} / {:.1} / {:.1} ms**",
+        "- mean of game medians / mean of game p95 / mean of game p99 / overall max: **{:.1} / {:.1} / {:.1} / {:.1} ms** vs **{:.1} / {:.1} / {:.1} / {:.1} ms**",
         think(0, |game| game.think_median_ms),
         think(0, |game| game.think_p95_ms),
         think(0, |game| game.think_p99_ms),
@@ -1157,6 +1383,33 @@ pub fn default_report_path(round: u32) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evaluation_binary_matches_its_build_checkout() {
+        check_evaluation_binary().unwrap();
+    }
+
+    #[test]
+    fn evaluation_allocations_cannot_be_reused_in_another_output() {
+        let path = std::env::temp_dir().join(format!(
+            "intetrigence-evaluation-{}-{}.json",
+            std::process::id(),
+            now_stamp().replace(':', "-")
+        ));
+        std::fs::write(&path, "original").unwrap();
+        assert!(check_legacy_allocation(&path, "other output", false).is_err());
+        assert!(check_legacy_allocation(&path, "other output", true).is_err());
+        check_legacy_allocation(&path, "original", true).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn evaluation_seed_exclusions_cover_used_series_but_allow_fresh_seeds() {
+        let registry = include_str!("../../../docs/evaluation-seed-exclusions.txt");
+        assert!(reject_reserved_seeds(&HashSet::from([386001, 386056]), registry).is_err());
+        assert!(reject_reserved_seeds(&HashSet::from([9001]), registry).is_err());
+        assert!(reject_reserved_seeds(&HashSet::from([30001, 386056]), registry).is_ok());
+    }
 
     #[test]
     fn seeds_file_parses_range_form() {

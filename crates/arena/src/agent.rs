@@ -46,6 +46,8 @@ pub struct BotDescriptor {
 pub struct Candidate {
     pub piece: PieceKind,
     pub cells: [(i32, i32); 4],
+    /// TBP supplies only a piece and cell set, so its hold remains inferred.
+    pub used_hold: Option<bool>,
     /// Spin label claimed by the bot (audit only; never used for scoring).
     pub claimed_spin: Option<SpinType>,
     /// Attack the bot claims for this placement (audit only).
@@ -54,7 +56,10 @@ pub struct Candidate {
 
 impl Candidate {
     pub fn target(&self) -> PlacementTarget {
-        PlacementTarget::new(self.piece, self.cells)
+        PlacementTarget {
+            used_hold: self.used_hold,
+            ..PlacementTarget::new(self.piece, self.cells)
+        }
     }
 }
 

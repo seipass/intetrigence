@@ -10,7 +10,7 @@
 //!
 //! - [`eval`]: board features, S2 placement rewards (attack, B2B, combo,
 //!   surge, opener) and the T-slot cutout;
-//! - [`search`]: anytime beam search with hold, bag prediction, a
+//! - [`search`]: anytime beam search over the visible queue with hold, a
 //!   transposition graph and a worker pool;
 //! - [`play`]: a self-contained single-player driver that plays a legal game
 //!   through the engine and records think times.
@@ -35,5 +35,6 @@ pub use movegen::{
 };
 pub use play::{GameReport, SearchStats, play_game, play_game_with_garbage, play_game_with_setup};
 pub use search::{
-    Candidate, MAX_THREADS, Move, PieceSequence, RootState, SearchConfig, SearchResult, Searcher,
+    Candidate, MAX_THREADS, Move, PieceSequence, RootState, SearchConfig, SearchResult,
+    SearchTiming, Searcher,
 };

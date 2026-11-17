@@ -5,7 +5,7 @@
 **凍結日**: 2026-11-13
 **状態**: 凍結(v1)。以降の変更は「改訂履歴」に追記し、`crates/core` のバージョンと同時に上げる。
 
-この文書は PLAN.md §3.1 の表を一次ソースで裏取りし、数値定数として固定する。**ソース間で決着しなかった項目は §11 で我々が決定(暫定自決)として確定**しており、各項目に「決定値・根拠・差し替え条件」を書いてある。作者確認は非ブロッキング(AGPL 利用許可のみ取得済み・公開 I/F のみ使用)なので、**§11 の決定が実装の正**である。
+この文書は 旧計画 §3.1 の表を一次ソースで裏取りし、数値定数として固定する。**ソース間で決着しなかった項目は §11 で我々が決定(暫定自決)として確定**しており、各項目に「決定値・根拠・差し替え条件」を書いてある。作者確認は非ブロッキング(AGPL 利用許可のみ取得済み・公開 I/F のみ使用)なので、**§11 の決定が実装の正**である。
 
 > **マッチの運用(ターン・席・提出・replay・監査)は [`docs/s2-referee-protocol.md`](s2-referee-protocol.md) が定める。** 本書はルールの数値と判定だけを持ち、レフェリーの手順は持たない。片方を変えるときはもう片方への影響を確認すること。
 
@@ -64,7 +64,7 @@ S7(teto)由来の座標表を本書やコードに写すときは、**必ず次�
 
 ---
 
-## 1. PLAN.md §3.1 の裏取り表
+## 1. 旧計画 §3.1 の裏取り表
 
 PLAN §3.1 の全 15 行を 1 行ずつ潰す。
 
@@ -73,7 +73,7 @@ PLAN §3.1 の全 15 行を 1 行ずつ潰す。
 | 1 | 攻撃 base | Single 0 / Double 1 / Triple 2 / Quad 4 / TSM 0 / TSS 2 / TSD 4 / TST 6 / mini Double 1(完全表は §6.1) | S7 `damageCalc`、S8、S10 | [実装一致] |
 | 2 | コンボ | `base × (1 + 0.25 × combo)`、切り捨て。`base = 0` は `ln(1 + 1.25 × combo)`(combo ≥ 2)。丸めは **DOWN** | S1、S5、S7 | [確定] |
 | 3 | B2B | **B2B Charging**: difficult clear 毎に **+1 フラット**。表示 B2B ≥ 4 で surge 溜め、非 difficult clear で全放出(3 分割) | S1、S4 `PN BETA 1.1.0`/`PN BETA 1.2.0`、S7、S6 golden | [確定] |
-| 4 | All-Spin | **All-Mini+**: 非 T は immobile 判定で mini。T は 3-corner / 2-corner + 5th kick。B2B は維持・加算 | S1、S2、S4 `PN BETA 1.5.0`、S7 `spinbonusRules["all-mini+"]`、S6 (`spinbonuses: "all-mini+"`) | [確定] |
+| 4 | All-Spin | **All-Mini+**。T は 3-corner / 2-corner と 5th kick を優先し、3-corner 未満でも immobile なら mini。非 T は immobile で mini。ライン消去で B2B を維持・加算 | S4 `PN BETA 1.5.0`、S6 の観測設定と `all-mini-plus-combines-t-and-immobility` | [確定] |
 | 5 | パーフェクトクリア | **+5 ゴミ、+1 B2B**(+2 ではない。§6.5 で決着) | S4 `PN BETA 1.2.0`、S6 (`allclear_garbage: 5`, `allclear_b2b: 1`)、S6 golden `perfect-clear-adds-b2b` | [確定] |
 | 6 | ゴミ込みボーナス | Garbage Special Bonus: ゴミを 1 行以上消し、かつ (spin または 4 行消し) のとき **+1 フラット** | S1、S4 `PN BETA 1.3.0`、S7、S6 (`garbagespecialbonus: true`) | [確定] |
 | 7 | Opener Phase | 設置 1〜14 個目の間、`pending ≥ sent` なら相殺量 **×2** | S1、S4 `PN BETA 1.1.0`/`1.2.0`、S7 `GarbageQueue.cancel`、S6 (`openerphase: 14`) | [確定] |
@@ -357,13 +357,13 @@ immobile(p) =
 
 ### 4.3 T ピース: 3-corner / 2-corner + 5th kick
 
-T のみ corner ベースの判定を使う。
+T は corner ベースの判定を優先する。
 
 ```
 1. 最後の操作が回転でなければ spin なし
 2. T の 4 隅(回転状態ごとに定義)のうち、埋まっている数を corners とする
    - 盤外(左右の壁・底)は「埋まっている」とみなす
-3. corners < 3 → spin なし
+3. corners < 3 → 上下左右に1マスも動けなければ mini、動ければ spin なし
 4. front_corners = 「T が向いている 2 隅」のうち埋まっている数
 5. front_corners == 2 → full spin
    front_corners != 2 → mini
@@ -398,7 +398,7 @@ front 2 隅 = **nub が向いている側の 2 隅**。これが 3-corner 則の
 >
 > **検算**: 標準の TSD スロット(T が回転 2 で、nub の左右 2 マスが埋まっている)では front = 2 → full、base 4。壊れた表では front = 0 → mini、base 1 になり、TSD が 4 行ではなく 1 行になる。
 
-- `PN BETA 1.5.0`:「Immobile T-Spins that don't fulfill the three-corner-rule now count as Minis」= All-Mini+ で **T も immobile 判定の mini を取れる**。実装上は「3-corner を満たさない T スピンでも、immobile なら mini」ではなく、**T の mini 判定は 2-corner ルールで行い、immobile は非 T 専用**と解釈する(S7 の実装がそうなっている)。§11-U2 で決定(暫定)。
+- `BETA 1.5.0` で All-Mini+ に immobile T の mini が加わった。FIN/TST の full 昇格には 3-corner が必要。詳細と再現盤面は §11-U2。
 
 ### 4.4 B2B との関係
 
@@ -1135,7 +1135,7 @@ v1.3 で旧「未確定リスト」の 9 件すべてを**我々の決定**と�
 | # | 項目 | 決定(暫定) | v1.2 からの変更 |
 |---|---|---|---|
 | U1 | SRS+ I kick のテスト順 | S7 の順序(§3.1.2 の表) | 変更なし |
-| U2 | T の mini 判定 | 3-corner + 2-corner のみ(immobile は非 T 専用) | 変更なし |
+| U2 | T の mini 判定 | 3-corner 未満の immobile T も mini | v1.3.25 で修正 |
 | U3 | PC の surge 寄与 | **寄与する**(PC の +1 も溜めに数える) | 変更なし |
 | U4 | surge 3 分割の端数 | `[r, r, S-2r]`(`S=4 → [1,1,2]`) | 変更なし |
 | U5 | Opener 境界 | `queue_total >= sent_total`(以上) | 変更なし |
@@ -1224,10 +1224,9 @@ v1.3 で旧「未確定リスト」の 9 件すべてを**我々の決定**と�
 
 ### U2. T の mini 判定における immobile の扱い
 
-**決定(暫定)**: **T は 3-corner / 2-corner ルールのみ**で mini / full を決める。immobile 判定は**非 T 専用**。T が 3-corner を満たさない場合、immobile でも mini にはならない(スピンなし扱い)。
+回転が最後の操作で、3-corner を満たさずに上下左右への移動がすべて塞がれている T は Mini。3-corner を満たす場合は通常どおり front corner と FIN/TST で判定する。
 
-- **根拠**: S2「In All-Mini, the T-piece does not score Spin Minis when immobile」と S7 の実装(`#detectSpin` が T には `#detectSpinFromCorners` のみを使い、`isAllSpinPosition` は非 T の分岐でのみ使う)が一致。S4 `PN BETA 1.5.0` の「Immobile T-Spins … now count as Minis」だけが素直に読むと食い違うが、これは「3-corner を満たさない T スピンは mini になる」の意味であって、immobile 判定を T に適用する意味ではないと解釈する。
-- **差し替え条件**: TETR.IO のリプレイで「3-corner を満たさず、immobile でもない T」が mini として記録されている実例が得られた場合。
+Lab の `all-mini-plus-combines-t-and-immobility` は4隅がすべて空でも、移動不能の T を Mini と判定する。Rust でも同じ盤面を回帰テストする。 [TETR.IO BETA 1.5.0 公式パッチノート](https://tetr.io/about/patchnotes/) · [Lab のコンポーネントフィクスチャ](https://github.com/61bi-234469/s2-bot-lab/blob/79505ca93bd15f7bcbd58724cb2a6ba312e09434/fixtures/golden/all-spin-placement.json)
 - **影響範囲**: T の置き方のうち、隅が 2 個以下しか埋まっていない局面。実戦では稀。
 
 ### U3. PC の B2B 加算が surge の溜めに寄与するか
@@ -1235,9 +1234,8 @@ v1.3 で旧「未確定リスト」の 9 件すべてを**我々の決定**と�
 **決定(暫定)**: **寄与する。** PC の +1 は `b2b_streak` を 1 増やし、その結果として surge の溜め量も 1 増える。**別カウンタは持たない。**
 
 - **根拠**: S7(teto)も S11(fusion)も、B2B カウンタを 1 本だけ持ち、PC の加算をそのまま surge の導出に使う(S11 は `b2b_after += PC_B2B` の後に `broke` を `None` にして surge を抑止するが、カウンタ自体は増えるので次の break で効く)。S6 の option 名 `allclear_charges: false` だけが「PC は溜めない」と読めるが、**その意味を裏付ける実装も記述も無い**。
-- **設計判断**: カウンタを 2 本にすると、表示 B2B と溜め量がずれて UI/評価/リプレイ検証のすべてが複雑になる。PC は 1 試合に 0〜2 回程度しか起きず、**影響は最大 1 行**。複雑さに見合わない。
-- **差し替え条件**: TETR.IO のリプレイで「B2B x3 → PC → 非 difficult clear」を打って surge が出ない実例が得られた場合(この 1 ケースだけが判別点)。
-- **影響範囲**: PC の直後に B2B を切る局面のみ。
+- **コンポーネント照合**。Lab と Rust に同じ PC Single → 通常 Single を与えた。PC 前の内部カウンタ `N` が 3、4、5 のとき、解放される Surge はそれぞれ 0、4、5 行。4 行は `[1,1,2]`、5 行は `[2,2,1]` に分かれる。 [Lab のチェーン計算](https://github.com/61bi-234469/s2-bot-lab/blob/79505ca93bd15f7bcbd58724cb2a6ba312e09434/src-js/triangle/chain-adapter.mjs) · [Rust 回帰テスト](../crates/core/tests/scoring.rs)
+- **実クライアントでの照合条件**。表示 B2B x3 (`N=4`) → PC → 通常クリアで Surge が出るかをリプレイから確認する。この境界では PC の加算が充填に効くかによって、Surge が0行と4行に分かれる。適用範囲は PC を含んだチェーンが切れる局面。
 
 ### U4. surge 3 分割の端数の位置
 
@@ -1589,3 +1587,4 @@ attax の T-spin 判定(3-corner + 5th kick で full)は本書 §4.3 と**一致
 | v1.3.22 | 2026-11-16 | **U1 を A(SRS+ ミラー順を維持し attax を合わせる)で確定**(manager 決定)。**C(和集合)は不採用** — 審判を相手に合わせて寛容にすると「S2 忠実」の主張が崩れる。**U1.2.1 にリスクを記録**: A は「S7 が真の順序」という [単一実装] の前提に立ち、**U1 が SRS と判明したら attax 段階はやり直し**。**U1.3 に観測件数**(seed 9003 / 9007)を参考として残し、**パッチ後の検証項目**に。 |
 | v1.3.23 | 2026-11-16 | **U1 を C(和集合)で最終確定**(manager 決定)。**A を採らない理由を明記**: **A の誤差は無界で検出不能**(U1 が SRS と判明したら attax 段階の全ゲームが無効、検出手段は U1 の確定だけ)、**C の誤差は有界で測定可能**(件数で測れる)。**「審判の忠実性」より「誤差を測れること」を優先**。しきい値(0〜2 / 3〜4 / 5 以上)を維持。**ボットは SRS+ のまま、attax は書き換えない、レフェリーだけが和集合**。 |
 | v1.3.24 | 2026-11-16 | **§3.1.2.1 を追加**(素の SRS の I 表、参照用)。**`I_KICKS_SRS` と attax の `srs.ts` に一致することを確認**。**§3.1.2 の「太字 = 差分」を訂正**: 差分は 5 遷移で、**`0→R` は T2/T3 のみ、`R→0` / `2→R` / `L→2` は T2〜T5 の 4 つ、`0→L` は T4/T5**。**「T2/T3 の入れ替え」と一括りにすると 4 遷移で説明が合わない。** 8 遷移すべてで集合一致を機械確認。 |
+| v1.3.25 | 2026-11-17 | All-Mini+ で3隅未満の immobile T を Mini とする。Rust レフェリーの新規リプレイに `t_immobility_mini` を記録し、旧記録は記録時の判定で再生する。 |

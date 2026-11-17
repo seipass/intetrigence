@@ -25,6 +25,7 @@
  * Environment:
  *   CLYS_TBP_LOG   same as --log (JSONL audit log of every message)
  *   CLYS_THINK_MS  same as --think-ms
+ *   CLYS_TBP_BIN   path to a separately built clys executable
  *
  * The adapter forwards `info` / `ready` / `suggestion` unchanged. It never
  * rewrites a placement: coordinates are clys's own TBP coordinates, which the
@@ -82,7 +83,9 @@ function parseArgs(argv: string[]): Args {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const binary = path.join(args.clysDir, "bin", "tbp", "tbp.exe");
+const binary = process.env.CLYS_TBP_BIN
+  ? path.resolve(process.env.CLYS_TBP_BIN)
+  : path.join(args.clysDir, "bin", "tbp", process.platform === "win32" ? "tbp.exe" : "tbp");
 if (!existsSync(binary)) {
   console.error(`clys binary not found: ${binary}`);
   console.error("build it with the command in docs/clys-integration.md §1.2");
@@ -115,6 +118,13 @@ child.on("error", (error) => {
   log("adapter-error", String(error));
   console.error(`clys spawn failed: ${error}`);
   process.exit(1);
+});
+child.stdin.on("error", (error) => {
+  if (!quitting) {
+    log("adapter-error", String(error));
+    console.error(`clys stdin failed: ${error}`);
+    finish(1);
+  }
 });
 
 // ---- message plumbing -------------------------------------------------------------------
@@ -177,22 +187,25 @@ function ensureRandomizer(message: Record<string, unknown>): Record<string, unkn
 //
 // Standard TBP order is `play` then `new_piece`; clys wants the opposite. The
 // adapter therefore holds the `play` until the new pieces for that turn have
-// arrived, then forwards `new_piece`* followed by `play`. A short settle timer
-// catches the second `new_piece` of a first-hold turn; `suggest` (and `quit`)
-// flush immediately so the turn never stalls.
+// arrived, then forwards `new_piece`* followed by `play` at the next protocol
+// boundary. The number of queued pieces cannot depend on the scheduler.
 const pendingNewPieces: unknown[] = [];
 let pendingPlay: unknown | null = null;
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
-const SETTLE_MS = 5;
+let pendingSuggest: ReturnType<typeof setTimeout> | undefined;
+let quitting = false;
 /// True once the first `start` has been forwarded. A later `start` (garbage
 /// resend) is preceded by a `stop` so clys joins its running search thread.
 let started = false;
 
+function quit(): void {
+  if (quitting || child.exitCode !== null) return;
+  quitting = true;
+  if (pendingSuggest !== undefined) clearTimeout(pendingSuggest);
+  sendToClys({ type: "quit" });
+  child.stdin.end();
+}
+
 function flushTurn(): void {
-  if (flushTimer !== null) {
-    clearTimeout(flushTimer);
-    flushTimer = null;
-  }
   if (pendingPlay === null) return;
   for (const piece of pendingNewPieces) sendToClys(piece);
   pendingNewPieces.length = 0;
@@ -202,6 +215,7 @@ function flushTurn(): void {
 
 const stdin = readline.createInterface({ input: process.stdin });
 stdin.on("line", (line) => {
+  if (quitting) return;
   const text = line.trim();
   if (text === "") return;
   let message: Record<string, unknown>;
@@ -220,10 +234,6 @@ stdin.on("line", (line) => {
       // A start resets the game: drop any buffered pieces from the old board.
       pendingNewPieces.length = 0;
       pendingPlay = null;
-      if (flushTimer !== null) {
-        clearTimeout(flushTimer);
-        flushTimer = null;
-      }
       // clys's start calls ai.clear() without joining a running search thread;
       // a stop first (request + clear) joins it, so the new search starts clean.
       if (started) sendToClys({ type: "stop" });
@@ -235,8 +245,11 @@ stdin.on("line", (line) => {
       flushTurn();
       // Give clys a think budget: its search starts on start/play, and
       // `suggest` joins the current beam iteration.
-      if (args.thinkMs > 0) {
-        setTimeout(() => sendToClys(message), args.thinkMs);
+      if (args.thinkMs > 0 && process.env.INTETRIGENCE_TBP_THINK_MS === undefined) {
+        pendingSuggest = setTimeout(() => {
+          pendingSuggest = undefined;
+          sendToClys(message);
+        }, args.thinkMs);
       } else {
         sendToClys(message);
       }
@@ -249,31 +262,20 @@ stdin.on("line", (line) => {
       break;
     case "new_piece":
       pendingNewPieces.push(message);
-      if (flushTimer !== null) clearTimeout(flushTimer);
-      flushTimer = setTimeout(flushTurn, SETTLE_MS);
       break;
+    case "stop":
       // clys's stop clears its engine; never forward it mid-game.
       log("adapter-note", { note: "swallowed stop (clys stop is destructive)" });
       break;
     case "quit":
-      flushTurn();
-      sendToClys(message);
+      quit();
       break;
     default:
       sendToClys(message);
       break;
   }
 });
-stdin.on("close", () => {
-  // The referee closed stdin: ask clys to quit and give it a moment.
-  if (child.exitCode === null) {
-    try {
-      sendToClys({ type: "quit" });
-    } catch {
-      /* already gone */
-    }
-  }
-});
+stdin.on("close", quit);
 
 // clys -> adapter -> referee
 const stdout = readline.createInterface({ input: child.stdout });

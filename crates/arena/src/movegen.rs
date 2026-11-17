@@ -174,6 +174,16 @@ pub fn generate_with_180(
     hold: bool,
     supports_180: bool,
 ) -> MoveSet {
+    generate_with_spin_rule(board, start, hold, supports_180, true)
+}
+
+pub(crate) fn generate_with_spin_rule(
+    board: &Board,
+    start: ActivePiece,
+    hold: bool,
+    supports_180: bool,
+    t_immobility_mini: bool,
+) -> MoveSet {
     let kind = start.kind;
     // S2 spec U1: the I 90-degree offset set is fixed but the test order is
     // not. SRS stops at the first fitting offset, so the orders reach
@@ -181,11 +191,13 @@ pub fn generate_with_180(
     // SRS+ only.
     let (unique, alternate) = MOVEGEN.with(|cell| {
         let mut movegen = cell.borrow_mut();
+        movegen.set_t_immobility_mini(t_immobility_mini);
         movegen.set_kick_order(KickOrder::SrsPlus);
         let primary = unique_by_cells(movegen.generate_from_with_180(board, start, supports_180));
         movegen.set_kick_order(KickOrder::Srs);
         let alternate = unique_by_cells(movegen.generate_from_with_180(board, start, supports_180));
         movegen.set_kick_order(KickOrder::SrsPlus);
+        movegen.set_t_immobility_mini(true);
         (primary, alternate)
     });
     let mut placements = Vec::with_capacity(unique.len());

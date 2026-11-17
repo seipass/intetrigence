@@ -1,0 +1,31 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  rust:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
+      - run: cargo +1.98.1 fmt --all -- --check
+      - run: cargo +1.98.1 clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo +1.98.1 test --workspace --release --locked
+
+  cc2-tbp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: MinusKelvin/cold-clear-2
+          ref: ed8b19327b6bd1410ddd873d8611485bd45d8fae
+          path: cc2-upstream
+          persist-credentials: false
+      - run: git -C cc2-upstream apply "$GITHUB_WORKSPACE/adapters/cc2-tbp-compat.patch"
+      - run: cargo build --manifest-path cc2-upstream/Cargo.toml --bin cold-clear-2 --release --locked
+      - run: node adapters/cc2-hold-smoke.mjs ./cc2-upstream/target/release/cold-clear-2
+      - run: node adapters/tbp-request-window-smoke.mjs ./cc2-upstream/target/release/cold-clear-2

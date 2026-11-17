@@ -398,7 +398,18 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let max_stages = max_stages.unwrap_or(if dry_run { 1 } else { 3 });
+    let max_stages = max_stages.unwrap_or(if dry_run { 1 } else { 2 });
+    if !(1..=2).contains(&max_stages) {
+        return Err(
+            "round runs one or two TBP stages; use adapters/s2lab/run-match.mjs for Attax".into(),
+        );
+    }
+    if !dry_run && (turn_cap != 1000 || ms != 100) {
+        return Err("evaluation rounds use 1000 turns and a 100 ms search budget".into());
+    }
+    if !dry_run && seeds_override.is_some() {
+        return Err("--seeds override is only available with --dry-run".into());
+    }
     let build_commit = head_commit();
     let seeds_commit =
         check_seed_discipline(seeds_file.as_deref(), build_commit.as_deref(), !dry_run)?;
@@ -486,8 +497,12 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.commit = cc2_commit.clone();
             config.visible_rows = cc2_visible_rows;
             config.supports_180 = cc2_supports_180;
-            config.suggest_delay_ms = cc2_suggest_delay_ms;
-            config.retry_empty_suggest_ms = cc2_retry_empty_ms;
+            if dry_run {
+                config.suggest_delay_ms = cc2_suggest_delay_ms;
+                config.retry_empty_suggest_ms = cc2_retry_empty_ms;
+            } else {
+                config.request_window_ms = Some(ms);
+            }
             config.cwd = cc2_cwd;
             config.env = cc2_env;
             OpponentSpec {
@@ -514,8 +529,12 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             config.commit = clys_commit.clone();
             config.visible_rows = clys_visible_rows;
             config.supports_180 = clys_supports_180;
-            config.suggest_delay_ms = clys_suggest_delay_ms;
-            config.retry_empty_suggest_ms = clys_retry_empty_ms;
+            if dry_run {
+                config.suggest_delay_ms = clys_suggest_delay_ms;
+                config.retry_empty_suggest_ms = clys_retry_empty_ms;
+            } else {
+                config.request_window_ms = Some(ms);
+            }
             config.cwd = clys_cwd;
             config.env = clys_env;
             OpponentSpec {
@@ -553,6 +572,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
                 depth,
                 width,
                 max_width: width,
+                deterministic,
                 ..SearchConfig::default()
             };
             apply_weight_overrides(&mut search.weights, &weight_overrides)?;
@@ -573,6 +593,9 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             .map(|(key, value)| format!("{key}={value}"))
             .collect(),
     };
+    let _measurement = dry_run
+        .then(|| intetrigence_arena::measurement_lock::MeasurementLock::acquire("round run"))
+        .transpose()?;
     let report = run_round(&spec)?;
     println!(
         "round {}: {} stage(s), completed={}, stopped_at={:?}",
@@ -604,5 +627,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         eprintln!("warning: mark the evaluation seed range as burned in docs/seed-registry.md");
     }
     let _ = current_build();
+    if !report.completed && (!dry_run || report.stages.iter().any(|stage| stage.games == 0)) {
+        return Err("round did not pass the requested stages".into());
+    }
     Ok(())
 }

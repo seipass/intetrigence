@@ -434,8 +434,10 @@ impl Default for Weights {
 }
 
 /// Scoring state carried through the search.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct EvalContext {
+    /// Garbage multiplier at the root lock. The default is the initial 1.0.
+    pub multiplier: f64,
     /// Consecutive difficult clears before the next placement.
     pub b2b_streak: u32,
     /// Combo before the next placement (0 = the previous placement missed).
@@ -533,7 +535,7 @@ pub fn apply_placement(
         b2b_streak: context.b2b_streak,
         perfect_clear: clear.perfect_clear,
         garbage_cleared: u32::from(clear.garbage_lines),
-        multiplier: 1.0,
+        multiplier: context.multiplier.max(1.0),
     });
 
     let surge_charged = surge_charge_from_streak(attack.b2b_streak_after);
@@ -609,19 +611,28 @@ pub fn apply_placement(
     // (`docs/s2-spec.md` §7.3), and the opener phase doubles the budget
     // (§7.4). Propagating this through the search is what lets it see that a
     // quad now is worth more than a quad later when a spike is queued.
-    let cancel_budget = if context.opener() {
-        2 * attack.total
-    } else {
-        attack.total
-    };
-    let next_context = EvalContext {
+    let mut incoming = context.incoming;
+    let mut arrived = context.arrived;
+    let mut opener = intetrigence_core::OpenerPhase {
+        pieces_placed: context.pieces_placed,
         sent_total: context.sent_total,
+    };
+    for &event in &attack.events {
+        let budget = opener.cancel_budget(event, incoming);
+        let cancelled = incoming.min(event.saturating_add(budget));
+        incoming -= cancelled;
+        arrived = arrived.saturating_sub(cancelled);
+        opener.on_sent(event.saturating_sub(cancelled));
+    }
+    let next_context = EvalContext {
+        multiplier: context.multiplier,
+        sent_total: opener.sent_total,
         received_total: context.received_total,
         b2b_streak: attack.b2b_streak_after,
         combo: attack.combo_after,
         pieces_placed: context.pieces_placed + 1,
-        incoming: context.incoming.saturating_sub(cancel_budget),
-        arrived: context.arrived.saturating_sub(cancel_budget),
+        incoming,
+        arrived,
         t_slot: 0,
     };
     (next, reward, next_context)
@@ -675,13 +686,6 @@ pub fn leaf_value(
             + weights.height_sq * features.height_sq
             + weights.danger_height * features.danger_height)
         + readiness_scale * weights.quad_ready * features.quad_ready
-        + weights.holes * features.holes
-        + weights.hole_cover * features.hole_cover
-        + weights.hole_rows * features.hole_rows
-        + weights.bumpiness * features.bumpiness
-        + weights.bumpiness_sq * features.bumpiness_sq
-        + weights.row_transitions * features.row_transitions
-        + weights.well_depth * features.well_depth
         + if survival {
             // Survival mode removes the shape terms instead of scaling them:
             // under a deep queue a hole is worth less than a cleared row.
@@ -1284,6 +1288,7 @@ mod tests {
             .find(|placement| placement.piece.rotation == Rotation::Zero && placement.piece.x == 0)
             .expect("the I can finish the row");
         let context = EvalContext {
+            multiplier: 1.0,
             b2b_streak: 6,
             combo: 0,
             pieces_placed: 20,

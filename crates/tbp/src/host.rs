@@ -231,18 +231,14 @@ impl Host {
         }
     }
 
-    fn recv_event(&self) -> Result<ReaderEvent, HostError> {
-        match self.rx.recv_timeout(self.config.timeout) {
-            Ok(event) => Ok(event),
-            Err(RecvTimeoutError::Timeout) => Err(HostError::Timeout(self.config.timeout)),
-            Err(RecvTimeoutError::Disconnected) => Err(HostError::Closed),
-        }
-    }
-
     /// Reads one non-empty line and parses it.
     pub fn recv_bot_message(&mut self) -> Result<BotMessage, HostError> {
+        self.recv_bot_message_since(Instant::now())
+    }
+
+    fn recv_bot_message_since(&mut self, started: Instant) -> Result<BotMessage, HostError> {
         loop {
-            match self.recv_event()? {
+            match receive_event(&self.rx, self.config.timeout, started)? {
                 ReaderEvent::Line(line) => {
                     if line.trim().is_empty() {
                         continue;
@@ -291,7 +287,7 @@ impl Host {
         let started = Instant::now();
         self.send(&HostMessage::Suggest)?;
         loop {
-            match self.recv_bot_message()? {
+            match self.recv_bot_message_since(started)? {
                 BotMessage::Suggestion(suggestion) => {
                     let elapsed = started.elapsed().as_secs_f64() * 1000.0;
                     self.think_ms.push(elapsed);
@@ -321,25 +317,29 @@ impl Host {
         self.send(&HostMessage::Quit)?;
         self.closed = true;
         let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
+        let result = loop {
             match self.child.try_wait() {
-                Ok(Some(_status)) => break,
+                Ok(Some(status)) if status.success() => break Ok(()),
+                Ok(Some(status)) => {
+                    break Err(HostError::Protocol(format!("bot quit with {status}")));
+                }
                 Ok(None) => {
                     if Instant::now() >= deadline {
                         let _ = self.child.kill();
                         let _ = self.child.wait();
-                        break;
+                        break Err(HostError::Timeout(Duration::from_secs(5)));
                     }
                     thread::sleep(Duration::from_millis(10));
                 }
-                Err(_) => {
+                Err(error) => {
                     let _ = self.child.kill();
-                    break;
+                    let _ = self.child.wait();
+                    break Err(HostError::Io(format!("wait for bot: {error}")));
                 }
             }
-        }
+        };
         self.join_threads();
-        Ok(())
+        result
     }
 
     fn join_threads(&mut self) {
@@ -362,6 +362,22 @@ impl Host {
 
     pub fn think_time_stats(&self) -> ThinkTimeStats {
         ThinkTimeStats::from_samples(&self.think_ms)
+    }
+}
+
+fn receive_event(
+    rx: &Receiver<ReaderEvent>,
+    timeout: Duration,
+    started: Instant,
+) -> Result<ReaderEvent, HostError> {
+    let remaining = timeout.saturating_sub(started.elapsed());
+    if remaining.is_zero() {
+        return Err(HostError::Timeout(timeout));
+    }
+    match rx.recv_timeout(remaining) {
+        Ok(event) => Ok(event),
+        Err(RecvTimeoutError::Timeout) => Err(HostError::Timeout(timeout)),
+        Err(RecvTimeoutError::Disconnected) => Err(HostError::Closed),
     }
 }
 
@@ -416,6 +432,17 @@ impl ThinkTimeStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queued_messages_do_not_extend_the_response_deadline() {
+        let (tx, rx) = mpsc::channel();
+        tx.send(ReaderEvent::Line(String::new())).unwrap();
+        let timeout = Duration::from_secs(1);
+        let started = Instant::now() - Duration::from_secs(2);
+        assert!(
+            matches!(receive_event(&rx, timeout, started), Err(HostError::Timeout(value)) if value == timeout)
+        );
+    }
 
     #[test]
     fn think_time_stats_use_nearest_rank_p95() {

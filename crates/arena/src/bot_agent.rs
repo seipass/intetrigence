@@ -5,18 +5,16 @@
 //! `combo` is the value used by this placement, `b2b_streak` is 0-based, and
 //! `pending_garbage` includes packets that have not arrived yet.
 //!
-//! The search assumes the standard spawn. After a garbage insertion the active
-//! piece is pushed up, and a blocked standard spawn makes the search return
-//! `None`; in either case the agent appends placements generated from the
-//! **actual** active piece as a safety net, so the referee always receives a
-//! legal candidate.
+//! Search starts at the active piece's actual position, including after
+//! Clutch. Additional legal placements from that position follow the beam's
+//! ranked candidates as a fallback.
 
 use std::collections::HashSet;
 use std::time::Instant;
 
 use intetrigence_bot::{
-    EvalContext, Movegen, Placement as BotPlacement, RootState, SearchConfig, Searcher,
-    unique_by_cells,
+    EvalContext, Movegen, Placement as BotPlacement, RootState, SearchConfig, SearchTiming,
+    Searcher, unique_by_cells,
 };
 use intetrigence_core::{Board, ClearInput, PieceKind, compute_attack};
 
@@ -39,6 +37,13 @@ impl BotAgentConfig {
     pub fn new(search: SearchConfig) -> Self {
         let budget_ms = search.budget.as_millis();
         let threads = search.threads;
+        let depth = search.depth;
+        let width = search.width;
+        let mode = if search.deterministic {
+            "fixed"
+        } else {
+            "anytime"
+        };
         Self {
             search,
             name: "intetrigence".into(),
@@ -49,6 +54,11 @@ impl BotAgentConfig {
                 budget_ms.to_string(),
                 "--threads".into(),
                 threads.to_string(),
+                "--depth".into(),
+                depth.to_string(),
+                "--width".into(),
+                width.to_string(),
+                format!("mode={mode}"),
             ],
         }
     }
@@ -89,6 +99,7 @@ impl BotAgent {
 
     fn context(view: &View) -> EvalContext {
         EvalContext {
+            multiplier: view.multiplier,
             b2b_streak: view.b2b_streak,
             combo: view.combo,
             pieces_placed: view.pieces_placed,
@@ -131,12 +142,13 @@ impl BotAgent {
         Candidate {
             piece: placement.piece.kind,
             cells,
+            used_hold: None,
             claimed_spin: Some(placement.spin),
             claimed_attack: Some(Self::declared_attack(view, placement)),
         }
     }
 
-    /// Simple fallback score for the rare non-standard-spawn case.
+    /// Simple fallback score for placements outside the final beam.
     fn fallback_score(board: &Board, placement: &BotPlacement) -> f64 {
         let mut copy = board.clone();
         copy.place(
@@ -184,7 +196,8 @@ impl BotAgent {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         for placement in placements {
-            let candidate = Self::candidate(view, &placement);
+            let mut candidate = Self::candidate(view, &placement);
+            candidate.used_hold = Some(false);
             if seen.insert(candidate.cells) {
                 candidates.push(candidate);
             }
@@ -235,7 +248,12 @@ impl Agent for BotAgent {
         let mut width = None;
         let mut fallback = true;
         let mut aborted = false;
-        match self.searcher.search(&root) {
+        let timing =
+            SearchTiming::from_queue(view.frame, view.frames_per_turn, &view.garbage_packets);
+        match self
+            .searcher
+            .search_timed_from(&root, view.active, view.can_hold, &timing)
+        {
             Some(result) => {
                 self.searches += 1;
                 self.nodes_total += result.nodes;
@@ -248,13 +266,13 @@ impl Agent for BotAgent {
                 fallback = result.fallback;
                 aborted = result.aborted;
                 for candidate in &result.candidates {
-                    let converted = Self::candidate(view, &candidate.first.placement);
+                    let mut converted = Self::candidate(view, &candidate.first.placement);
+                    converted.used_hold = Some(candidate.first.hold);
                     candidates.push(converted);
                 }
             }
             None => {
-                // The standard spawn is blocked; the actual active piece (pushed
-                // up by garbage or Clutch) can still be placed.
+                // The search returned no candidates. Try the unpruned roots.
                 self.clutch_fallbacks += 1;
             }
         }
@@ -313,4 +331,72 @@ impl Agent for BotAgent {
 /// Pieces a hold would bring in, for tests and diagnostics.
 pub fn hold_piece(view: &View) -> Option<PieceKind> {
     view.hold_piece()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{Engine, Sheet};
+    use intetrigence_bot::spawn_piece;
+    use intetrigence_core::Game;
+
+    #[test]
+    fn clutch_position_uses_beam_search_from_the_actual_active_piece() {
+        let mut board = Board::new();
+        let mut first = spawn_piece(PieceKind::I);
+        let gap = first
+            .cells()
+            .into_iter()
+            .fold(0, |mask, (x, _)| mask | 1 << x);
+        board.set_row(0, Board::FULL_ROW & !gap);
+        board.set_row(22, gap);
+        first.y -= 2;
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        let mut game = Game::from_position(1, board, first).unwrap();
+        assert_eq!(game.hard_drop().unwrap().lock.clear.lines, 1);
+        let active = game.active().unwrap();
+        assert_eq!(active.y, spawn_piece(active.kind).y + 1);
+        engine.players[0].game = game;
+        let view = engine.view(0);
+        let mut bot = BotAgent::new(BotAgentConfig::new(SearchConfig {
+            depth: 1,
+            width: 16,
+            threads: 1,
+            deterministic: true,
+            ..SearchConfig::default()
+        }));
+        let suggestion = bot.suggest(&view).unwrap();
+        assert_eq!(suggestion.depth, Some(1));
+        assert!(!suggestion.fallback);
+        assert_eq!(bot.clutch_fallbacks(), 0);
+        let adopted = engine.adopt(0, &suggestion, true).unwrap();
+        assert_eq!(adopted.candidate_index, 0);
+        let applied = engine.apply(0, &adopted.target, None).unwrap();
+        assert_eq!(applied.piece, active.kind);
+        assert!(!applied.hold);
+    }
+
+    #[test]
+    fn agent_sees_an_inflight_packet_at_its_future_lock() {
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.turn = 2;
+        engine.begin_turn();
+        engine.players[0].garbage.receive(3, 12);
+        let view = engine.view(0);
+        assert_eq!(view.frame, 24);
+        assert_eq!(view.arrived_garbage, 0);
+        let mut bot = BotAgent::new(BotAgentConfig::new(SearchConfig {
+            depth: 4,
+            width: 16,
+            threads: 2,
+            deterministic: true,
+            ..SearchConfig::default()
+        }));
+        let suggestion = bot.suggest(&view).unwrap();
+        assert_eq!(suggestion.depth, Some(2));
+        assert_eq!(
+            engine.adopt(0, &suggestion, true).unwrap().candidate_index,
+            0
+        );
+    }
 }

@@ -8,18 +8,42 @@
 //
 //   ATTAX_DIR=/path/to/attax S2_LAB_ROOT=/path/to/s2-bot-lab-ref \
 //     bun adapters/s2lab/run-match.mjs --games 1 --seed 9001 --out /tmp/x.jsonl
-import { appendFile, open } from "node:fs/promises";
-import { parseArgs } from "node:util";
+import { appendFile, open, readFile, readdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { isDeepStrictEqual, parseArgs } from "node:util";
 import { createHash } from "node:crypto";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createIntetrigenceDecider } from "./intetrigence-decider.mjs";
+import { acquireMeasurement } from "./measurement-lock.mjs";
+import { labSeedClaims } from "./evaluation-seeds.mjs";
 
-const ATTAX_DIR = process.env.ATTAX_DIR ?? "C:/Users/Hasilan/Projects/attax";
-const BRIDGE = process.env.S2LAB_BRIDGE ?? "target/release/s2lab_bridge.exe";
+if (!process.env.ATTAX_DIR || !process.env.S2_LAB_ROOT) {
+  throw new Error("ATTAX_DIR and S2_LAB_ROOT are required");
+}
+const ATTAX_DIR = resolve(process.env.ATTAX_DIR);
+const exe = process.platform === "win32" ? ".exe" : "";
+const BRIDGE = resolve(process.env.S2LAB_BRIDGE ?? `target/release/s2lab_bridge${exe}`);
+const attaxBuild = "c83d3397d458f4af9cfd6fe3ba3468df48bb2877";
+const attaxWidth = 96;
+const git = (...args) => execFileSync("git", ["-C", ATTAX_DIR, ...args], { encoding: "utf8" }).trim();
+if (git("rev-parse", "HEAD") !== attaxBuild || git("status", "--porcelain")) {
+  throw new Error(`ATTAX_DIR must be a clean checkout of ${attaxBuild}`);
+}
+process.env.ATTAX_RUST_CLI ??= resolve(ATTAX_DIR, `rust/target/release/attax-agree${exe}`);
+process.env.ATTAX_ENGINE = "rust";
+process.env.ATTAX_RUST_MODE = "server";
+process.env.ATTAX_S2_STOCK_POTENTIAL = "1";
+process.env.ATTAX_S2_SOLVENCY = "0";
 
-const attaxPlayer = await import(`${ATTAX_DIR}/tools/s2-lab/attax-player.ts`);
-const labModule = await import(`${ATTAX_DIR}/tools/s2-lab/lab.mjs`);
+const attaxPlayer = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/attax-player.ts")).href);
+const labModule = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/lab.mjs")).href);
 const { lab, labRoot, parameters, profile } = labModule;
-const { createAttaxDecider, cellKey, placementCells } = attaxPlayer;
+const { createAttaxDecider, cellKey, engineIdentity, placementCells } = attaxPlayer;
+const identity = engineIdentity();
+if (identity.id !== "rust" || identity.build !== attaxBuild) {
+  throw new Error(`expected Attax Rust ${attaxBuild}, got ${JSON.stringify(identity)}`);
+}
 const { createGame, extendSeededQueue, toS2GuiState } = await lab("cc2-gui/game.mjs");
 const { guiStateToCanonical } = await lab("src-js/gui-state.mjs");
 const { placementGeometry } = await lab("src-js/triangle/placement-geometry.mjs");
@@ -33,53 +57,100 @@ const { values } = parseArgs({
     games: { type: "string", default: "1" },
     seed: { type: "string", default: "9001" },
     "seat-offset": { type: "string", default: "0" },
-    "max-locks": { type: "string", default: "1000" },
-    "opponent-profile": { type: "string" },
+    "max-locks": { type: "string", default: "2000" },
+    "first-to": { type: "string" },
+    resume: { type: "boolean" },
+    verify: { type: "boolean" },
+    "recorded-runner": { type: "string" },
     out: { type: "string" },
   },
 });
 if (!values.out) throw new Error("--out <file.jsonl> is required");
-const games = Number(values.games);
-const seed = Number(values.seed);
-const maxLocks = Number(values["max-locks"]);
-const pps = ppsForCc2Parameters(parameters);
-const digest = createHash("sha256").update(canonicalize(profile)).digest("hex");
-await (await open(values.out, "a")).close();
-
-const ROTATION = { "0": "spawn", R: "right", "2": "reverse", L: "left" };
-
-/**
- * Find the lab's own placement object for a reply.
- *
- * The two bots report different coordinate frames, so each is matched the way
- * its own adapter defines it: ours carries the occupied cell set (board space,
- * row 0 at the bottom), attax's carries the lab's screen-space cell set via
- * `placementCells`. The witness map is keyed the way attax's runner keys it.
- */
-function witnessFor(witnesses, geometry, reply) {
-  const key = Array.isArray(reply.cells)
-    ? cellSetKey(reply.cells)
-    : cellKey(placementCells(reply));
-  for (const p of witnesses.values()) {
-    const labKey = cellSetKey(
-      geometry.blocks[p.piece][p.rotation].map(([x, y]) => [p.x + x, p.y + y]),
-    );
-    if (labKey === key) return p;
+function integer(value, name, minimum, maximum = Number.MAX_SAFE_INTEGER) {
+  const number = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(number) || number < minimum || number > maximum) {
+    throw new Error(`invalid ${name}: ${value}`);
   }
-  return null;
+  return number;
+}
+const games = integer(values.games, "--games", 1);
+const seed = integer(values.seed, "--seed", 1, 0x7fffffff);
+const maxLocks = integer(values["max-locks"], "--max-locks", 2, 100_000);
+const firstTo = values["first-to"] === undefined ? null : integer(values["first-to"], "--first-to", 1);
+if (values.resume && values.verify) throw new Error("--resume and --verify are mutually exclusive");
+if (values["recorded-runner"] && !values.verify) throw new Error("--recorded-runner requires --verify");
+const seatOffset = integer(values["seat-offset"], "--seat-offset", 0, 1);
+for (const [key, fallback, max] of [
+  ["S2LAB_DEPTH", "8", 40],
+  ["S2LAB_WIDTH", "88", 10_000],
+  ["S2LAB_THREADS", "8", 8],
+]) {
+  process.env[key] = String(integer(process.env[key] ?? fallback, key, 1, max));
+}
+const pps = ppsForCc2Parameters(parameters);
+const framesPerLock = 60 / pps;
+if (!Number.isSafeInteger(framesPerLock) || framesPerLock < 1) {
+  throw new Error(`unsupported fixed Lab lock cadence: ${pps} PPS`);
+}
+const digest = createHash("sha256").update(canonicalize(profile)).digest("hex");
+const sha256 = async (file) => createHash("sha256").update(await readFile(file)).digest("hex");
+const bridgeSha256 = await sha256(BRIDGE);
+const attaxSha256 = await sha256(process.env.ATTAX_RUST_CLI);
+async function hashLabSources() {
+  const hash = createHash("sha256");
+  async function visit(path) {
+    const dir = await readdir(join(labRoot, path), { withFileTypes: true });
+    for (const entry of dir.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const relative = `${path}/${entry.name}`;
+      if (entry.isDirectory()) await visit(relative);
+      else if (entry.isFile()) hash.update(`${relative}\0${await sha256(join(labRoot, relative))}\0`);
+    }
+  }
+  for (const path of ["src-js", "cc2-gui", "rulesets", "schema"]) await visit(path);
+  return hash.digest("hex");
+}
+const settings = {
+  mode: "paced",
+  pps,
+  garbageDelayFrames: 0,
+  queueModel: "legacy-lcg",
+  publicQueueIncludingCurrent: parameters.queueDepth,
+  maxLocks,
+  firstTo,
+  startSeed: seed,
+  seatOffset,
+  labSourceSha256: await hashLabSources(),
+  championProfileSha256: digest,
+  runnerSha256: await sha256(values["recorded-runner"] ?? new URL(import.meta.url)),
+  deciderSha256: await sha256(new URL("./intetrigence-decider.mjs", import.meta.url)),
+  bridgeSha256,
+  intetrigenceSearch: {
+    depth: Number(process.env.S2LAB_DEPTH),
+    width: Number(process.env.S2LAB_WIDTH),
+    threads: Number(process.env.S2LAB_THREADS),
+  },
+  attaxEngine: identity,
+  attaxSha256,
+  attaxWidth,
+  attaxStockPotential: true,
+  attaxSolvency: false,
+};
+
+function checkRecorded(actual, expected, label) {
+  // Compare the durable JSON representation (timings may have more decimal
+  // places than the Lab's CS1 encoding allows).
+  const persisted = JSON.parse(JSON.stringify(actual));
+  if (!isDeepStrictEqual(persisted, expected)) throw new Error(`replay mismatch: ${label}`);
 }
 
-function cellSetKey(cells) {
-  return cells
-    .map(([x, y]) => `${x},${y}`)
-    .sort()
-    .join(";");
+function witnessKey({ kind, usedHold, spinEntry, cells }) {
+  return `${kind}:${usedHold}:${spinEntry}:${cellKey(cells)}`;
 }
 
-async function play(gameIndex) {
+async function play(gameIndex, expected) {
   const started = performance.now();
   const gameSeed = seed + gameIndex;
-  const seatOffset = values["seat-offset"] === "1" ? 1 : 0;
   const ourSide = (gameIndex + seatOffset) % 2 === 0 ? "left" : "right";
   const scenario = createGame(gameSeed);
   const initial = guiStateToCanonical(toS2GuiState(scenario));
@@ -94,13 +165,19 @@ async function play(gameIndex) {
   const queueSeeds = { left: scenario.bagSeed, right: scenario.bagSeed };
   const lastTankTopout = { left: false, right: false };
   const receipts = { left: null, right: null };
-  const ours = await createIntetrigenceDecider(BRIDGE);
-  const attax = createAttaxDecider(values["opponent-profile"]);
+  const trace = [];
+  const received = { left: 0, right: 0 };
+  let ours;
+  let attax;
   let outcome = null;
   let error = null;
   let locks = 0;
   let rejectedRoots = 0;
   try {
+    if (!expected) {
+      ours = await createIntetrigenceDecider(BRIDGE);
+      attax = createAttaxDecider(undefined, { width: attaxWidth });
+    }
     while (true) {
       outcome = matchOutcome(
         match.bots.map((b) => ({
@@ -135,38 +212,51 @@ async function play(gameIndex) {
           allow180: true,
         });
         const witnesses = new Map();
+        const legalRoots = [];
         for (const p of reachable) {
-          const cells = cellKey(
-            geometry.blocks[p.piece][p.rotation].map(([x, y]) => [p.x + x, p.y + y]),
-          );
-          const key = `${p.piece}:${p.usedHold}:${p.rotationEvidence.lastInputWasRotation}:${cells}`;
-          if (!witnesses.has(key)) witnesses.set(key, p);
+          const root = {
+            kind: p.piece,
+            usedHold: p.usedHold,
+            spinEntry: p.rotationEvidence.lastInputWasRotation,
+            cells: geometry.blocks[p.piece][p.rotation].map(([x, y]) => [p.x + x, p.y + y]),
+          };
+          const key = witnessKey(root);
+          if (!witnesses.has(key)) {
+            witnesses.set(key, p);
+            legalRoots.push(root);
+          }
         }
-        const witnessKey = (p, usedHold) =>
-          `${p.kind}:${usedHold}:${p.lastSrs > 0}:${cellKey(placementCells(p))}`;
+        const attaxRoot = (p, usedHold) => ({
+          kind: p.kind, usedHold, spinEntry: p.lastSrs > 0, cells: placementCells(p),
+        });
+        const thinkStart = performance.now();
         let reply;
-        if (side === ourSide) {
-          reply = await ours.decide(decision);
+        const recorded = expected?.trace[trace.length];
+        if (expected) {
+          if (!recorded) throw new Error("replay trace ended early");
+          checkRecorded({ side, decision }, { side: recorded.side, decision: recorded.decision }, "decision");
+          reply = recorded.reply;
+        } else if (side === ourSide) {
+          reply = await ours.decide({
+            ...decision,
+            framesPerLock,
+            ownTotals: { sent: bot.stats.garbageSent, received: received[side] },
+            legalRoots,
+          });
         } else {
           // attax's own runner passes this predicate: without it attax can pick
           // a root the lab cannot witness, the game dies as an error, and only
           // attax's games disappear from the record.
-          const searched = attax.decide(decision, (p, usedHold) => {
-            const accepted = witnesses.has(witnessKey(p, usedHold));
+          const searched = await attax.decideAsync(decision, (p, usedHold) => {
+            const accepted = witnesses.has(witnessKey(attaxRoot(p, usedHold)));
             if (!accepted) rejectedRoots += 1;
             return accepted;
           });
           if (searched === null) throw new Error("attax found no move before top-out");
-          reply = {
-            kind: searched.best.placement.kind,
-            rotation: searched.best.placement.rotation,
-            x: searched.best.placement.x,
-            y: searched.best.placement.y,
-            usedHold: searched.best.usedHold,
-            spinEntry: searched.best.placement.lastSrs > 0,
-          };
+          reply = attaxRoot(searched.best.placement, searched.best.usedHold);
         }
-        const placement = witnessFor(witnesses, geometry, reply);
+        const thinkMs = recorded?.thinkMs ?? (performance.now() - thinkStart);
+        const placement = witnesses.get(witnessKey(reply));
         if (!placement) throw new Error(`no lab witness for ${JSON.stringify(reply)}`);
         const transition = applyTransition(
           bot.state,
@@ -176,6 +266,12 @@ async function play(gameIndex) {
         if (!transition.legality.legal)
           throw new Error(`illegal placement: ${transition.legality.reason}`);
         receipts[side] = transition;
+        const tankedRows = transition.tankResult?.inserted?.reduce((n, packet) => n + packet.amount, 0) ?? 0;
+        received[side] += tankedRows;
+        trace.push({
+          side, decision, reply, placement, thinkMs,
+          lock: transition.lockResult, attack: transition.attackStages, tankedRows,
+        });
         lastTankTopout[side] = transition.tankResult?.toppedOut === true;
         submissions.push({
           botId: side,
@@ -186,9 +282,11 @@ async function play(gameIndex) {
       locks += submissions.length;
     }
   } catch (failure) {
+    if (expected) throw failure;
     error = failure instanceof Error ? failure.message : String(failure);
   } finally {
-    await ours.close();
+    await ours?.close();
+    attax?.close();
   }
   const complete = !error && outcome?.complete === true;
   const winnerName =
@@ -198,7 +296,7 @@ async function play(gameIndex) {
         : "attax"
       : null;
   const record = {
-    schema: "intetrigence-s2lab/1",
+    schema: "intetrigence-s2lab/2",
     seed: gameSeed,
     ourSide,
     contestants: {
@@ -226,28 +324,19 @@ async function play(gameIndex) {
       ]),
     ),
     rejectedRoots,
+    trace,
     wallMs: performance.now() - started,
     logicalFrames: match.clock.logicalFrame,
     error,
-    settings: {
-      mode: "paced",
-      pps,
-      garbageDelayFrames: 0,
-      queueModel: "legacy-lcg",
-      publicQueueIncludingCurrent: parameters.queueDepth,
-      maxLocks,
-      labRoot,
-      championProfileSha256: digest,
-      bridge: BRIDGE,
-      attaxProfile: values["opponent-profile"] ?? "DEFAULT_WEIGHTS",
-      // The opponent's configuration decides whether the number means anything:
-      // the tree, the beam width and whether the stock potential is on.
-      attaxTree: process.env.ATTAX_TREE ?? null,
-      attaxWidth: attax.width ?? null,
-      attaxStockPotential: process.env.ATTAX_S2_STOCK_POTENTIAL ?? "0",
-      attaxSolvency: process.env.ATTAX_S2_SOLVENCY ?? "0",
-    },
+    settings,
+    attaxProfile: attax?.profileId ?? null,
   };
+  if (expected) {
+    for (const field of ["winner", "winnerName", "status", "reason", "locks", "stats", "logicalFrames", "trace"]) {
+      checkRecorded(record[field], expected[field], field);
+    }
+    return record;
+  }
   await appendFile(values.out, JSON.stringify(record) + "\n");
   console.log(
     JSON.stringify({
@@ -258,6 +347,41 @@ async function play(gameIndex) {
       error,
     }),
   );
+  return record;
 }
 
-for (let index = 0; index < games; index++) await play(index);
+const releaseMeasurement = values.verify ? null : await acquireMeasurement("Attax Lab");
+try {
+  const seedClaims = !values.verify && firstTo !== null ? await labSeedClaims(values.out, settings) : null;
+  if (!values.resume) seedClaims?.check(seed, false);
+  if (!values.resume && !values.verify) await (await open(values.out, "wx")).close();
+  const score = { intetrigence: 0, attax: 0 };
+  let index = 0;
+  if (values.resume || values.verify) {
+    const lines = (await readFile(values.out, "utf8")).split(/\r?\n/).filter(Boolean);
+    if (values.verify && !lines.length) throw new Error("no recorded games");
+    for (const line of lines) {
+      const record = JSON.parse(line);
+      if (record.seed !== seed + index || record.schema !== "intetrigence-s2lab/2" || record.error) {
+        throw new Error(`invalid or failed replay at index ${index}`);
+      }
+      checkRecorded(settings, record.settings, "match settings");
+      if (seedClaims && !seedClaims.check(record.seed, true)) {
+        throw new Error(`recorded evaluation seed ${record.seed} has no original claim`);
+      }
+      await play(index++, record);
+      if (record.winnerName) score[record.winnerName]++;
+    }
+    console.log(JSON.stringify({ verified: index, score }));
+  }
+  for (; !values.verify && (firstTo === null ? index < games : Math.max(...Object.values(score)) < firstTo); index++) {
+    if (seed + index > 0x7fffffff) throw new Error("seed range exhausted");
+    await seedClaims?.claim(seed + index, values.resume);
+    const record = await play(index);
+    if (record.error) throw new Error(`seed ${record.seed}: ${record.error}`);
+    if (record.winnerName) score[record.winnerName]++;
+    console.log(JSON.stringify({ score, attempted: index + 1, firstTo }));
+  }
+} finally {
+  await releaseMeasurement?.();
+}

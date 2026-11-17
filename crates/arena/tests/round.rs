@@ -90,6 +90,37 @@ fn tampered_replay_is_rejected() {
 }
 
 #[test]
+fn replay_requires_a_valid_terminal_record() {
+    let mut first = BaselineBot::new();
+    let mut second = BaselineBot::with_name("opponent");
+    let mut agents: [&mut dyn Agent; 2] = [&mut first, &mut second];
+    let mut report = run_round(&config(19, Sheet::A, 2), &mut agents).expect("round must run");
+    let path = std::env::temp_dir().join(format!(
+        "intetrigence-replay-terminal-{}.jsonl",
+        std::process::id()
+    ));
+    write_replay(&path, &report.records[..1]).unwrap();
+    assert!(verify_replay(&path).is_err());
+
+    let Some(ReplayRecord::Result(result)) = report.records.last_mut() else {
+        panic!("missing round result");
+    };
+    result.reason = "Forfeit".into();
+    result.winner = Some(0);
+    write_replay(&path, &report.records).unwrap();
+    assert!(verify_replay(&path).is_err());
+
+    let Some(ReplayRecord::Result(result)) = report.records.last_mut() else {
+        panic!("missing round result");
+    };
+    result.reason = "TopOut".into();
+    result.winner = Some(3);
+    write_replay(&path, &report.records).unwrap();
+    assert!(verify_replay(&path).is_err());
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
 fn audit_records_think_time_and_first_choice() {
     let mut first = BaselineBot::new();
     let mut second = BaselineBot::with_name("opponent");

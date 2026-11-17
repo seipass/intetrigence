@@ -1,5 +1,7 @@
 # S2 マッチ・レフェリープロトコル(凍結版)
 
+> 現在の Attax 対戦には [s2-bot-lab の手順](../adapters/s2lab/README.md)を使う。本文中の Attax TBP 手順と旧ラウンドの段階3は当時の計測条件を記録したもの。現行の入口と判定条件は [PLAN.md](../PLAN.md) を参照。
+
 **対象**: `crates/arena`(レフェリー)、`crates/tbp`(接続)、attax アダプタ、replay 検証ツール
 **ルールの正**: [`docs/s2-spec.md`](s2-spec.md)(S2 ルール仕様)。本書は**ルールをどう運用するか**だけを定める。
 **接続の実装詳細**: [`docs/attax-integration.md`](attax-integration.md)(TBP アダプタの挙動)
@@ -512,6 +514,8 @@ v1.39 で「anytime のランプを depth 優先にすれば決定論に頼ら�
 | 1 | **思考時間の測定は機械を専有して行う**(他の測定・ビルド・テストを同時に走らせない) |
 | 2 | **公式ラウンドも機械を専有して実行する** |
 | 3 | **レポートに「専有で実行した」と明記**する。専有できなかった場合は**その旨と、同時に走っていたもの**を書く |
+
+同じ端末ユーザーでの `arena match`、`round run`、Lab 対戦と Bash の計測スクリプトは、checkout に依存しないロックを共有する。OS 上のほかのアプリやビルドは負荷として別途確認する。 [ロックの保存場所と復旧手順](../scripts/evidence/README.md#measurement-lock)
 | 4 | **`think_ms` が 100 ms を超えた手があれば、件数と最大値を報告**する(§8.4) |
 
 **負荷に強いスケジュール**(実測、2 回とも安定):
@@ -1306,7 +1310,7 @@ CC2 と clys は我々のレフェリーの前提(spawn が row 21、空の hold
 {"type":"header","schema":"intetrigence/s2-replay/1","seed":12345,"sheet":"A",
  "slots":{"0":"intetrigence","1":"attax"},
  "seats":{"1":0,"2":1},
- "rules":"docs/s2-spec.md@v1.3.4",
+ "rules":"docs/s2-spec.md@v1.3.25","t_immobility_mini":true,
  "bots":{"0":{"name":"intetrigence","commit":"...","args":["--ms","100"]},
          "1":{"name":"attax","commit":"...","args":[...]}},
  "started_at":"..."}
@@ -1324,6 +1328,7 @@ CC2 と clys は我々のレフェリーの前提(spawn が row 21、空の hold
 {"type":"result","winner":0,"reason":"TopOut","turns":87}
 ```
 
+- `t_immobility_mini` が真なら、All-Mini+ の3隅未満の immobile T の Mini 判定を使う。旧リプレイはこのキーを省略しており、旧判定で再生する。
 - **`placements` は seat 順**(解決順)に並べる。verify-replay はこの順で適用する。
 - **`placement.piece` を必ず記録する**。袋はプレイヤーごとに独立しているので(§2.2)、hold の後は両者のピースが異なる。verify-replay は**この値**を使う。
 - `turn.piece` は**置かない**(v1.1 で削除)。turn 単位の「その turn のピース」は per-player bag では定義できない。参考値が要るなら `placement.piece` を読む。

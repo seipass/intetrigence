@@ -1,4 +1,4 @@
-//! All-Mini+ spin classification (`docs/s2-spec.md` §4, v1.3.1).
+//! All-Mini+ spin classification (`docs/s2-spec.md` §4).
 
 use intetrigence_core::{Board, Cell, PieceKind, Rotation, SpinType};
 
@@ -63,12 +63,13 @@ fn t_front_corners_follow_the_nub_for_all_rotations() {
 }
 
 #[test]
-fn t_corners_below_three_are_not_a_spin() {
+fn a_mobile_t_with_fewer_than_three_corners_is_not_a_spin() {
     let mut board = Board::new();
     board.set_cell(2, 0, Cell::Block);
     board.set_cell(4, 0, Cell::Block);
 
     assert_eq!(board.t_spin_corners(Rotation::Two, 2, 0), (2, 2));
+    assert!(!board.is_immobile(PieceKind::T, Rotation::Two, 2, 0));
     assert_eq!(
         board.spin_type(PieceKind::T, Rotation::Two, 2, 0, true, false),
         SpinType::None
@@ -76,6 +77,29 @@ fn t_corners_below_three_are_not_a_spin() {
     // fin_or_tst does not bypass the 3-corner requirement.
     assert_eq!(
         board.spin_type(PieceKind::T, Rotation::Two, 2, 0, true, true),
+        SpinType::None
+    );
+}
+
+#[test]
+fn immobile_t_without_three_corners_is_mini_after_rotation() {
+    // s2-bot-lab 79505ca, fixtures/golden/all-spin-placement.json,
+    // tImmobileWithoutCornersBoardRows / all-mini-plus-combines-t-and-immobility.
+    let board = Board::from_rows(&[1 << 4, (1 << 2) | (1 << 6), 0, 1 << 4]);
+    let rotation = Rotation::Zero;
+    assert!(board.can_place(PieceKind::T, rotation, 3, 0));
+    assert_eq!(board.t_spin_corners(rotation, 3, 0), (0, 0));
+    assert!(board.is_immobile(PieceKind::T, rotation, 3, 0));
+    assert_eq!(
+        board.spin_type(PieceKind::T, rotation, 3, 0, true, false),
+        SpinType::Mini
+    );
+    assert_eq!(
+        board.spin_type(PieceKind::T, rotation, 3, 0, true, true),
+        SpinType::Mini
+    );
+    assert_eq!(
+        board.spin_type(PieceKind::T, rotation, 3, 0, false, false),
         SpinType::None
     );
 }
@@ -94,13 +118,15 @@ fn walls_count_as_filled_but_the_top_is_open() {
     );
 
     // T Two at the top: the two upper corners are above row 39 and open.
+    // The movement boundary still blocks an upward shift.
     let mut board = Board::new();
     board.set_cell(2, 38, Cell::Block);
     board.set_cell(4, 38, Cell::Block);
     assert_eq!(board.t_spin_corners(Rotation::Two, 2, 38), (2, 2));
+    assert!(board.is_immobile(PieceKind::T, Rotation::Two, 2, 38));
     assert_eq!(
         board.spin_type(PieceKind::T, Rotation::Two, 2, 38, true, false),
-        SpinType::None
+        SpinType::Mini
     );
 }
 

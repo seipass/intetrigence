@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
-use intetrigence_core::{PieceKind, Rotation, SpinType};
+use intetrigence_core::{Board, PieceKind, Rotation, SpinType};
 use serde::{Deserialize, Serialize};
 
 use crate::agent::BotDescriptor;
@@ -49,6 +49,10 @@ pub struct Header {
     /// `{"1": 0, "2": 1}`: seat -> slot.
     pub seats: BTreeMap<String, u8>,
     pub rules: String,
+    /// Beta 1.5.0 All-Mini+ labels an immobile T with fewer than three
+    /// occupied corners as Mini. Older recordings used the corner-only rule.
+    #[serde(default)]
+    pub t_immobility_mini: bool,
     pub protocol: String,
     pub bots: BTreeMap<String, BotRecord>,
     pub started_at: String,
@@ -297,12 +301,14 @@ pub fn write_replay(path: &Path, records: &[ReplayRecord]) -> std::io::Result<()
 /// `garbage` records with `from == 2` at the same turns.
 pub fn engine_from_header(header: &Header) -> Engine {
     let sheet = Sheet::parse(&header.sheet).unwrap_or(Sheet::A);
-    Engine::with_start_garbage(
+    let mut engine = Engine::with_start_garbage(
         header.seed,
         sheet,
         header.frames_per_turn,
         &header.start_garbage,
-    )
+    );
+    engine.t_immobility_mini = header.t_immobility_mini;
+    engine
 }
 
 pub fn read_replay(path: &Path) -> Result<Vec<ReplayRecord>, VerifyError> {
@@ -415,6 +421,39 @@ pub fn verify_replay_with_options(
             ));
         }
     };
+    if header.schema != SCHEMA {
+        return Err(VerifyError::Structure(format!(
+            "unsupported replay schema {:?}",
+            header.schema
+        )));
+    }
+    let Some(ReplayRecord::Result(result)) = records.last() else {
+        return Err(VerifyError::Structure(
+            "last record must be the result".into(),
+        ));
+    };
+    if result.winner.is_some_and(|slot| slot > 1)
+        || result.forfeit_slot.is_some_and(|slot| slot > 1)
+        || (result.reason == "TopOut") != result.winner.is_some()
+        || result.per_player.len() != 2
+        || result.per_player[0].slot == result.per_player[1].slot
+        || result.per_player.iter().any(|player| player.slot > 1)
+    {
+        return Err(VerifyError::Structure(
+            "invalid result slots or winner".into(),
+        ));
+    }
+    if header.frames_per_turn == 0
+        || u64::from(header.turn_cap)
+            .checked_mul(header.frames_per_turn)
+            .is_none()
+        || header.start_garbage.iter().any(|hole| *hole >= 10)
+        || header.start_garbage.len() > Board::HEIGHT
+    {
+        return Err(VerifyError::Structure(
+            "invalid replay frame or start garbage configuration".into(),
+        ));
+    }
     Sheet::parse(&header.sheet)
         .ok_or_else(|| VerifyError::Structure(format!("bad sheet {:?}", header.sheet)))?;
     let visible_rows = override_rows.unwrap_or_else(|| {
@@ -445,7 +484,8 @@ pub fn verify_replay_with_options(
                 .unwrap_or(true),
         ]
     });
-    let profile = Profile::parse(&header.profile).unwrap_or(Profile::Official);
+    let profile = Profile::parse(&header.profile)
+        .ok_or_else(|| VerifyError::Structure(format!("unknown profile {:?}", header.profile)))?;
     let mut engine = engine_from_header(&header);
     let mut report = VerifyReport {
         seed: header.seed,
@@ -460,6 +500,12 @@ pub fn verify_replay_with_options(
     while index < records.len() {
         match &records[index] {
             ReplayRecord::Garbage(garbage) if garbage.from == 2 => {
+                if garbage.t != report.turns || garbage.t >= header.turn_cap {
+                    return Err(VerifyError::Structure(format!(
+                        "unexpected injection turn {}",
+                        garbage.t
+                    )));
+                }
                 // Harness injection (garbage-pressure profile). It is recorded
                 // before the turn it applies to, so the verifier applies it at
                 // the same point.
@@ -491,6 +537,15 @@ pub fn verify_replay_with_options(
                 index += 1;
             }
             ReplayRecord::Turn(turn) => {
+                if turn.t != report.turns
+                    || turn.t >= header.turn_cap
+                    || turn.frame != u64::from(turn.t) * header.frames_per_turn
+                {
+                    return Err(VerifyError::Structure(format!(
+                        "unexpected turn/frame {}/{}",
+                        turn.t, turn.frame
+                    )));
+                }
                 let start_height = [
                     engine.players[0].game.board().height() as u32,
                     engine.players[1].game.board().height() as u32,
@@ -522,8 +577,11 @@ pub fn verify_replay_with_options(
                     let rotation = Rotation::from_u8(placement.rotation).ok_or_else(|| {
                         VerifyError::Structure(format!("bad rotation {}", placement.rotation))
                     })?;
-                    let target =
-                        PlacementTarget::from_core(kind, rotation, placement.x, placement.y);
+                    let target = PlacementTarget {
+                        used_hold: Some(placement.hold),
+                        supports_180: supports_180[slot],
+                        ..PlacementTarget::from_core(kind, rotation, placement.x, placement.y)
+                    };
                     let claimed = placement.claimed_spin.as_deref().and_then(parse_spin);
                     match engine.apply(slot, &target, claimed) {
                         Ok(applied) => {
@@ -637,7 +695,7 @@ pub fn verify_replay_with_options(
                     packet_index += 1;
                     index += 1;
                 }
-                if packet_index != packets.len() {
+                if packet_index < packets.len() {
                     report.mismatches.push(format!(
                         "t{}: {} garbage packets missing from the replay",
                         turn.t,
@@ -661,7 +719,7 @@ pub fn verify_replay_with_options(
                             board_hash(engine.players[0].game.board()),
                             board_hash(engine.players[1].game.board()),
                         ];
-                        if hash.boards != actual {
+                        if hash.t != turn.t || hash.boards != actual {
                             report.mismatches.push(format!(
                                 "t{} hash: recorded {:?}, recomputed {:?}",
                                 turn.t, hash.boards, actual
@@ -675,6 +733,16 @@ pub fn verify_replay_with_options(
                 }
             }
             ReplayRecord::Result(result) => {
+                if index + 1 != records.len() {
+                    return Err(VerifyError::Structure(
+                        "unexpected intermediate result".into(),
+                    ));
+                }
+                if result.reason == "TurnCap" && report.turns != header.turn_cap {
+                    return Err(VerifyError::Structure(
+                        "TurnCap reached before turn limit".into(),
+                    ));
+                }
                 verify_result(&mut engine, result, visible_rows, supports_180, &mut report);
                 index += 1;
             }

@@ -14,8 +14,18 @@
 
 use std::io::{BufRead, Write};
 
-use intetrigence_bot::{EvalContext, RootState, SearchConfig, Searcher};
-use intetrigence_core::{Board, PieceKind, Rotation};
+use intetrigence_bot::{EvalContext, RootState, SearchConfig, SearchTiming, Searcher};
+use intetrigence_core::{Board, Cell, GarbageMultiplier, PieceKind, Rotation};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Witness {
+    kind: String,
+    used_hold: bool,
+    spin_entry: bool,
+    cells: [(i32, i32); 4],
+}
 
 fn piece_kind(name: &str) -> Result<PieceKind, String> {
     Ok(match name {
@@ -43,19 +53,18 @@ fn rotation_name(rotation: Rotation) -> &'static str {
 /// counts rows the same way we do, and its top-out check reads the top half as
 /// `cells.slice(200)`. No flip.
 fn board_from_cells(cells: &str) -> Result<Board, String> {
-    if cells.chars().count() != 400 {
-        return Err(format!("expected 400 board cells, got {}", cells.chars().count()));
+    if cells.len() != Board::WIDTH * Board::HEIGHT {
+        return Err(format!("expected 400 board cells, got {}", cells.len()));
     }
-    let chars: Vec<char> = cells.chars().collect();
     let mut board = Board::new();
-    for y in 0..40usize {
-        let mut row = 0u16;
-        for x in 0..10usize {
-            if chars[y * 10 + x] != '_' {
-                row |= 1 << x;
-            }
-        }
-        board.set_row(y, row);
+    for (index, value) in cells.bytes().enumerate() {
+        let cell = match value {
+            b'_' => Cell::Empty,
+            b'G' => Cell::Garbage,
+            b'I' | b'O' | b'T' | b'S' | b'Z' | b'J' | b'L' => Cell::Block,
+            _ => return Err(format!("unknown board cell at index {index}")),
+        };
+        board.set_cell(index % Board::WIDTH, index / Board::WIDTH, cell);
     }
     Ok(board)
 }
@@ -74,7 +83,11 @@ fn main() {
         let request: serde_json::Value = match serde_json::from_str(line) {
             Ok(value) => value,
             Err(error) => {
-                let _ = writeln!(stdout, "{}", serde_json::json!({ "error": error.to_string() }));
+                let _ = writeln!(
+                    stdout,
+                    "{}",
+                    serde_json::json!({ "error": error.to_string() })
+                );
                 let _ = stdout.flush();
                 continue;
             }
@@ -114,17 +127,32 @@ fn decide(
     };
     let hold_available = request["pieces"]["holdAvailable"].as_bool().unwrap_or(true);
 
-    let context = EvalContext {
-        combo: request["chain"]["combo"].as_u64().unwrap_or(0) as u32,
-        // The lab carries the exact chain length; TBP only carries a bool.
-        b2b_streak: request["chain"]["b2b"].as_u64().unwrap_or(0) as u32,
-        incoming: request["incoming"]["pendingRows"].as_u64().unwrap_or(0) as u32,
-        arrived: request["incoming"]["dueThisLockRows"]
+    let counter = |value: &serde_json::Value, field: &str| {
+        value
             .as_u64()
-            .unwrap_or(0) as u32,
-        pieces_placed: 0,
-        sent_total: 0,
-        received_total: 0,
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| format!("invalid {field}"))
+    };
+    let frame = counter(
+        &request["lockTime"]["logicalFrame"],
+        "lockTime.logicalFrame",
+    )?;
+    let context = EvalContext {
+        multiplier: GarbageMultiplier::at_frame(u64::from(frame)).value(),
+        combo: counter(&request["chain"]["combo"], "chain.combo")?,
+        // The lab carries the exact chain length; TBP only carries a bool.
+        b2b_streak: counter(&request["chain"]["b2b"], "chain.b2b")?,
+        incoming: counter(&request["incoming"]["pendingRows"], "incoming.pendingRows")?,
+        arrived: counter(
+            &request["incoming"]["dueThisLockRows"],
+            "incoming.dueThisLockRows",
+        )?,
+        pieces_placed: counter(
+            &request["lockTime"]["piecesPlaced"],
+            "lockTime.piecesPlaced",
+        )?,
+        sent_total: counter(&request["ownTotals"]["sent"], "ownTotals.sent")?,
+        received_total: counter(&request["ownTotals"]["received"], "ownTotals.received")?,
         t_slot: 0,
     };
 
@@ -132,20 +160,60 @@ fn decide(
         board,
         current,
         preview,
-        hold: if hold_available { hold } else { None },
+        hold,
         context,
     };
+    let timing = request
+        .get("framesPerLock")
+        .map(|value| {
+            let frames = counter(value, "framesPerLock")?;
+            if frames == 0 {
+                return Err("framesPerLock must be positive".to_string());
+            }
+            Ok(SearchTiming::from_lab(
+                u64::from(frame),
+                u64::from(frames),
+                context.incoming,
+                context.arrived,
+            ))
+        })
+        .transpose()?;
 
+    // The lab runs on a synthetic paced clock rather than a realtime budget, so
+    // the search size is a free parameter here. That makes the lab the place to
+    // ask how much of the gap to attax is search and how much is evaluation.
+    let env_usize = |name: &str, fallback: usize| {
+        std::env::var(name)
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(fallback)
+    };
     let searcher = searcher.get_or_insert_with(|| {
         Searcher::new(SearchConfig {
             deterministic: true,
-            depth: 8,
-            width: 88,
+            depth: env_usize("S2LAB_DEPTH", 8),
+            width: env_usize("S2LAB_WIDTH", 88),
+            threads: env_usize("S2LAB_THREADS", 8),
             ..SearchConfig::default()
         })
     });
+    let witnesses: Vec<Witness> = serde_json::from_value(request["legalRoots"].clone())
+        .map_err(|error| format!("invalid legalRoots: {error}"))?;
+    let roots = witnesses
+        .into_iter()
+        .filter(|witness| hold_available || !witness.used_hold)
+        .map(|mut witness| {
+            witness.cells.sort_unstable();
+            Ok((
+                piece_kind(&witness.kind)?,
+                witness.used_hold,
+                witness.spin_entry,
+                witness.cells,
+            ))
+        })
+        .collect::<Result<_, String>>()?;
     let result = searcher
-        .search(&root)
+        .search_with_roots(&root, roots, timing.as_ref())
         .ok_or("the search found no placement")?;
     let best = result.best;
     // The lab's piece origins differ from ours, so the occupied cell set is the

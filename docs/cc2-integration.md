@@ -43,15 +43,13 @@ let reserve = start.hold.unwrap_or_else(|| start.queue.remove(0));
 このままだと CC2 は current を 1 ピース先と誤認し、最初の `play` を hold と解釈する
 (実測: `queue=[I,T,L,S,Z,O]` で 1 手目 I、2 手目が T ではなく **L**)。
 
-我々は `adapters/cc2-tbp-compat.patch`(116 行)を適用する。内容は 2 つ:
+互換パッチ `adapters/cc2-tbp-compat.patch` は空 hold、スポーン位置、`suggest` ごとの探索枠を扱う。
 
 **(a) 空の hold の表現**
 
-- `GameState` に `reserve_is_hold: bool` を追加
-- `create_bot`: `reserve = start.hold.unwrap_or(Piece::I)`, `reserve_is_hold = start.hold.is_some()`。
-  **queue から current を remove しない**
-- `GameState::advance`: hold 時に `reserve_is_hold = true`
-- `Freestyle`: `reserve_is_hold` のときだけ hold 候補を列挙、T-slot cutout も同様
+- `start` では current を維持し、空 hold を明示する。
+- 探索グラフでは、空 hold を使うと current だけを消費し、盤面・得点を変えずに次のピースの層へ進む。次の設置まで再 hold を禁止し、通常の設置と同じ評価で候補を比較する。数手先の初回 hold もこの遷移で探索する。
+- TBP の `play` では、空 hold で次のピースを置いたときだけ2枚進める。current と次のピースが同種のときは TBP が hold の有無を運ばないため、通常設置として扱う。
 
 **(b) スポーン位置を S2 に合わせる**
 
@@ -62,13 +60,13 @@ CC2 の `movegen.rs` は全ピースを `y: 19`(可視最上段)からスポー�
 
 ```powershell
 cd C:\Users\Hasilan\Projects\cold-clear-2
-git apply C:\Users\Hasilan\Projects\intetrigence\adapters\cc2-tbp-empty-hold.patch
-cargo build --release
+git apply C:\Users\Hasilan\Projects\intetrigence\adapters\cc2-tbp-compat.patch
+cargo build --bin cold-clear-2 --release --locked
 ```
 
-パッチ後の実測: `queue=[I,T,L,S,Z,O], hold=null` → 1 手目 I、2 手目 **T**(正しい)。
-パッチなしの場合は「hold 無効のハンディ付き CC2」になるため、公式マッチではパッチ適用版を使い、
-レポートに「upstream + 文書化された TBP 互換修正」と明記する。
+動作確認は Intetrigence のルートで `node adapters/cc2-hold-smoke.mjs <CC2実行ファイル>` を実行する。初手・数手後・プレビューが後で届く場合の空 hold、2枚補充、同種ピースの扱いを TBP 経由で検証する。公式マッチのレポートにはパッチと CC2 バイナリの識別情報を記録する。
+
+**探索枠**。Rust の公式ラウンドは `INTETRIGENCE_TBP_THINK_MS=100` を渡して起動し、CC2 の `info.features` に `intetrigence-request-window-v1:100` があることを確認する。探索木は手の間で引き継ぐ。探索ワーカーは `suggest` に応じた枠内で新しい展開を開始し、開始済みの展開と入出力の時間も審判が計測する。単発検証では arena の `--tbp-request-window-ms 100` または `node adapters/tbp-request-window-smoke.mjs <CC2実行ファイル>` を使う。
 
 ### 1.3 起動
 

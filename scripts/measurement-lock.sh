@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Machine-wide measurement lock. Only one measurement may run at a time.
+# Shared measurement lock for this user and machine.
 #
 #   source scripts/measurement-lock.sh
 #   acquire_measurement "tuning-smoke"
@@ -12,20 +12,16 @@
 # remove the lock directory by hand.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# The lock must be shared by every worktree: the main checkout owns the git
-# common dir, so put the lock next to it. A per-worktree lock lets two
-# measurements run at once (the CPU contention corrupts the think times).
-COMMON_DIR="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [ -n "$COMMON_DIR" ]; then
-  SHARED_ROOT="$(dirname "$COMMON_DIR")"
+if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
+  MEASUREMENT_LOCK_DIR="${MEASUREMENT_LOCK_DIR:-${LOCALAPPDATA:-${USERPROFILE:?set LOCALAPPDATA or USERPROFILE}/AppData/Local}/intetrigence/measurement.lock}"
+  MEASUREMENT_LOCK_DIR="$(cygpath -am "$MEASUREMENT_LOCK_DIR")"
 else
-  SHARED_ROOT="$ROOT"
+  MEASUREMENT_LOCK_DIR="${MEASUREMENT_LOCK_DIR:-${HOME:?set HOME}/.cache/intetrigence/measurement.lock}"
 fi
-MEASUREMENT_LOCK_DIR="${MEASUREMENT_LOCK_DIR:-$SHARED_ROOT/.measurement-lock}"
 
 acquire_measurement() {
   local name="${1:-measurement}"
+  mkdir -p -- "$(dirname "$MEASUREMENT_LOCK_DIR")"
   if ! mkdir "$MEASUREMENT_LOCK_DIR" 2>/dev/null; then
     local owner
     owner="$(cat "$MEASUREMENT_LOCK_DIR/owner" 2>/dev/null || echo unknown)"
@@ -33,11 +29,21 @@ acquire_measurement() {
     echo "       remove $MEASUREMENT_LOCK_DIR if it is stale." >&2
     return 1
   fi
-  printf '%s pid=%s started=%s\n' "$name" "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    > "$MEASUREMENT_LOCK_DIR/owner"
-  trap 'release_measurement' EXIT INT TERM
+  INTETRIGENCE_MEASUREMENT_OWNER="$name pid=$$ started=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if ! printf '%s\n' "$INTETRIGENCE_MEASUREMENT_OWNER" > "$MEASUREMENT_LOCK_DIR/owner"; then
+    rm -f -- "$MEASUREMENT_LOCK_DIR/owner"
+    rmdir -- "$MEASUREMENT_LOCK_DIR"
+    return 1
+  fi
+  export MEASUREMENT_LOCK_DIR INTETRIGENCE_MEASUREMENT_OWNER
+  trap 'release_measurement' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 }
 
 release_measurement() {
-  rm -rf "$MEASUREMENT_LOCK_DIR"
+  if [[ "$(cat "$MEASUREMENT_LOCK_DIR/owner" 2>/dev/null)" == "$INTETRIGENCE_MEASUREMENT_OWNER" ]]; then
+    rm -f -- "$MEASUREMENT_LOCK_DIR/owner"
+    rmdir -- "$MEASUREMENT_LOCK_DIR"
+  fi
 }

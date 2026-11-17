@@ -6,8 +6,8 @@
 //! input is `frame = turn * 12` (`docs/s2-spec.md` §11-U9).
 
 use intetrigence_core::{
-    ActivePiece, Board, ClearInput, Game, GarbageMultiplier, GarbageQueue, OpenerPhase, PieceKind,
-    Rotation, S2Scoring, SpinType, compute_attack, derive_seeds,
+    ActivePiece, Board, ClearInput, Game, GarbageMultiplier, GarbagePacket, GarbageQueue,
+    OpenerPhase, PieceKind, Rotation, S2Scoring, SpinType, compute_attack, derive_seeds,
 };
 
 use crate::movegen;
@@ -79,6 +79,7 @@ impl Player {
 pub struct View {
     pub turn: u32,
     pub frame: u64,
+    pub frames_per_turn: u64,
     pub slot: usize,
     /// 1 or 2 (`docs/s2-referee-protocol.md` §1.2).
     pub seat: u8,
@@ -100,6 +101,8 @@ pub struct View {
     /// `pending_garbage` also counts packets still in flight, which cannot be
     /// inserted yet (`docs/s2-burst-defense.md` §6.7).
     pub arrived_garbage: u32,
+    /// Received packet amounts and send frames. Hole RNG stays in the referee.
+    pub garbage_packets: Vec<GarbagePacket>,
     pub pieces_placed: u32,
     pub sent_total: u32,
     pub received_total: u32,
@@ -139,13 +142,20 @@ impl View {
 pub struct PlacementTarget {
     pub piece: PieceKind,
     pub cells: [(i32, i32); 4],
+    pub used_hold: Option<bool>,
+    pub supports_180: bool,
 }
 
 impl PlacementTarget {
     pub fn new(piece: PieceKind, cells: [(i32, i32); 4]) -> Self {
         let mut cells = cells;
         cells.sort_unstable();
-        Self { piece, cells }
+        Self {
+            piece,
+            cells,
+            used_hold: None,
+            supports_180: true,
+        }
     }
 
     pub fn from_core(piece: PieceKind, rotation: Rotation, x: i32, y: i32) -> Self {
@@ -490,6 +500,7 @@ pub struct Engine {
     pub frame: u64,
     pub frames_per_turn: u64,
     pub multiplier: GarbageMultiplier,
+    pub(crate) t_immobility_mini: bool,
 }
 
 impl Engine {
@@ -539,6 +550,7 @@ impl Engine {
             frame: 0,
             frames_per_turn,
             multiplier: GarbageMultiplier::new(),
+            t_immobility_mini: true,
         }
     }
 
@@ -554,6 +566,7 @@ impl Engine {
         View {
             turn: self.turn,
             frame: self.frame,
+            frames_per_turn: self.frames_per_turn,
             slot,
             seat,
             board: player.game.board().clone(),
@@ -566,6 +579,7 @@ impl Engine {
             b2b_streak: player.scoring.state.b2b_streak,
             pending_garbage: player.garbage.queue_total(),
             arrived_garbage: player.garbage.arrived_total(self.frame),
+            garbage_packets: player.garbage.packets().to_vec(),
             pieces_placed: player.opener.pieces_placed,
             sent_total: player.opener.sent_total,
             received_total: player.game.stats().garbage_lines_received,
@@ -600,21 +614,36 @@ impl Engine {
         let mut current_moves: Option<movegen::MoveSet> = None;
         let mut hold_moves: Option<movegen::MoveSet> = None;
         for (index, candidate) in suggestion.candidates.iter().enumerate() {
-            let is_hold = candidate.piece != current_kind;
-            if is_hold && (!can_hold || hold_kind != Some(candidate.piece)) {
+            let is_hold = candidate
+                .used_hold
+                .unwrap_or(candidate.piece != current_kind);
+            if (is_hold && (!can_hold || hold_kind != Some(candidate.piece)))
+                || (!is_hold && candidate.piece != current_kind)
+            {
                 continue;
             }
             let moves = if is_hold {
                 hold_moves.get_or_insert_with(|| {
-                    movegen::generate(&board, movegen::spawn_state(candidate.piece), true)
+                    movegen::generate_with_180(
+                        &board,
+                        movegen::spawn_state(candidate.piece),
+                        true,
+                        supports_180,
+                    )
                 })
             } else {
-                current_moves.get_or_insert_with(|| movegen::generate(&board, active, false))
+                current_moves.get_or_insert_with(|| {
+                    movegen::generate_with_180(&board, active, false, supports_180)
+                })
             };
             if moves.get(&candidate.cells).is_some() {
                 return Ok(Adopted {
                     candidate_index: index,
-                    target: PlacementTarget::new(candidate.piece, candidate.cells),
+                    target: PlacementTarget {
+                        used_hold: Some(is_hold),
+                        supports_180,
+                        ..PlacementTarget::new(candidate.piece, candidate.cells)
+                    },
                     claimed_spin: candidate.claimed_spin,
                     claimed_attack: candidate.claimed_attack,
                     alternate_order: moves.is_alternate_only(&candidate.cells),
@@ -665,17 +694,9 @@ impl Engine {
         false
     }
 
-    /// True when the next piece's spawn cells are occupied: the spawn must
-    /// fail, so the player has topped out (spec v1.3.18 §2.3.1). This is the
-    /// board-first check the referee runs before asking for a suggestion: an
-    /// external bot whose board is pushed above the spawn rows by garbage
-    /// exits, and that is a top-out, not a forfeit.
+    /// The current spawn has already been resolved by Game, including clutch.
     pub fn spawn_blocked(&mut self, slot: usize) -> bool {
-        let player = &mut self.players[slot];
-        let Some(kind) = player.game.preview(1).first().copied() else {
-            return false;
-        };
-        spawn_blocked_on(player.game.board(), kind)
+        self.players[slot].game.is_over()
     }
 
     /// Applies one placement: hold, path replay, lock, scoring, cancellation,
@@ -692,7 +713,7 @@ impl Engine {
             .game
             .active()
             .ok_or(RefereeError::NoActivePiece)?;
-        let hold = target.piece != current.kind;
+        let hold = target.used_hold.unwrap_or(target.piece != current.kind);
 
         if hold {
             if !self.players[slot].game.can_hold() {
@@ -724,7 +745,13 @@ impl Engine {
             });
         }
 
-        let moves = movegen::generate(self.players[slot].game.board(), active, hold);
+        let moves = movegen::generate_with_spin_rule(
+            self.players[slot].game.board(),
+            active,
+            hold,
+            target.supports_180,
+            self.t_immobility_mini,
+        );
         let placement = moves
             .get(&target.cells)
             .ok_or(RefereeError::IllegalPlacement {
@@ -850,6 +877,7 @@ fn split_players(players: &mut [Player; 2], slot: usize) -> (&mut Player, &mut P
 
 /// True when `kind`'s spawn cells are occupied on `board`: the next spawn must
 /// fail, so the player has topped out (spec v1.3.18 §2.3.1).
+#[cfg(test)]
 fn spawn_blocked_on(board: &Board, kind: PieceKind) -> bool {
     let (box_x, box_y) = kind.spawn_position();
     kind.cells(Rotation::Zero).iter().any(|&(cell_x, cell_y)| {
@@ -870,6 +898,33 @@ mod tests {
         assert_eq!(Sheet::A.seat_of(1), 2);
         assert_eq!(Sheet::B.seat_of(0), 2);
         assert_eq!(Sheet::B.seat_of(1), 1);
+    }
+
+    #[test]
+    fn explicitly_holding_the_same_kind_consumes_the_correct_queue() {
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        let mut fresh = Game::new(1);
+        let kind = fresh.active().unwrap().kind;
+        let following = fresh.preview(1)[0];
+        let active = movegen::spawn_state(kind);
+        engine.players[0].game = Game::from_position(1, Board::new(), active).unwrap();
+        assert_eq!(engine.players[0].game.preview(1)[0], kind);
+        let cells = movegen::generate(&Board::new(), active, false).placements()[0].cells;
+        let suggestion = crate::agent::Suggestion {
+            candidates: vec![crate::agent::Candidate {
+                piece: kind,
+                cells,
+                used_hold: Some(true),
+                claimed_spin: None,
+                claimed_attack: None,
+            }],
+            ..Default::default()
+        };
+        let adopted = engine.adopt(0, &suggestion, true).unwrap();
+        let placement = engine.apply(0, &adopted.target, None).unwrap();
+        assert!(placement.hold);
+        assert_eq!(engine.players[0].game.held_piece(), Some(kind));
+        assert_eq!(engine.players[0].game.active().unwrap().kind, following);
     }
 
     #[test]
@@ -964,5 +1019,26 @@ mod tests {
         assert_eq!(applied.sent, applied.attack_total);
         assert_eq!(engine.players[1].garbage.queue_total(), applied.sent);
         assert_eq!(applied.packets.len(), 2);
+    }
+
+    #[test]
+    fn replay_spin_rule_preserves_the_corner_only_classification() {
+        let board = Board::from_rows(&[1 << 4, (1 << 2) | (1 << 6), 0, 1 << 4]);
+        let active = movegen::spawn_state(PieceKind::T);
+        let mut engine = Engine::new(1, Sheet::A, 12);
+        engine.players[0].game = Game::from_position(1, board, active).unwrap();
+        let target = PlacementTarget::new(
+            PieceKind::T,
+            ActivePiece {
+                x: 3,
+                y: 0,
+                ..active
+            }
+            .cells(),
+        );
+        let mut legacy = engine.clone();
+        legacy.t_immobility_mini = false;
+        assert_eq!(engine.apply(0, &target, None).unwrap().spin, SpinType::Mini);
+        assert_eq!(legacy.apply(0, &target, None).unwrap().spin, SpinType::None);
     }
 }

@@ -79,6 +79,7 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
     let mut tbp_visible_rows = 40u32;
     let mut tbp_supports_180 = false;
     let mut tbp_suggest_delay_ms = 0u64;
+    let mut tbp_request_window_ms = None;
     // A TBP opponent needs a moment after `start` before it can suggest: when
     // it moves first (sheet B) the host used to ask for a move before the
     // opponent had parsed the board, and it answered with no candidates. The
@@ -263,6 +264,16 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
                     .map_err(|error| format!("--tbp-suggest-delay-ms: {error}"))?;
                 index += 2;
             }
+            "--tbp-request-window-ms" => {
+                let ms = value(1)?
+                    .parse::<u64>()
+                    .map_err(|error| format!("--tbp-request-window-ms: {error}"))?;
+                if !(1..=10_000).contains(&ms) {
+                    return Err("--tbp-request-window-ms must be between 1 and 10000".into());
+                }
+                tbp_request_window_ms = Some(ms);
+                index += 2;
+            }
             "--tbp-retry-empty-ms" => {
                 tbp_retry_empty_ms = value(1)?
                     .parse()
@@ -320,8 +331,11 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         opponent.cwd = tbp_cwd;
         opponent.visible_rows = tbp_visible_rows;
         opponent.supports_180 = tbp_supports_180;
-        opponent.suggest_delay_ms = tbp_suggest_delay_ms;
-        opponent.retry_empty_suggest_ms = tbp_retry_empty_ms;
+        opponent.request_window_ms = tbp_request_window_ms;
+        if tbp_request_window_ms.is_none() {
+            opponent.suggest_delay_ms = tbp_suggest_delay_ms;
+            opponent.retry_empty_suggest_ms = tbp_retry_empty_ms;
+        }
         config.tbp_opponent = Some(opponent);
     } else if !no_attax && !self_play {
         let dir = attax.ok_or_else(|| "match needs --attax DIR or --no-attax".to_string())?;
@@ -391,6 +405,8 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
         }
         other => return Err(format!("unknown --bot `{other}` (baseline|search)")),
     };
+    let _measurement =
+        intetrigence_arena::measurement_lock::MeasurementLock::acquire("arena match")?;
     config.started_at = now_stamp();
 
     println!(
@@ -425,6 +441,9 @@ fn cmd_match(args: &[String]) -> Result<(), String> {
             "{} replay(s) failed verification",
             summary.verify_failures
         ));
+    }
+    if !summary.measurement_complete && (config.attax.is_some() || config.tbp_opponent.is_some()) {
+        return Err("external match evidence is incomplete".into());
     }
     Ok(())
 }

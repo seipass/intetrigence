@@ -156,6 +156,26 @@ fn perfect_clear_adds_five_and_one_b2b() {
 }
 
 #[test]
+fn perfect_clear_then_chain_break_matches_lab_surge_threshold() {
+    // Cross-checked against s2-bot-lab 79505ca's chain-adapter for the
+    // observed Season 2 profile: PC B2B bonus 1, charge at 4, base 3.
+    let cases: [(u32, u32, &[u32]); 3] = [(3, 0, &[]), (4, 4, &[1, 1, 2]), (5, 5, &[2, 2, 1])];
+    for (b2b_before, surge, chunks) in cases {
+        let mut scoring = S2Scoring::new();
+        scoring.state.b2b_streak = b2b_before;
+        let mut pc = input(1, SpinType::None);
+        pc.perfect_clear = true;
+        let cleared = scoring.score(pc);
+        assert_eq!(cleared.b2b_streak_after, b2b_before + 1);
+        assert_eq!(cleared.surge_amount, 0);
+        let broken = scoring.score(input(1, SpinType::None));
+        assert_eq!(broken.b2b_streak_after, 0);
+        assert_eq!(broken.surge_amount, surge);
+        assert_eq!(broken.events, chunks);
+    }
+}
+
+#[test]
 fn garbage_special_bonus_conditions() {
     // TSD with garbage: +1.
     let mut clear = input(2, SpinType::Full);

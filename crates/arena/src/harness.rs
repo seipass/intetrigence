@@ -5,7 +5,8 @@
 //! on our side is configurable: the M0 baseline stand-in (`crate::baseline`) or
 //! the real search (`crate::bot_agent`). The summary records which one ran.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -18,7 +19,7 @@ use crate::audit::{GameAudit, wilson_interval};
 use crate::baseline::BaselineBot;
 use crate::engine::{Profile, Sheet};
 use crate::referee::{RoundConfig, run_round};
-use crate::replay::{VerifyReport, verify_replay, write_replay};
+use crate::replay::{ReplayRecord, VerifyReport, read_replay, verify_replay, write_replay};
 use crate::tbp_agent::{TbpAgent, TbpAgentConfig};
 
 #[derive(Clone, Debug)]
@@ -76,6 +77,7 @@ pub struct TbpOpponentConfig {
     pub visible_rows: u32,
     /// Whether the bot's input set includes 180-degree rotations.
     pub supports_180: bool,
+    pub request_window_ms: Option<u64>,
     /// Delay before each `suggest` (budget for continuously-searching bots).
     pub suggest_delay_ms: u64,
     /// Retry an empty `suggest` for this long (CC2 race).
@@ -96,10 +98,19 @@ impl TbpOpponentConfig {
             // CC2, clys and attax do not have 180-degree rotation; an
             // unknown TBP bot is treated conservatively.
             supports_180: false,
+            request_window_ms: None,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             timeout: Duration::from_secs(30),
         }
+    }
+
+    pub(crate) fn host_config(&self) -> HostConfig {
+        let mut config = HostConfig::new(self.program.clone(), self.args.clone());
+        config.cwd = self.cwd.clone();
+        config.env = self.env.clone();
+        config.timeout = self.timeout;
+        config
     }
 }
 
@@ -166,7 +177,7 @@ impl MatchConfig {
             attax: None,
             tbp_opponent: None,
             started_at: now_stamp(),
-            rules: version_string("docs/s2-spec.md", "v1.3.11"),
+            rules: version_string("docs/s2-spec.md", "v1.3.25"),
             protocol: version_string("docs/s2-referee-protocol.md", "v1.9"),
             bot: BotChoice::Baseline,
             profile: Profile::Official,
@@ -279,13 +290,12 @@ pub fn detect_attax_visible_rows(dir: &Path) -> u32 {
     20
 }
 
-/// Repository root (the arena crate lives at `<root>/crates/arena`).
+/// Repository root of the checkout from which the command was invoked.
 pub fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."))
+    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    git_output(&current, &["rev-parse", "--show-toplevel"])
+        .map(PathBuf::from)
+        .unwrap_or(current)
 }
 
 fn git_output(root: &Path, args: &[&str]) -> Option<String> {
@@ -1503,7 +1513,129 @@ fn check_opponent_log(
     Ok(())
 }
 
+fn check_game_opponent_log(
+    config: &MatchConfig,
+    audit: &GameAudit,
+    logs: &Path,
+    name: &str,
+    replay_path: &Path,
+) -> Result<(), String> {
+    if config.self_play || (config.tbp_opponent.is_none() && config.attax.is_none()) {
+        return Ok(());
+    }
+    let tbp = config.tbp_opponent.is_some();
+    let suffix = if tbp { "opponent" } else { "attax" };
+    let plays = audit.totals[1].pieces_placed;
+    let forfeit = audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
+    let path = logs.join(format!("{name}-{suffix}.jsonl"));
+    check_opponent_log(&path, plays + u32::from(forfeit), plays, forfeit, tbp)?;
+    if !tbp {
+        return Ok(());
+    }
+    let records = read_replay(replay_path).map_err(|error| error.to_string())?;
+    let expected = records.iter().filter_map(|record| match record {
+        ReplayRecord::Turn(turn) => turn.placements.iter().find(|placement| placement.slot == 1),
+        _ => None,
+    });
+    let text = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
+    let mut expected = expected.peekable();
+    let mut suggestion = None;
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        let event: serde_json::Value =
+            serde_json::from_str(line).map_err(|error| error.to_string())?;
+        match event["type"].as_str() {
+            Some("suggestion") => {
+                let payload: intetrigence_tbp::SuggestionPayload =
+                    serde_json::from_value(event["payload"].clone())
+                        .map_err(|error| error.to_string())?;
+                suggestion = Some(payload);
+            }
+            Some("play") => {
+                let report = expected.next().ok_or("unexpected transcript play")?;
+                let kind =
+                    crate::replay::parse_piece(&report.piece).ok_or("invalid replay piece")?;
+                let rotation = intetrigence_core::Rotation::from_u8(report.rotation)
+                    .ok_or("invalid replay rotation")?;
+                let cells = crate::movegen::core_cells(kind, rotation, report.x, report.y);
+                let chosen: intetrigence_tbp::Move = serde_json::from_value(event["move"].clone())
+                    .map_err(|error| error.to_string())?;
+                let candidate = suggestion.take().and_then(|payload| {
+                    payload.moves.get(report.candidate_index as usize).cloned()
+                });
+                if chosen.location.kind.to_core() != kind
+                    || intetrigence_tbp::location_cells(&chosen.location) != cells
+                    || crate::replay::spin_name(chosen.spin.to_core()) != report.spin
+                    || candidate.is_none_or(|candidate| {
+                        candidate.location.kind.to_core() != kind
+                            || intetrigence_tbp::location_cells(&candidate.location) != cells
+                    })
+                {
+                    return Err("opponent transcript placement doesn't match the replay".into());
+                }
+            }
+            _ => {}
+        }
+    }
+    if expected.peek().is_some() {
+        return Err("opponent transcript is missing replayed placements".into());
+    }
+    Ok(())
+}
+
+fn opponent_build_id(config: &MatchConfig) -> Option<String> {
+    if config.self_play {
+        return None;
+    }
+    let mut paths = Vec::new();
+    if let Some(tbp) = &config.tbp_opponent {
+        paths.push(PathBuf::from(&tbp.program));
+        for arg in &tbp.args {
+            paths.push(PathBuf::from(arg));
+        }
+        if let Some(cwd) = &tbp.cwd {
+            paths.extend([
+                cwd.join("config.json"),
+                cwd.join("bin/tbp/tbp"),
+                cwd.join("bin/tbp/tbp.exe"),
+            ]);
+        }
+        if let Some((_, path)) = tbp.env.iter().find(|(key, _)| key == "CLYS_TBP_BIN") {
+            paths.push(PathBuf::from(path));
+        } else if let Some(path) = std::env::var_os("CLYS_TBP_BIN") {
+            paths.push(PathBuf::from(path));
+        }
+    } else if let Some(attax) = &config.attax {
+        paths.push(attax.entry_point());
+        paths.push(attax.dir.join("src/ai/bot/movegen.ts"));
+    }
+    let mut hash = DefaultHasher::new();
+    let mut found = false;
+    for path in paths.into_iter().filter(|path| path.is_file()) {
+        if let Ok(bytes) = std::fs::read(&path) {
+            found = true;
+            path.hash(&mut hash);
+            bytes.hash(&mut hash);
+        }
+    }
+    found.then(|| format!("{:016x}", hash.finish()))
+}
+
 pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
+    if config.seeds.is_empty()
+        || config.seeds.iter().collect::<HashSet<_>>().len() != config.seeds.len()
+        || config.sheets.is_empty()
+        || config
+            .sheets
+            .iter()
+            .map(|sheet| sheet.as_str())
+            .collect::<HashSet<_>>()
+            .len()
+            != config.sheets.len()
+        || config.turn_cap == 0
+        || config.frames_per_turn == 0
+    {
+        return Err("match requires distinct seeds and sheets and positive time limits".into());
+    }
     let build_commit = config.build_commit.clone().or_else(git_short_head);
     let (search_depth, search_width, search_threads) = match &config.bot {
         BotChoice::Search(search) => (
@@ -1521,12 +1653,42 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
         BotChoice::Baseline => "intetrigence-baseline",
     };
     let build_id = crate::BUILD_ID;
+    let opponent_build_id = opponent_build_id(config);
     let replays = config.out_dir.join("replays");
     let audits_dir = config.out_dir.join("audit");
     let logs = config.out_dir.join("logs");
     for dir in [&replays, &audits_dir, &logs] {
         std::fs::create_dir_all(dir)
             .map_err(|error| format!("create {}: {error}", dir.display()))?;
+    }
+    let mut identity = config.clone();
+    identity.started_at.clear();
+    identity.notes.clear();
+    identity.out_dir = PathBuf::new();
+    identity.resume = false;
+    let mut hash = DefaultHasher::new();
+    build_id.hash(&mut hash);
+    opponent_build_id.hash(&mut hash);
+    format!("{identity:?}").hash(&mut hash);
+    let run_id = format!("{:016x}", hash.finish());
+    let manifest = config.out_dir.join("match-id");
+    if config.resume {
+        match std::fs::read_to_string(&manifest) {
+            Ok(previous) if previous == run_id => {}
+            _ => return Err("cannot resume: missing or different match configuration".into()),
+        }
+    } else {
+        if [&replays, &audits_dir, &logs].iter().any(|dir| {
+            dir.read_dir()
+                .is_ok_and(|mut entries| entries.next().is_some())
+        }) {
+            return Err(
+                "match output already contains games; use a new directory or matching --resume"
+                    .into(),
+            );
+        }
+        std::fs::write(&manifest, &run_id)
+            .map_err(|error| format!("write match identity: {error}"))?;
     }
 
     let mut audits = Vec::new();
@@ -1546,50 +1708,33 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                 let stderr_path = logs.join(format!("{name}-attax-stderr.log"));
 
                 if config.resume && replay_path.exists() && audit_path.exists() {
-                    if let Ok(verify) = verify_replay(&replay_path) {
-                        if verify.ok {
-                            if let Ok(text) = std::fs::read_to_string(&audit_path) {
-                                if let Ok(mut audit) = serde_json::from_str::<GameAudit>(&text) {
-                                    // A replay from a different build is not
-                                    // comparable: re-run the game instead of
-                                    // reusing it.
-                                    let same_bot = audit.bots[0].name == expected_bot_name;
-                                    let same_build = match audit.bots[0].build_id.as_deref() {
-                                        Some(id) => id == build_id,
-                                        // Older replays predate the build id;
-                                        // fall back to the checkout commit.
-                                        None => audit.bots[0].commit == build_commit,
-                                    };
-                                    if same_bot && same_build {
-                                        audit.verify = verify;
-                                        audit.opener_lines = opener_lines_from_replay(&replay_path);
-                                        audit.spin_placements =
-                                            spin_placements_from_replay(&replay_path);
-                                        println!("{name}: resumed (verified)");
-                                        audits.push(audit);
-                                        resumed_games += 1;
-                                        continue;
-                                    }
-                                    if !same_bot {
-                                        println!(
-                                            "{name}: not resumed (bot {} != {})",
-                                            audit.bots[0].name, expected_bot_name
-                                        );
-                                    } else {
-                                        println!(
-                                            "{name}: not resumed (build {} != {})",
-                                            audit.bots[0]
-                                                .build_id
-                                                .as_deref()
-                                                .or(audit.bots[0].commit.as_deref())
-                                                .unwrap_or("unknown"),
-                                            build_id
-                                        );
-                                    }
-                                }
+                    let previous = std::fs::read_to_string(&audit_path)
+                        .ok()
+                        .and_then(|text| serde_json::from_str::<GameAudit>(&text).ok());
+                    if let Some(mut audit) = previous {
+                        let same_build = audit.bots[0].build_id.as_deref() == Some(build_id)
+                            || (audit.bots[0].build_id.is_none()
+                                && audit.bots[0].commit == build_commit);
+                        if audit.bots[0].name == expected_bot_name
+                            && same_build
+                            && audit.seed == seed
+                            && audit.sheet == sheet.as_str()
+                            && audit.repeat == repeat
+                            && check_game_opponent_log(config, &audit, &logs, &name, &replay_path)
+                                .is_ok()
+                        {
+                            if let Ok(verify) = verify_audit(&replay_path, &audit) {
+                                audit.verify = verify;
+                                audit.opener_lines = opener_lines_from_replay(&replay_path);
+                                audit.spin_placements = spin_placements_from_replay(&replay_path);
+                                println!("{name}: resumed (verified)");
+                                audits.push(audit);
+                                resumed_games += 1;
+                                continue;
                             }
                         }
                     }
+                    println!("{name}: rerunning incomplete or inconsistent evidence");
                 }
 
                 // A fresh game must not append to a previous run's logs: the TBP
@@ -1620,16 +1765,15 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     bot_config.args.extend(config.weights_note.clone());
                     Box::new(crate::bot_agent::BotAgent::new(bot_config))
                 } else if let Some(tbp) = &config.tbp_opponent {
-                    let mut host = HostConfig::new(tbp.program.clone(), tbp.args.clone());
-                    host.cwd = tbp.cwd.clone();
-                    host.env = tbp.env.clone();
-                    host.timeout = tbp.timeout;
+                    let mut host = tbp.host_config();
                     host.stderr_path = Some(stderr_path.clone());
                     let mut tbp_config = TbpAgentConfig::new(host);
                     tbp_config.commit = tbp.commit.clone();
+                    tbp_config.build_id = opponent_build_id.clone();
                     tbp_config.name = Some(tbp.name.clone());
                     tbp_config.visible_rows = tbp.visible_rows;
                     tbp_config.supports_180 = tbp.supports_180;
+                    tbp_config.request_window_ms = tbp.request_window_ms;
                     tbp_config.suggest_delay_ms = tbp.suggest_delay_ms;
                     tbp_config.retry_empty_suggest_ms = tbp.retry_empty_suggest_ms;
                     tbp_config.transcript = Some(logs.join(format!("{name}-opponent.jsonl")));
@@ -1646,6 +1790,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                             host.env = attax.env.clone();
                             let mut tbp_config = TbpAgentConfig::new(host);
                             tbp_config.commit = attax.commit.clone();
+                            tbp_config.build_id = opponent_build_id.clone();
                             tbp_config.bun_version = attax.bun_version.clone();
                             tbp_config.visible_rows = if attax.visible_rows == 0 {
                                 detect_attax_visible_rows(&attax.dir)
@@ -1697,41 +1842,7 @@ pub fn run_match(config: &MatchConfig) -> Result<MatchSummary, String> {
                     .write(&audit_path)
                     .map_err(|error| format!("write {}: {error}", audit_path.display()))?;
 
-                let tbp_opponent = config.tbp_opponent.is_some();
-                let opponent_log = if tbp_opponent {
-                    logs.join(format!("{name}-opponent.jsonl"))
-                } else {
-                    log_path.clone()
-                };
-                // `exists()` is not proof of completeness: a 0-byte file, a
-                // truncated final line, or a log that stops mid-game all exist.
-                // Count the opponent's actual placements from the replay; do not
-                // derive the count from the winner (the seat that dies first
-                // decides whether the opponent gets the last turn; protocol v1.33
-                // §8.3.1.2).
-                let opponent_plays = report
-                    .records
-                    .iter()
-                    .filter(|record| {
-                        matches!(
-                            record,
-                            crate::replay::ReplayRecord::Turn(turn)
-                                if turn.placements.iter().any(|placement| placement.slot == 1)
-                        )
-                    })
-                    .count() as u32;
-                let forfeit_by_opponent =
-                    audit.reason == "Forfeit" && audit.forfeit_slot == Some(1);
-                // A forfeit by the opponent logs the forfeit turn's suggestion
-                // but no play; every other game has one suggestion per play.
-                let expected_suggestions = opponent_plays + u32::from(forfeit_by_opponent);
-                let log_check = check_opponent_log(
-                    &opponent_log,
-                    expected_suggestions,
-                    opponent_plays,
-                    forfeit_by_opponent,
-                    tbp_opponent,
-                );
+                let log_check = check_game_opponent_log(config, &audit, &logs, &name, &replay_path);
                 if !replay_path.exists() || !audit_path.exists() || log_check.is_err() {
                     measurement_incomplete += 1;
                     eprintln!(
@@ -1809,12 +1920,54 @@ pub fn load_audits(dir: &Path) -> Result<Vec<GameAudit>, String> {
         }
         let text = std::fs::read_to_string(&path)
             .map_err(|error| format!("read {}: {error}", path.display()))?;
-        let audit: GameAudit = serde_json::from_str(&text)
+        let mut audit: GameAudit = serde_json::from_str(&text)
             .map_err(|error| format!("parse {}: {error}", path.display()))?;
+        let replay_path = dir
+            .join("replays")
+            .join(path.file_name().unwrap())
+            .with_extension("jsonl");
+        audit.verify = verify_audit(&replay_path, &audit)?;
         audits.push(audit);
     }
     audits.sort_by_key(|audit| (audit.seed, audit.sheet.clone()));
     Ok(audits)
+}
+
+fn verify_audit(path: &Path, audit: &GameAudit) -> Result<VerifyReport, String> {
+    let records = read_replay(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let (Some(ReplayRecord::Header(header)), Some(ReplayRecord::Result(result))) =
+        (records.first(), records.last())
+    else {
+        return Err(format!("missing header or result in {}", path.display()));
+    };
+    if header.seed != audit.seed
+        || header.sheet != audit.sheet
+        || header.profile != audit.profile
+        || result.winner != audit.winner
+        || result.reason != audit.reason
+        || result.turns != audit.turns
+        || result.forfeit_slot != audit.forfeit_slot
+        || result.per_player.iter().any(|player| {
+            audit
+                .totals
+                .get(usize::from(player.slot))
+                .is_none_or(|total| {
+                    total.pieces_placed != player.pieces_placed
+                        || total.lines_cleared != player.lines_cleared
+                        || total.sent_total != player.sent_total
+                        || total.received_total != player.received_total
+                        || total.attack_total != player.attack_total
+                })
+        })
+    {
+        return Err(format!("audit and replay disagree for {}", path.display()));
+    }
+    let verify =
+        verify_replay(path).map_err(|error| format!("verify {}: {error}", path.display()))?;
+    if !verify.ok {
+        return Err(format!("replay failed verification: {}", path.display()));
+    }
+    Ok(verify)
 }
 
 /// Re-verifies every replay under `<dir>/replays`.
@@ -1834,6 +1987,9 @@ pub fn verify_all(dir: &Path) -> Result<Vec<(String, VerifyReport)>, String> {
         reports.push((path.display().to_string(), report));
     }
     reports.sort_by(|a, b| a.0.cmp(&b.0));
+    if reports.is_empty() {
+        return Err(format!("no replays under {}", replay_dir.display()));
+    }
     Ok(reports)
 }
 

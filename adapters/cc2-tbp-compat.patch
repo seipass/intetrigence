@@ -1,13 +1,68 @@
+diff --git a/src/bot.rs b/src/bot.rs
+index 8f08ad4..e184caf 100644
+--- a/src/bot.rs
++++ b/src/bot.rs
+@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
+ use once_cell::sync::Lazy;
+ use serde::{Deserialize, Serialize};
+ 
+-use crate::data::{GameState, Piece, Placement};
++use crate::data::{GameState, Piece, Placement, SearchAction};
+ 
+ mod freestyle;
+ 
+@@ -45,7 +45,7 @@ enum ModeEnum {
+ 
+ #[enum_dispatch(ModeEnum)]
+ trait Mode {
+-    fn advance(&mut self, options: &BotOptions, mv: Placement) -> Option<ModeSwitch>;
++    fn advance(&mut self, options: &BotOptions, action: SearchAction) -> Option<ModeSwitch>;
+     fn new_piece(&mut self, options: &BotOptions, piece: Piece);
+     fn suggest(&self, options: &BotOptions) -> Vec<Placement>;
+     fn do_work(&self, options: &BotOptions) -> Statistics;
+@@ -67,8 +67,18 @@ impl Bot {
+ 
+     pub fn advance(&mut self, mv: Placement) {
+         puffin::profile_function!();
+-        self.current.advance(self.queue.pop_front().unwrap(), mv);
+-        if let Some(to) = self.mode.advance(&self.options, mv) {
++        if !self.current.reserve_is_hold
++            && self.queue.front().copied() != Some(mv.location.piece)
++        {
++            assert_eq!(self.queue.get(1).copied(), Some(mv.location.piece));
++            self.advance_action(SearchAction::InitialHold);
++        }
++        self.advance_action(SearchAction::Place(mv));
++    }
++
++    fn advance_action(&mut self, action: SearchAction) {
++        self.current.apply_search_action(self.queue.pop_front().unwrap(), action);
++        if let Some(to) = self.mode.advance(&self.options, action) {
+             self.switch(to);
+         };
+     }
 diff --git a/src/bot/freestyle.rs b/src/bot/freestyle.rs
-index 0a50093..6903726 100644
+index 0a50093..9f9946a 100644
 --- a/src/bot/freestyle.rs
 +++ b/src/bot/freestyle.rs
+@@ -23,9 +23,9 @@ impl Freestyle {
+ }
+ 
+ impl Mode for Freestyle {
+-    fn advance(&mut self, _options: &BotOptions, mv: Placement) -> Option<ModeSwitch> {
++    fn advance(&mut self, _options: &BotOptions, action: SearchAction) -> Option<ModeSwitch> {
+         puffin::profile_function!();
+-        self.dag.advance(mv);
++        self.dag.advance(action);
+         None
+     }
+ 
 @@ -54,7 +54,12 @@ impl Mode for Freestyle {
              let mut moves = EnumMap::default();
              {
                  puffin::profile_scope!("movegen");
 -                for piece in next_possibilities | state.reserve {
-+                let hold_pieces = if state.reserve_is_hold {
++                let hold_pieces = if state.reserve_is_hold && !state.hold_locked {
 +                    EnumSet::only(state.reserve)
 +                } else {
 +                    EnumSet::empty()
@@ -21,11 +76,61 @@ index 0a50093..6903726 100644
                  puffin::profile_scope!("eval");
                  for next in next_possibilities {
 -                    let moves = moves[next].iter().chain(if next == state.reserve {
-+                    let moves = moves[next].iter().chain(if !state.reserve_is_hold || next == state.reserve {
++                    let moves = moves[next].iter().chain(if !state.reserve_is_hold || state.hold_locked || next == state.reserve {
                          [].iter()
                      } else {
                          moves[state.reserve].iter()
-@@ -159,7 +164,7 @@ fn evaluate(
+@@ -78,12 +83,23 @@ impl Mode for Freestyle {
+ 
+                         children[next].push(ChildData {
+                             resulting_state: state,
+-                            mv,
++                            mv: SearchAction::Place(mv),
+                             eval,
+                             reward,
+                         });
+                     }
+ 
++                    if !state.reserve_is_hold && node.next_known() != Some(next)
++                    {
++                        let mut held = state;
++                        held.apply_search_action(next, SearchAction::InitialHold);
++                        children[next].push(ChildData {
++                            resulting_state: held,
++                            mv: SearchAction::InitialHold,
++                            eval: evaluate_board(&options.config.freestyle_weights, held),
++                            reward: Reward { value: 0.0.into() },
++                        });
++                    }
+                     new_stats.nodes += children[next].len() as u64;
+                 }
+             }
+@@ -123,11 +139,10 @@ pub struct Weights {
+ 
+ fn evaluate(
+     weights: &Weights,
+-    mut state: GameState,
++    state: GameState,
+     info: &PlacementInfo,
+     softdrop: u32,
+ ) -> (Eval, Reward) {
+-    let mut eval = 0.0;
+     let mut reward = 0.0;
+ 
+     // line clear rewards
+@@ -152,14 +167,16 @@ fn evaluate(
+     {
+         reward += weights.wasted_t;
+     }
+-    if state.back_to_back {
+-        eval += weights.has_back_to_back;
+-    }
+     reward += weights.softdrop * softdrop as f32;
++    (evaluate_board(weights, state), Reward { value: reward.into() })
++}
++
++fn evaluate_board(weights: &Weights, mut state: GameState) -> Eval {
++    let mut eval = if state.back_to_back { weights.has_back_to_back } else { 0.0 };
  
      // cutouts
      let cutout_count = state.bag.contains(Piece::T) as usize
@@ -34,22 +139,304 @@ index 0a50093..6903726 100644
          + (state.bag.len() <= 3) as usize;
      for _ in 0..cutout_count {
          let location =
+@@ -250,12 +267,7 @@ fn evaluate(
+     }
+     eval += row_transitions as f32 * weights.row_transitions;
+ 
+-    (
+-        Eval { value: eval.into() },
+-        Reward {
+-            value: reward.into(),
+-        },
+-    )
++    Eval { value: eval.into() }
+ }
+ 
+ fn well_known_tslot_left(board: &Board) -> Option<PieceLocation> {
+diff --git a/src/dag.rs b/src/dag.rs
+index fbe106e..30c890e 100644
+--- a/src/dag.rs
++++ b/src/dag.rs
+@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
+ use ouroboros::self_referencing;
+ 
+ use crate::data::Placement;
+-use crate::data::{GameState, Piece};
++use crate::data::{GameState, Piece, SearchAction};
+ 
+ mod known;
+ mod speculated;
+@@ -29,7 +29,7 @@ pub struct Selection<'a, E: Evaluation> {
+ 
+ pub struct ChildData<E: Evaluation> {
+     pub resulting_state: GameState,
+-    pub mv: Placement,
++    pub mv: SearchAction,
+     pub eval: E,
+     pub reward: E::Reward,
+ }
+@@ -55,7 +55,7 @@ enum LayerKind<'bump, E: Evaluation> {
+ 
+ #[derive(Clone, Copy, Debug)]
+ struct Child<E: Evaluation> {
+-    mv: Placement,
++    mv: SearchAction,
+     reward: E::Reward,
+     cached_eval: E,
+ }
+@@ -63,13 +63,13 @@ struct Child<E: Evaluation> {
+ enum SelectResult {
+     Failed,
+     Done,
+-    Advance(Piece, Placement),
++    Advance(Piece, SearchAction),
+ }
+ 
+ struct BackpropUpdate {
+     parent: u64,
+     speculation_piece: Piece,
+-    mv: Placement,
++    mv: SearchAction,
+     child: u64,
+ }
+ 
+@@ -90,10 +90,10 @@ impl<E: Evaluation> Dag<E> {
+         }
+     }
+ 
+-    pub fn advance(&mut self, mv: Placement) {
++    pub fn advance(&mut self, mv: SearchAction) {
+         puffin::profile_function!();
+         let top_layer = std::mem::take(&mut *self.top_layer);
+-        self.root.advance(
++        self.root.apply_search_action(
+             top_layer
+                 .kind
+                 .piece()
+@@ -119,7 +119,31 @@ impl<E: Evaluation> Dag<E> {
+ 
+     pub fn suggest(&self) -> Vec<Placement> {
+         puffin::profile_function!();
+-        self.top_layer.kind.suggest(&self.root)
++        let mut candidates = Vec::new();
++        for (action, eval) in self.top_layer.kind.suggest(&self.root) {
++            match action {
++                SearchAction::Place(mv) => candidates.push((mv, eval)),
++                SearchAction::InitialHold => {
++                    let next_layer = &self.top_layer.next_layer;
++                    let (Some(current), Some(next)) = (self.top_layer.kind.piece(), next_layer.kind.piece()) else {
++                        continue;
++                    };
++                    // TBP's play message identifies a hold by piece kind.
++                    if current == next {
++                        continue;
++                    }
++                    let mut held = self.root;
++                    held.apply_search_action(current, action);
++                    for (action, eval) in next_layer.kind.suggest(&held) {
++                        if let SearchAction::Place(mv) = action {
++                            candidates.push((mv, eval));
++                        }
++                    }
++                }
++            }
++        }
++        candidates.sort_by(|a, b| b.1.cmp(&a.1));
++        candidates.into_iter().map(|(mv, _)| mv).collect()
+     }
+ 
+     pub fn select(&self, speculate: bool, exploration: f64) -> Option<Selection<E>> {
+@@ -133,7 +157,7 @@ impl<E: Evaluation> Dag<E> {
+                 SelectResult::Failed => return None,
+                 SelectResult::Done => return Some(Selection { layers, game_state }),
+                 SelectResult::Advance(next, placement) => {
+-                    game_state.advance(next, placement);
++                    game_state.apply_search_action(next, placement);
+                     layers.push(&layer.next_layer);
+                 }
+             }
+@@ -146,6 +170,10 @@ impl<E: Evaluation> Selection<'_, E> {
+         (self.game_state, self.layers.last().unwrap().kind.piece())
+     }
+ 
++    pub fn next_known(&self) -> Option<Piece> {
++        self.layers.last().unwrap().next_layer.kind.piece()
++    }
++
+     pub fn expand(self, children: EnumMap<Piece, Vec<ChildData<E>>>) {
+         puffin::profile_function!();
+         let mut layers = self.layers;
+@@ -167,7 +195,7 @@ impl<E: Evaluation> Selection<'_, E> {
+     }
+ }
+ 
+-fn update_child<E: Evaluation>(list: &mut [Child<E>], placement: Placement, child_eval: E) -> bool {
++fn update_child<E: Evaluation>(list: &mut [Child<E>], placement: SearchAction, child_eval: E) -> bool {
+     let mut index = list
+         .iter()
+         .enumerate()
+@@ -246,7 +274,7 @@ impl<E: Evaluation> WithBump<E> {
+         })
+     }
+ 
+-    fn suggest(&self, state: &GameState) -> Vec<Placement> {
++    fn suggest(&self, state: &GameState) -> Vec<(SearchAction, E)> {
+         puffin::profile_function!();
+         self.with(|this| match this.data {
+             LayerKind::Known(l) => l.suggest(state),
+diff --git a/src/dag/known.rs b/src/dag/known.rs
+index 72fac62..47f1716 100644
+--- a/src/dag/known.rs
++++ b/src/dag/known.rs
+@@ -4,7 +4,7 @@ use bumpalo_herd::{Herd, Member};
+ use enum_map::EnumMap;
+ use rand::prelude::*;
+ 
+-use crate::data::{GameState, Piece, Placement};
++use crate::data::{GameState, Piece, SearchAction};
+ use crate::map::StateMap;
+ 
+ use super::{
+@@ -17,7 +17,7 @@ pub(super) struct Layer<'bump, E: Evaluation> {
+ }
+ 
+ pub(super) struct Node<'bump, E: Evaluation> {
+-    pub parents: &'bump [(u64, Placement, Piece)],
++    pub parents: &'bump [(u64, SearchAction, Piece)],
+     pub eval: E,
+     pub children: Option<&'bump mut [Child<E>]>,
+     pub expanding: AtomicBool,
+@@ -33,19 +33,20 @@ impl<'bump, E: Evaluation> Layer<'bump, E> {
+         });
+     }
+ 
+-    pub fn suggest(&self, state: &GameState) -> Vec<Placement> {
++    pub fn suggest(&self, state: &GameState) -> Vec<(SearchAction, E)> {
+         puffin::profile_function!();
+-        let node = self.states.get(state).unwrap();
++        let Some(node) = self.states.get(state) else { return vec![]; };
+         let children = match &node.children {
+             Some(children) => children,
+             None => return vec![],
+         };
+ 
+         let mut candidates: Vec<&_> = vec![];
+-        candidates.extend(children.first());
++        candidates.extend(children.iter().find(|c| matches!(c.mv, SearchAction::Place(_))));
++        candidates.extend(children.iter().find(|c| c.mv == SearchAction::InitialHold));
+         candidates.sort_by(|a, b| a.cached_eval.partial_cmp(&b.cached_eval).unwrap().reverse());
+ 
+-        candidates.into_iter().map(|c| c.mv).collect()
++        candidates.into_iter().map(|c| (c.mv, c.cached_eval)).collect()
+     }
+ 
+     pub fn select(&self, game_state: &GameState, exploration: f64) -> SelectResult {
+diff --git a/src/dag/speculated.rs b/src/dag/speculated.rs
+index 0b96014..132a205 100644
+--- a/src/dag/speculated.rs
++++ b/src/dag/speculated.rs
+@@ -6,7 +6,7 @@ use enum_map::EnumMap;
+ use enumset::EnumSet;
+ use rand::prelude::*;
+ 
+-use crate::data::{GameState, Piece, Placement};
++use crate::data::{GameState, Piece, SearchAction};
+ use crate::map::StateMap;
+ 
+ use super::{
+@@ -19,7 +19,7 @@ pub(super) struct Layer<'bump, E: Evaluation> {
+ }
+ 
+ pub(super) struct Node<'bump, E: Evaluation> {
+-    pub parents: &'bump [(u64, Placement, Piece)],
++    pub parents: &'bump [(u64, SearchAction, Piece)],
+     pub eval: E,
+     pub children: Option<PackedChildren<'bump, E>>,
+     pub expanding: AtomicBool,
+@@ -38,9 +38,9 @@ impl<'bump, E: Evaluation> Layer<'bump, E> {
+         });
+     }
+ 
+-    pub fn suggest(&self, state: &GameState) -> Vec<Placement> {
++    pub fn suggest(&self, state: &GameState) -> Vec<(SearchAction, E)> {
+         puffin::profile_function!();
+-        let node = self.states.get(state).unwrap();
++        let Some(node) = self.states.get(state) else { return vec![]; };
+         let children = match &node.children {
+             Some(children) => children,
+             None => return vec![],
+@@ -48,11 +48,12 @@ impl<'bump, E: Evaluation> Layer<'bump, E> {
+ 
+         let mut candidates: Vec<&_> = vec![];
+         for piece in state.bag {
+-            candidates.extend(children[piece].first());
++            candidates.extend(children[piece].iter().find(|c| matches!(c.mv, SearchAction::Place(_))));
++            candidates.extend(children[piece].iter().find(|c| c.mv == SearchAction::InitialHold));
+         }
+         candidates.sort_by(|a, b| a.cached_eval.partial_cmp(&b.cached_eval).unwrap().reverse());
+ 
+-        candidates.into_iter().map(|c| c.mv).collect()
++        candidates.into_iter().map(|c| (c.mv, c.cached_eval)).collect()
+     }
+ 
+     pub fn select(&self, game_state: &GameState, exploration: f64) -> SelectResult {
 diff --git a/src/data.rs b/src/data.rs
-index 0c00ba6..22dd5be 100644
+index 0c00ba6..3f5af21 100644
 --- a/src/data.rs
 +++ b/src/data.rs
-@@ -13,6 +13,9 @@ pub struct GameState {
+@@ -13,6 +13,10 @@ pub struct GameState {
      pub board: Board,
      pub bag: EnumSet<Piece>,
      pub reserve: Piece,
 +    /// True when `reserve` is the hold slot; false when the hold is empty
 +    /// (`reserve` is then a placeholder and must not be offered as a hold).
 +    pub reserve_is_hold: bool,
++    pub hold_locked: bool,
      pub back_to_back: bool,
      pub combo: u8,
  }
-@@ -291,6 +294,7 @@ impl GameState {
+@@ -33,6 +37,12 @@ pub struct Placement {
+     pub spin: Spin,
+ }
+ 
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
++pub(crate) enum SearchAction {
++    Place(Placement),
++    InitialHold,
++}
++
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+ pub struct PlacementInfo {
+     pub placement: Placement,
+@@ -284,13 +294,33 @@ impl Board {
+ }
+ 
+ impl GameState {
+-    pub fn advance(&mut self, next: Piece, placement: Placement) -> PlacementInfo {
++    fn consume(&mut self, next: Piece) {
+         self.bag.remove(next);
+         if self.bag.is_empty() {
+             self.bag = EnumSet::all();
          }
++    }
++
++    pub(crate) fn apply_search_action(&mut self, next: Piece, action: SearchAction) {
++        match action {
++            SearchAction::Place(placement) => { self.advance(next, placement); }
++            SearchAction::InitialHold => {
++                debug_assert!(!self.reserve_is_hold);
++                self.consume(next);
++                self.reserve = next;
++                self.reserve_is_hold = true;
++                self.hold_locked = true;
++            }
++        }
++    }
++
++    pub fn advance(&mut self, next: Piece, placement: Placement) -> PlacementInfo {
++        self.consume(next);
++        debug_assert!(!self.hold_locked || placement.location.piece == next);
++        self.hold_locked = false;
          if placement.location.piece != next {
              self.reserve = next;
 +            self.reserve_is_hold = true;
@@ -57,10 +444,17 @@ index 0c00ba6..22dd5be 100644
          self.board.place(placement.location);
          let cleared_mask = self.board.line_clears();
 diff --git a/src/lib.rs b/src/lib.rs
-index dfa2cb0..2f02f29 100644
+index dfa2cb0..1a43116 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -7,7 +7,7 @@ use futures::prelude::*;
+@@ -1,5 +1,6 @@
+ use std::convert::Infallible;
+ use std::sync::Arc;
++use std::time::Duration;
+ 
+ use bot::{BotConfig, BotOptions};
+ use enumset::EnumSet;
+@@ -7,7 +8,7 @@ use futures::prelude::*;
  use tbp::Randomizer;
  
  use crate::bot::Bot;
@@ -69,7 +463,38 @@ index dfa2cb0..2f02f29 100644
  use crate::sync::BotSyncronizer;
  use crate::tbp::{BotMessage, FrontendMessage};
  
-@@ -89,8 +89,12 @@ pub async fn run(
+@@ -25,17 +26,28 @@ pub async fn run(
+     mut outgoing: impl Sink<BotMessage, Error = Infallible> + Unpin,
+     config: Arc<BotConfig>,
+ ) {
++    let think_ms = std::env::var_os("INTETRIGENCE_TBP_THINK_MS").map(|raw| {
++        raw.to_str()
++            .and_then(|raw| raw.parse::<u64>().ok())
++            .filter(|ms| (1..=10_000).contains(ms))
++            .unwrap_or_else(|| {
++                eprintln!("INTETRIGENCE_TBP_THINK_MS must be an integer between 1 and 10000");
++                std::process::exit(2);
++            })
++    });
++    let feature = think_ms.map(|ms| format!("intetrigence-request-window-v1:{ms}"));
++    let features = feature.into_iter().collect();
+     outgoing
+         .send(BotMessage::Info {
+             name: "Cold Clear 2",
+             version: concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_HASH")),
+             author: "MinusKelvin",
+-            features: &[],
++            features,
+         })
+         .await
+         .unwrap();
+ 
+-    let bot = Arc::new(BotSyncronizer::new());
++    let bot = Arc::new(BotSyncronizer::new(think_ms.map(Duration::from_millis)));
+ 
+     spawn_workers(&bot);
+ 
+@@ -89,8 +101,12 @@ pub async fn run(
      }
  }
  
@@ -84,11 +509,12 @@ index dfa2cb0..2f02f29 100644
  
      let speculate = matches!(start.randomizer, Randomizer::SevenBag { .. });
      let bag = match start.randomizer {
-@@ -108,6 +112,7 @@ fn create_bot(mut start: tbp::Start, config: Arc<BotConfig>) -> Bot {
+@@ -108,6 +124,8 @@ fn create_bot(mut start: tbp::Start, config: Arc<BotConfig>) -> Bot {
  
      let state = GameState {
          reserve,
 +        reserve_is_hold,
++        hold_locked: false,
          back_to_back: start.back_to_back,
          combo: start.combo.try_into().unwrap_or(255),
          bag,
@@ -114,3 +540,122 @@ index 59ce9f2..b7b9b77 100644
          };
          if collision_map.obstructed(spawned) {
              spawned.y += 1;
+diff --git a/src/sync.rs b/src/sync.rs
+index 89540ac..7c1a36c 100644
+--- a/src/sync.rs
++++ b/src/sync.rs
+@@ -1,4 +1,4 @@
+-use std::time::Instant;
++use std::time::{Duration, Instant};
+ 
+ use parking_lot::{Condvar, Mutex, RwLock};
+ 
+@@ -9,20 +9,24 @@ use crate::tbp::MoveInfo;
+ pub struct BotSyncronizer {
+     state: Mutex<State>,
+     blocker: Condvar,
++    search_budget: Option<Duration>,
+     bot: RwLock<Option<Bot>>,
+ }
+ 
+ impl BotSyncronizer {
+-    pub fn new() -> Self {
++    pub fn new(search_budget: Option<Duration>) -> Self {
+         BotSyncronizer {
+             state: Mutex::new(State {
+                 stats: Default::default(),
+                 last_advance: Instant::now(),
++                deadline: None,
++                in_flight: false,
+                 node_limit: u64::MAX,
+                 start: Instant::now(),
+                 nodes_since_start: 0,
+             }),
+             blocker: Condvar::new(),
++            search_budget,
+             bot: RwLock::new(None),
+         }
+     }
+@@ -41,13 +45,27 @@ impl BotSyncronizer {
+     }
+ 
+     pub fn suggest(&self) -> Option<(Vec<Placement>, MoveInfo)> {
++        let mut state = self.state.lock();
++        let started = Instant::now();
++        if let Some(budget) = self.search_budget {
++            let deadline = started + budget;
++            state.deadline = Some(deadline);
++            self.blocker.notify_all();
++            while Instant::now() < deadline {
++                self.blocker.wait_until(&mut state, deadline);
++            }
++            state.deadline = None;
++            while state.in_flight {
++                self.blocker.wait(&mut state);
++            }
++        }
+         let bot = self.bot.read();
+         bot.as_ref().map(|bot| {
+-            let state = self.state.lock();
+             let suggestion = bot.suggest();
++            let sample = if self.search_budget.is_some() { started } else { state.last_advance };
+             let info = MoveInfo {
+                 nodes: state.stats.nodes,
+-                nps: state.stats.nodes as f64 / state.last_advance.elapsed().as_secs_f64(),
++                nps: state.stats.nodes as f64 / sample.elapsed().as_secs_f64(),
+                 extra: format!(
+                     "{:.1}% of selections expanded, overall speed: {:.1} Mnps",
+                     state.stats.expansions as f64 / state.stats.selections as f64 * 100.0,
+@@ -80,7 +98,10 @@ impl BotSyncronizer {
+     pub fn work_loop(&self) {
+         let mut state = self.state.lock();
+         loop {
+-            if state.stats.nodes > state.node_limit {
++            if state.stats.nodes > state.node_limit
++                || (self.search_budget.is_some()
++                    && !state.deadline.is_some_and(|deadline| Instant::now() < deadline))
++            {
+                 self.blocker.wait(&mut state);
+                 continue;
+             }
+@@ -94,6 +115,7 @@ impl BotSyncronizer {
+                 }
+             };
+ 
++            state.in_flight = true;
+             drop(state);
+             let new_stats = bot.do_work();
+             drop(bot_guard);
+@@ -101,6 +123,10 @@ impl BotSyncronizer {
+             state = self.state.lock();
+             state.stats.accumulate(new_stats);
+             state.nodes_since_start += new_stats.nodes;
++            state.in_flight = false;
++            if self.search_budget.is_some() && state.deadline.is_none() {
++                self.blocker.notify_all();
++            }
+         }
+     }
+ }
+@@ -109,6 +135,8 @@ impl BotSyncronizer {
+ struct State {
+     stats: Statistics,
+     last_advance: Instant,
++    deadline: Option<Instant>,
++    in_flight: bool,
+     node_limit: u64,
+     start: Instant,
+     nodes_since_start: u64,
+diff --git a/src/tbp.rs b/src/tbp.rs
+index 60a0dd9..8045d54 100644
+--- a/src/tbp.rs
++++ b/src/tbp.rs
+@@ -31,7 +31,7 @@ pub enum BotMessage {
+         name: &'static str,
+         version: &'static str,
+         author: &'static str,
+-        features: &'static [&'static str],
++        features: Vec<String>,
+     },
+     Ready,
+     Suggestion {

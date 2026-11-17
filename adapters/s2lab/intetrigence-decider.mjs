@@ -3,44 +3,61 @@
 // The lab calls `decide(decision)` once per lock. One bridge process serves the
 // whole match, so what we measure is the search, not process startup.
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { createInterface } from "node:readline";
 
 export async function createIntetrigenceDecider(bridgePath, { log = null } = {}) {
   const child = spawn(bridgePath, [], { stdio: ["pipe", "pipe", "inherit"] });
   const lines = createInterface({ input: child.stdout });
-  const pending = [];
+  let pending;
+  let failure;
+  function finish(error, line) {
+    const request = pending;
+    pending = undefined;
+    if (!request) return;
+    clearTimeout(request.timer);
+    if (error) request.reject(error);
+    else request.resolve(line);
+  }
+  function fail(error) {
+    failure ??= error;
+    finish(failure);
+  }
+  child.on("error", fail);
+  child.stdin.on("error", fail);
+  child.on("exit", (code, signal) => fail(new Error(`bridge exited: ${signal ?? code}`)));
   lines.on("line", (line) => {
-    const resolve = pending.shift();
-    if (resolve) resolve(line);
+    if (pending) finish(undefined, line);
   });
-  let closed = false;
-  child.on("exit", () => {
-    closed = true;
-    while (pending.length) pending.shift()("__closed__");
-  });
+  await once(child, "spawn");
 
   const ask = (payload) =>
     new Promise((resolve, reject) => {
-      if (closed) return reject(new Error("bridge closed"));
-      pending.push(resolve);
-      child.stdin.write(`${JSON.stringify(payload)}\n`);
+      if (failure) return reject(failure);
+      if (pending) return reject(new Error("a bridge decision is already pending"));
+      const timer = setTimeout(() => {
+        fail(new Error("bridge decision timed out after 30 seconds"));
+        child.kill();
+      }, 30_000);
+      pending = { resolve, reject, timer };
+      child.stdin.write(`${JSON.stringify(payload)}\n`, (error) => {
+        if (error) fail(error);
+      });
     });
 
   return {
     profileId: "intetrigence",
     async decide(decision) {
       const reply = await ask(decision);
-      if (reply === "__closed__") throw new Error("bridge closed mid-match");
       const parsed = JSON.parse(reply);
       if (parsed.error) throw new Error(`bridge: ${parsed.error}`);
       if (log) log.push(parsed);
       return parsed;
     },
     async close() {
-      if (!closed) {
-        child.stdin.end();
-        child.kill();
-      }
+      lines.close();
+      child.stdin.end();
+      if (child.exitCode === null && child.signalCode === null) child.kill();
     },
   };
 }

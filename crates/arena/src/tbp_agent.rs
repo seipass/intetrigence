@@ -24,6 +24,7 @@ use crate::engine::{View, board_hash};
 pub struct TbpAgentConfig {
     pub host: HostConfig,
     pub commit: Option<String>,
+    pub build_id: Option<String>,
     pub bun_version: Option<String>,
     /// `ATTAX_TBP_LOG` output path for this game.
     pub decision_log: Option<PathBuf>,
@@ -33,6 +34,7 @@ pub struct TbpAgentConfig {
     pub visible_rows: u32,
     /// Whether the bot's input set includes 180-degree rotations (attax: no).
     pub supports_180: bool,
+    pub request_window_ms: Option<u64>,
     /// Delay before each `suggest`, giving a continuously-searching bot a
     /// budget (CC2/clys have no think-time option). Included in `think_ms`.
     pub suggest_delay_ms: u64,
@@ -50,16 +52,43 @@ impl TbpAgentConfig {
         Self {
             host,
             commit: None,
+            build_id: None,
             bun_version: None,
             decision_log: None,
             name: None,
             visible_rows: 40,
             supports_180: true,
+            request_window_ms: None,
             suggest_delay_ms: 0,
             retry_empty_suggest_ms: 0,
             transcript: None,
         }
     }
+}
+
+pub(crate) fn spawn_with_request_window(
+    mut config: HostConfig,
+    request_window_ms: Option<u64>,
+) -> Result<Host, AgentError> {
+    if let Some(ms) = request_window_ms {
+        config
+            .env
+            .retain(|(key, _)| key != "INTETRIGENCE_TBP_THINK_MS");
+        config
+            .env
+            .push(("INTETRIGENCE_TBP_THINK_MS".into(), ms.to_string()));
+    }
+    let host = Host::spawn(config).map_err(|error| AgentError::Io(error.to_string()))?;
+    if let Some(ms) = request_window_ms {
+        let feature = format!("intetrigence-request-window-v1:{ms}");
+        if !host.info.features.contains(&feature) {
+            return Err(AgentError::Protocol(format!(
+                "{} did not confirm the {ms} ms request search window",
+                host.info.name
+            )));
+        }
+    }
+    Ok(host)
 }
 
 pub struct TbpAgent {
@@ -83,7 +112,11 @@ pub struct TbpAgent {
 }
 
 impl TbpAgent {
-    pub fn new(config: TbpAgentConfig) -> Self {
+    pub fn new(mut config: TbpAgentConfig) -> Self {
+        if config.request_window_ms.is_some() {
+            config.suggest_delay_ms = 0;
+            config.retry_empty_suggest_ms = 0;
+        }
         let transcript = config.transcript.clone();
         let descriptor = BotDescriptor {
             name: config.name.clone().unwrap_or_else(|| "tbp-bot".into()),
@@ -91,13 +124,16 @@ impl TbpAgent {
             commit: config.commit.clone(),
             visible_rows: config.visible_rows,
             supports_180: config.supports_180,
-            build_id: None,
+            build_id: config.build_id.clone(),
             threads: None,
             suggest_delay_ms: Some(config.suggest_delay_ms),
             retry_empty_suggest_ms: Some(config.retry_empty_suggest_ms),
             args: {
                 let mut args = vec![config.host.program.clone()];
                 args.extend(config.host.args.clone());
+                if let Some(ms) = config.request_window_ms {
+                    args.push(format!("request_window_ms={ms}"));
+                }
                 args
             },
         };
@@ -212,8 +248,7 @@ impl Agent for TbpAgent {
                 .push(("ATTAX_TBP_LOG".into(), path.display().to_string()));
             self.decision_log = Some(path.display().to_string());
         }
-        let mut host =
-            Host::spawn(host_config).map_err(|error| AgentError::Io(error.to_string()))?;
+        let mut host = spawn_with_request_window(host_config, self.config.request_window_ms)?;
         self.descriptor.name = host.info.name.clone();
         self.descriptor.version = Some(host.info.version.clone());
         self.info_author = host.info.author.clone();
@@ -273,12 +308,12 @@ impl Agent for TbpAgent {
             }
         }
         let delay = self.config.suggest_delay_ms;
+        let started = std::time::Instant::now();
         if delay > 0 {
             std::thread::sleep(std::time::Duration::from_millis(delay));
         }
         let retry_ms = self.config.retry_empty_suggest_ms;
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(retry_ms);
-        let mut total_think = 0.0;
         let payload = loop {
             let host = self
                 .host
@@ -287,17 +322,16 @@ impl Agent for TbpAgent {
             let payload = host
                 .suggest()
                 .map_err(|error| AgentError::Io(error.to_string()))?;
-            total_think += host.think_ms.last().copied().unwrap_or(0.0);
             if !payload.moves.is_empty() || retry_ms == 0 || std::time::Instant::now() >= deadline {
                 break payload;
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
         };
+        let think_ms = started.elapsed().as_secs_f64() * 1000.0;
         transcript_log(
             self.transcript.as_deref(),
             serde_json::json!({"type": "suggestion", "payload": &payload}),
         );
-        let think_ms = delay as f64 + total_think;
         let (nodes, extra_ms) = match &payload.move_info {
             Some(info) => {
                 self.suggestions_with_stats += 1;
@@ -316,6 +350,7 @@ impl Agent for TbpAgent {
             .map(|mv| Candidate {
                 piece: mv.location.kind.to_core(),
                 cells: location_cells(&mv.location),
+                used_hold: None,
                 claimed_spin: Some(mv.spin.to_core()),
                 claimed_attack: None,
             })

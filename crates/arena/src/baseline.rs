@@ -102,6 +102,7 @@ impl BaselineBot {
                     Candidate {
                         piece: placement.kind,
                         cells: placement.cells,
+                        used_hold: Some(placement.hold),
                         claimed_spin: Some(placement.spin),
                         claimed_attack: Some(attack.total),
                     },

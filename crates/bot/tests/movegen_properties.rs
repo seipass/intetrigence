@@ -277,7 +277,11 @@ fn classify_independent(
         .map(|&(dx, dy)| corner_filled_independent(board, piece.x + dx, piece.y + dy))
         .collect();
     if filled.iter().filter(|&&f| f).count() < 3 {
-        return SpinType::None;
+        return if immobile_independent(board, piece) {
+            SpinType::Mini
+        } else {
+            SpinType::None
+        };
     }
     let (nx, ny) = t_nub_direction(piece);
     let front = corners

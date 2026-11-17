@@ -8,12 +8,9 @@
 //! - **Hold**: every node expands both "place the current piece" and "use
 //!   hold". With an empty hold the swap consumes two sequence entries, which
 //!   is exactly the game rule.
-//! - **Bag prediction**: the known pieces are the current piece plus the five
-//!   preview pieces. Beyond them the 7-bag is inferred (the pieces of the
-//!   current bag that have not appeared yet, then whole bags in canonical
-//!   order), so the search can reach the configured depth of eight plies.
-//!   Predicted plies are discounted, so they only break ties among lines that
-//!   are already good on the known pieces.
+//! - **Queue horizon**: placement search uses the current piece and the
+//!   actual preview. With empty hold, leave one preview piece available so
+//!   both hold and no-hold lines can be compared at the same lock depth.
 //! - **Transposition graph**: children are keyed by `(board, sequence
 //!   position, hold, b2b, combo, pieces placed)`. A child that is no better
 //!   than an already-seen state is dropped, so different piece orders that
@@ -31,14 +28,17 @@
 //!   transposition table and truncates, so the answer does not depend on the
 //!   thread count.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use intetrigence_core::{ALL_PIECES, Board, PieceKind};
+use intetrigence_core::constants::{
+    GARBAGE_INCREASE_PER_FRAME, GARBAGE_MARGIN_FRAMES, GARBAGE_SPEED_FRAMES,
+};
+use intetrigence_core::{ActivePiece, Board, GarbagePacket, PieceKind};
 
-use crate::eval::{EvalContext, Weights, apply_placement, leaf_value, t_slot_lines};
-use crate::movegen::{Movegen, Placement};
+use crate::eval::{EvalContext, GARBAGE_CAP, Weights, apply_placement, leaf_value, t_slot_lines};
+use crate::movegen::{Movegen, Placement, spawn_piece};
 
 /// Maximum worker threads (PLAN §7: default 8, the physical core count).
 pub const MAX_THREADS: usize = 8;
@@ -154,43 +154,18 @@ pub struct SearchResult {
     pub line: Vec<Move>,
 }
 
-/// The piece sequence: known pieces plus bag prediction.
+/// The active piece followed by the visible preview.
 #[derive(Clone, Debug)]
 pub struct PieceSequence {
     pieces: Vec<PieceKind>,
-    known: usize,
 }
 
 impl PieceSequence {
-    /// `current` followed by `preview`, extended by bag prediction to at least
-    /// `min_len` pieces.
-    pub fn new(current: PieceKind, preview: &[PieceKind], min_len: usize) -> Self {
-        let mut pieces = Vec::with_capacity(min_len.max(preview.len() + 1));
+    pub fn new(current: PieceKind, preview: &[PieceKind]) -> Self {
+        let mut pieces = Vec::with_capacity(preview.len() + 1);
         pieces.push(current);
         pieces.extend_from_slice(preview);
-        let known = pieces.len();
-
-        // Infer the rest of the current bag: walk the known pieces and remove
-        // them from the bag; a repeat means a new bag started.
-        let mut bag: Vec<PieceKind> = ALL_PIECES.to_vec();
-        for &piece in &pieces {
-            match bag.iter().position(|&candidate| candidate == piece) {
-                Some(index) => {
-                    bag.remove(index);
-                }
-                None => {
-                    bag = ALL_PIECES.to_vec();
-                    bag.retain(|&candidate| candidate != piece);
-                }
-            }
-        }
-        while pieces.len() < min_len {
-            if bag.is_empty() {
-                bag = ALL_PIECES.to_vec();
-            }
-            pieces.push(bag.remove(0));
-        }
-        Self { pieces, known }
+        Self { pieces }
     }
 
     pub fn get(&self, index: usize) -> Option<PieceKind> {
@@ -205,11 +180,6 @@ impl PieceSequence {
         self.pieces.is_empty()
     }
 
-    /// How many pieces came from the preview rather than prediction.
-    pub fn known(&self) -> usize {
-        self.known
-    }
-
     /// T pieces from `next` onwards, plus the hold slot.
     fn t_available(&self, next: usize, hold: Option<PieceKind>) -> usize {
         let held = usize::from(hold == Some(PieceKind::T));
@@ -217,6 +187,97 @@ impl PieceSequence {
             .iter()
             .filter(|&&piece| piece == PieceKind::T)
             .count()
+    }
+}
+
+/// Lock cadence and the eligibility frames of already queued rows. No hole RNG
+/// or future opponent attacks are visible to this model.
+pub struct SearchTiming {
+    frame: u64,
+    frames_per_lock: u64,
+    arrivals: Vec<(u64, u32)>,
+}
+
+impl SearchTiming {
+    pub fn from_queue(frame: u64, frames_per_lock: u64, packets: &[GarbagePacket]) -> Self {
+        let arrivals = packets
+            .iter()
+            .map(|p| {
+                (
+                    p.arrival_frame.saturating_add(GARBAGE_SPEED_FRAMES),
+                    p.amount,
+                )
+            })
+            .collect();
+        Self {
+            frame,
+            frames_per_lock,
+            arrivals,
+        }
+    }
+
+    /// The Lab uses zero extra delivery delay. Visible pending packets must
+    /// therefore mature within one garbage-speed interval after this snapshot.
+    /// The first lock can use only the published due (cap-limited) count.
+    pub fn from_lab(frame: u64, frames_per_lock: u64, pending: u32, due: u32) -> Self {
+        Self {
+            frame,
+            frames_per_lock,
+            arrivals: vec![
+                (frame, due),
+                (
+                    frame.saturating_add(GARBAGE_SPEED_FRAMES),
+                    pending.saturating_sub(due),
+                ),
+            ],
+        }
+    }
+
+    fn forecast(&self, depth: usize, root_multiplier: f64) -> Vec<LockForecast> {
+        let mut frame = self.frame;
+        let mut multiplier = root_multiplier.max(1.0);
+        let mut locks = Vec::with_capacity(depth + 1);
+        for _ in 0..=depth {
+            let eligible = self
+                .arrivals
+                .iter()
+                .filter(|(due, _)| *due <= frame)
+                .map(|(_, rows)| *rows)
+                .sum();
+            locks.push(LockForecast {
+                eligible,
+                multiplier,
+            });
+            let next_frame = frame.saturating_add(self.frames_per_lock);
+            for _ in frame.max(GARBAGE_MARGIN_FRAMES)..next_frame {
+                multiplier += GARBAGE_INCREASE_PER_FRAME;
+            }
+            frame = next_frame;
+        }
+        locks
+    }
+}
+
+struct LockForecast {
+    eligible: u32,
+    multiplier: f64,
+}
+
+struct SearchInput {
+    sequence: PieceSequence,
+    locks: Vec<LockForecast>,
+    initial_incoming: u32,
+}
+
+impl SearchInput {
+    fn context_at(&self, level: usize, mut context: EvalContext) -> EvalContext {
+        if let Some(lock) = self.locks.get(level) {
+            // Cancellation and insertion both consume the prefix of the queue.
+            let removed = self.initial_incoming.saturating_sub(context.incoming);
+            context.arrived = lock.eligible.saturating_sub(removed).min(context.incoming);
+            context.multiplier = lock.multiplier;
+        }
+        context
     }
 }
 
@@ -229,8 +290,13 @@ struct NodeRecord {
     /// The root move that leads to this node (`None` for the root).
     first: Option<Move>,
     board: Board,
+    /// The active piece, including any Clutch push-up.
+    active: Option<ActivePiece>,
+    terminal: bool,
+    visible_ceiling: bool,
     next: usize,
     hold: Option<PieceKind>,
+    can_hold: bool,
     context: EvalContext,
     /// Discounted reward accumulated up to this node.
     reward: f64,
@@ -246,6 +312,8 @@ struct Child {
     hold_used: bool,
     placement: Placement,
     board: Board,
+    active: Option<ActivePiece>,
+    terminal: bool,
     next: usize,
     hold: Option<PieceKind>,
     context: EvalContext,
@@ -268,18 +336,52 @@ struct Job {
 pub struct Searcher {
     config: SearchConfig,
     movegen: Movegen,
+    allowed_roots: Option<HashSet<RootMoveKey>>,
 }
+
+/// The observable parts of a placement used by the s2-bot-lab referee.
+pub type RootMoveKey = (PieceKind, bool, bool, [(i32, i32); 4]);
 
 impl Searcher {
     pub fn new(config: SearchConfig) -> Self {
         Self {
             config,
             movegen: Movegen::new(),
+            allowed_roots: None,
         }
     }
 
     pub fn config(&self) -> &SearchConfig {
         &self.config
+    }
+
+    /// Search under the Lab's visible-ceiling rule, limiting the first lock
+    /// to placements its referee can witness.
+    pub fn search_with_roots(
+        &mut self,
+        root: &RootState,
+        allowed_roots: HashSet<RootMoveKey>,
+        timing: Option<&SearchTiming>,
+    ) -> Option<SearchResult> {
+        self.allowed_roots = Some(allowed_roots);
+        let result = self.search_position(root, spawn_piece(root.current), true, true, timing);
+        self.allowed_roots = None;
+        result
+    }
+
+    fn retain_allowed_roots(&self, children: &mut Vec<Child>) {
+        if let Some(allowed) = &self.allowed_roots {
+            children.retain(|child| {
+                let mut cells = child.placement.cells();
+                cells.sort_unstable();
+                allowed.contains(&(
+                    child.piece,
+                    child.hold_used,
+                    child.placement.spin_entry,
+                    cells,
+                ))
+            });
+        }
     }
 
     /// Runs the anytime loop and returns the best move found.
@@ -288,14 +390,62 @@ impl Searcher {
     /// (the spawn is blocked, i.e. the game is already over). A referee should
     /// check for top-out before asking, but the search never panics on it.
     pub fn search(&mut self, root: &RootState) -> Option<SearchResult> {
-        if self.config.deterministic {
-            return self.search_fixed(root);
-        }
+        self.search_from(root, spawn_piece(root.current), true)
+    }
+
+    /// Search from the active piece provided by the referee. Hold, when
+    /// available, still spawns the swapped piece at its standard position.
+    pub fn search_from(
+        &mut self,
+        root: &RootState,
+        active: ActivePiece,
+        can_hold: bool,
+    ) -> Option<SearchResult> {
+        self.search_position(root, active, can_hold, false, None)
+    }
+
+    pub fn search_timed_from(
+        &mut self,
+        root: &RootState,
+        active: ActivePiece,
+        can_hold: bool,
+        timing: &SearchTiming,
+    ) -> Option<SearchResult> {
+        self.search_position(root, active, can_hold, false, Some(timing))
+    }
+
+    fn search_position(
+        &mut self,
+        root: &RootState,
+        active: ActivePiece,
+        can_hold: bool,
+        visible_ceiling: bool,
+        timing: Option<&SearchTiming>,
+    ) -> Option<SearchResult> {
         let start = Instant::now();
+        debug_assert_eq!(root.current, active.kind);
+        let sequence = PieceSequence::new(active.kind, &root.preview);
+        // The first empty-hold swap consumes one extra visible piece, even if
+        // the swap happens later in the line. With no preview the current
+        // piece is still playable and empty hold never expands.
+        let horizon = sequence.len() - usize::from(root.hold.is_none());
+        let max_depth = self.config.depth.clamp(1, horizon.max(1));
+        let input = &SearchInput {
+            sequence,
+            locks: timing.map_or_else(Vec::new, |timing| {
+                timing.forecast(max_depth, root.context.multiplier)
+            }),
+            initial_incoming: root.context.incoming,
+        };
+        let mut root = root_record(root, active, can_hold, visible_ceiling);
+        root.context = input.context_at(0, root.context);
+        let root = &root;
+        if self.config.deterministic {
+            return self.search_fixed(root, input, max_depth, start);
+        }
         // Leave a small margin for the final merge, which happens after the
         // last deadline check, so the wall-clock time stays inside the budget.
         let deadline = start + self.config.budget.mul_f32(0.95);
-        let max_depth = self.config.depth.max(1);
         // Iterative deepening: start shallow enough that the first iteration
         // almost always completes, then grow the depth, then widen the beam,
         // then grow the depth again. The previous version only widened a fixed
@@ -306,11 +456,10 @@ impl Searcher {
         let mut width = self.config.width.max(1);
         let mut iterations = 0usize;
         loop {
-            let sequence = PieceSequence::new(root.current, &root.preview, depth);
             let outcome = if self.config.threads <= 1 {
-                self.run_sequential(root, &sequence, depth, width, deadline)
+                self.run_sequential(root, input, depth, width, deadline)
             } else {
-                self.run_parallel(root, &sequence, depth, width, deadline)
+                self.run_parallel(root, input, depth, width, deadline)
             };
             let Some((nodes, candidates, line, completed)) = outcome else {
                 break;
@@ -351,7 +500,7 @@ impl Searcher {
         }
 
         best.or_else(|| {
-            self.greedy(root, start).map(|mut result| {
+            self.greedy(root, input, start).map(|mut result| {
                 result.fallback = true;
                 result.iterations = 0;
                 result
@@ -364,11 +513,14 @@ impl Searcher {
     /// The beam is deterministic (children are merged in chunk order and
     /// `commit` sorts by value), so the same position always yields the same
     /// move regardless of thread timing.
-    fn search_fixed(&mut self, root: &RootState) -> Option<SearchResult> {
-        let start = Instant::now();
-        let depth = self.config.depth.max(1);
+    fn search_fixed(
+        &mut self,
+        root: &NodeRecord,
+        input: &SearchInput,
+        depth: usize,
+        start: Instant,
+    ) -> Option<SearchResult> {
         let width = self.config.width.max(1);
-        let sequence = PieceSequence::new(root.current, &root.preview, depth);
         // No wall-clock stop at all. A fixed schedule is its own work bound
         // (`depth * width * placements per node`), which is a function of the
         // position, not of the machine. Stopping on the clock would make the
@@ -383,11 +535,11 @@ impl Searcher {
         // boundary, so a level that does not fit the budget is detected there.
         let level_start = Instant::now();
         let outcome = if self.config.threads <= 1 {
-            self.run_sequential(root, &sequence, depth, width, deadline)
+            self.run_sequential(root, input, depth, width, deadline)
         } else {
             self.run_parallel_with(
                 root,
-                &sequence,
+                input,
                 depth,
                 width,
                 deadline,
@@ -399,7 +551,7 @@ impl Searcher {
         // timing without threading a clock through the job loop.
         let max_level_time = level_start.elapsed();
         let Some((nodes, candidates, line, completed)) = outcome else {
-            return self.greedy(root, start).map(|mut result| {
+            return self.greedy(root, input, start).map(|mut result| {
                 result.fallback = true;
                 result.iterations = 0;
                 result
@@ -429,21 +581,25 @@ impl Searcher {
 
     /// One-ply fallback that always returns a move unless the piece cannot be
     /// placed anywhere.
-    fn greedy(&mut self, root: &RootState, start: Instant) -> Option<SearchResult> {
-        let sequence = PieceSequence::new(root.current, &root.preview, 2);
-        let node = root_record(root);
+    fn greedy(
+        &mut self,
+        root: &NodeRecord,
+        input: &SearchInput,
+        start: Instant,
+    ) -> Option<SearchResult> {
         let mut children = Vec::new();
         let mut movegen = std::mem::take(&mut self.movegen);
         expand_node(
             &mut movegen,
             0,
-            &node,
+            root,
             0,
-            &sequence,
+            input,
             &self.config.weights,
             &mut children,
         );
         self.movegen = movegen;
+        self.retain_allowed_roots(&mut children);
         children
             .sort_unstable_by(|a, b| b.value.total_cmp(&a.value).then_with(|| a.key.cmp(&b.key)));
         let child = children.first()?;
@@ -473,14 +629,15 @@ impl Searcher {
 
     fn run_sequential(
         &mut self,
-        root: &RootState,
-        sequence: &PieceSequence,
+        root: &NodeRecord,
+        input: &SearchInput,
         depth: usize,
         width: usize,
         deadline: Instant,
     ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
-        let mut arena = vec![root_record(root)];
+        let mut arena = vec![root.clone()];
         let mut beam = vec![0u32];
+        let mut terminal = Vec::new();
         let mut transposition = HashMap::new();
         let mut nodes = 0u64;
 
@@ -505,7 +662,7 @@ impl Searcher {
                     node_id,
                     &node,
                     level,
-                    sequence,
+                    input,
                     &self.config.weights,
                     &mut children,
                 );
@@ -516,29 +673,37 @@ impl Searcher {
             if Instant::now() >= deadline {
                 break;
             }
+            if level == 0 {
+                self.retain_allowed_roots(&mut children);
+            }
             let next = commit(&mut arena, children, width, &mut transposition);
             if next.is_empty() {
                 break;
             }
             beam = next;
+            collect_terminal_nodes(&arena, &mut beam, &mut terminal);
             completed = level + 1;
+            if beam.is_empty() {
+                break;
+            }
         }
         if completed == 0 {
             return None;
         }
+        beam.extend(terminal);
         let (nodes, candidates, line) = finish(&arena, &beam, nodes);
         Some((nodes, candidates, line, completed))
     }
 
     fn run_parallel(
         &mut self,
-        root: &RootState,
-        sequence: &PieceSequence,
+        root: &NodeRecord,
+        input: &SearchInput,
         depth: usize,
         width: usize,
         deadline: Instant,
     ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
-        self.run_parallel_with(root, sequence, depth, width, deadline, deadline)
+        self.run_parallel_with(root, input, depth, width, deadline, deadline)
     }
 
     /// [`Searcher::run_parallel`] with a separate deadline for the workers.
@@ -549,8 +714,8 @@ impl Searcher {
     /// stop mid-level, which is why the per-level time has to fit the budget.
     fn run_parallel_with(
         &mut self,
-        root: &RootState,
-        sequence: &PieceSequence,
+        root: &NodeRecord,
+        input: &SearchInput,
         depth: usize,
         width: usize,
         deadline: Instant,
@@ -558,8 +723,9 @@ impl Searcher {
     ) -> Option<(u64, Vec<Candidate>, Vec<Move>, usize)> {
         let threads = self.config.threads.clamp(1, MAX_THREADS);
         let weights = &self.config.weights;
-        let mut arena = vec![root_record(root)];
+        let mut arena = vec![root.clone()];
         let mut beam = vec![0u32];
+        let mut terminal = Vec::new();
         let mut transposition = HashMap::new();
         let mut nodes = 0u64;
 
@@ -583,7 +749,7 @@ impl Searcher {
                                 *node_id,
                                 node,
                                 job.level,
-                                sequence,
+                                input,
                                 weights,
                                 &mut children,
                             );
@@ -636,33 +802,47 @@ impl Searcher {
                     children.extend(chunk);
                 }
                 nodes += beam.len() as u64;
+                if level == 0 {
+                    self.retain_allowed_roots(&mut children);
+                }
                 let next = commit(&mut arena, children, width, &mut transposition);
                 if next.is_empty() {
                     break;
                 }
                 beam = next;
+                collect_terminal_nodes(&arena, &mut beam, &mut terminal);
                 completed = level + 1;
-                if Instant::now() >= deadline {
+                if beam.is_empty() || Instant::now() >= deadline {
                     break;
                 }
             }
             if completed == 0 {
                 return None;
             }
+            beam.extend(terminal);
             let (nodes, candidates, line) = finish(&arena, &beam, nodes);
             Some((nodes, candidates, line, completed))
         })
     }
 }
 
-fn root_record(root: &RootState) -> NodeRecord {
+fn root_record(
+    root: &RootState,
+    active: ActivePiece,
+    can_hold: bool,
+    visible_ceiling: bool,
+) -> NodeRecord {
     NodeRecord {
         parent: u32::MAX,
         mv: None,
         first: None,
         board: root.board.clone(),
+        active: Some(active),
+        terminal: false,
+        visible_ceiling,
         next: 0,
         hold: root.hold,
+        can_hold,
         context: root.context,
         reward: 0.0,
         value: 0.0,
@@ -676,11 +856,11 @@ fn expand_node(
     node_id: u32,
     node: &NodeRecord,
     level: usize,
-    sequence: &PieceSequence,
+    input: &SearchInput,
     weights: &Weights,
     out: &mut Vec<Child>,
 ) {
-    let Some(current) = sequence.get(node.next) else {
+    let Some(current) = input.sequence.get(node.next) else {
         return;
     };
     let mut context = node.context;
@@ -689,18 +869,21 @@ fn expand_node(
 
     // No hold: place the current piece.
     expand_piece(
-        movegen, node_id, node, sequence, weights, scale, context, current, false, out,
+        movegen, node_id, node, input, weights, scale, context, current, false, out,
     );
 
     // Hold: place the held piece, or the piece after the current one.
+    if !node.can_hold {
+        return;
+    }
     match node.hold {
         Some(held) => expand_piece(
-            movegen, node_id, node, sequence, weights, scale, context, held, true, out,
+            movegen, node_id, node, input, weights, scale, context, held, true, out,
         ),
         None => {
-            if let Some(next) = sequence.get(node.next + 1) {
+            if let Some(next) = input.sequence.get(node.next + 1) {
                 expand_piece(
-                    movegen, node_id, node, sequence, weights, scale, context, next, true, out,
+                    movegen, node_id, node, input, weights, scale, context, next, true, out,
                 );
             }
         }
@@ -712,7 +895,7 @@ fn expand_piece(
     movegen: &mut Movegen,
     node_id: u32,
     node: &NodeRecord,
-    sequence: &PieceSequence,
+    input: &SearchInput,
     weights: &Weights,
     scale: f64,
     context: EvalContext,
@@ -728,26 +911,80 @@ fn expand_piece(
         node.next + 1
     };
     let hold = if hold_used {
-        Some(sequence.get(node.next).unwrap_or(piece))
+        Some(input.sequence.get(node.next).unwrap_or(piece))
     } else {
         node.hold
     };
-    let t_available = sequence.t_available(next, hold);
+    let t_available = input.sequence.t_available(next, hold);
+    let next_kind = input.sequence.get(next);
 
-    let placements = movegen.generate(&node.board, piece);
+    let spawn = if hold_used {
+        spawn_piece(piece)
+    } else {
+        node.active.unwrap_or_else(|| spawn_piece(piece))
+    };
+    let placements = movegen.generate_from(&node.board, spawn);
     for placement in placements {
-        let (board, reward, next_context) =
+        let (board, reward, mut next_context) =
             apply_placement(&node.board, placement, &context, weights);
         let accumulated = node.reward + scale * reward.value;
-        let leaf = leaf_value(&board, &next_context, weights, t_available);
-        let value = accumulated + scale * weights.discount * leaf;
-        let key = state_key(&board, next, hold, &next_context);
+        let active = next_kind.and_then(|kind| {
+            if node.visible_ceiling {
+                Some(spawn_piece(kind))
+            } else {
+                ActivePiece::spawn_on(&board, kind, reward.lines > 0)
+            }
+        });
+        let topped_out = if node.visible_ceiling {
+            board.height() > Board::VISIBLE_HEIGHT
+        } else {
+            next_kind.is_some() && active.is_none()
+        };
+        let inserted = if reward.lines == 0 && !topped_out {
+            next_context
+                .arrived
+                .min(next_context.incoming)
+                .min(GARBAGE_CAP)
+        } else {
+            0
+        };
+        let terminal = topped_out || inserted > 0;
+        next_context.incoming -= inserted;
+        next_context.arrived -= inserted;
+        next_context.received_total += inserted;
+        next_context = input.context_at(node.depth + 1, next_context);
+        let leaf = if topped_out {
+            f64::NEG_INFINITY
+        } else if inserted > 0 {
+            inserted_garbage_value(
+                &board,
+                inserted as usize,
+                next_kind,
+                node.visible_ceiling,
+                &next_context,
+                weights,
+                t_available,
+            )
+        } else {
+            leaf_value(&board, &next_context, weights, t_available)
+        };
+        let value = if leaf == f64::NEG_INFINITY {
+            leaf
+        } else {
+            accumulated + scale * weights.discount * leaf
+        };
+        let mut key = state_key(&board, next, hold, &next_context);
+        if let Some(piece) = active.filter(|piece| piece.y != piece.kind.spawn_position().1) {
+            key = fnv(key, piece.y as u64);
+        }
         out.push(Child {
             parent: node_id,
             piece,
             hold_used,
             placement: *placement,
             board,
+            active,
+            terminal,
             next,
             hold,
             context: next_context,
@@ -756,6 +993,38 @@ fn expand_piece(
             key,
         });
     }
+}
+
+/// Hole columns are hidden. Approximate the board value over all possible
+/// columns of a single packet; the beam stops at this observation boundary.
+fn inserted_garbage_value(
+    board: &Board,
+    inserted: usize,
+    next_kind: Option<PieceKind>,
+    visible_ceiling: bool,
+    context: &EvalContext,
+    weights: &Weights,
+    t_available: usize,
+) -> f64 {
+    let mut total = 0.0;
+    for hole in 0..Board::WIDTH as u8 {
+        let mut raised = board.clone();
+        raised
+            .insert_garbage(&[hole; GARBAGE_CAP as usize][..inserted])
+            .expect("legal garbage rows");
+        let topped_out = if visible_ceiling {
+            board.height() + inserted > Board::VISIBLE_HEIGHT
+        } else {
+            next_kind.is_some_and(|kind| ActivePiece::spawn_on(&raised, kind, false).is_none())
+        };
+        if topped_out {
+            // Spawn/ceiling rows are above the inserted holes, so this is
+            // independent of which columns the actual packets use.
+            return f64::NEG_INFINITY;
+        }
+        total += leaf_value(&raised, context, weights, t_available);
+    }
+    total / Board::WIDTH as f64
 }
 
 /// Sorts children, drops transpositions that are not an improvement, and
@@ -800,8 +1069,20 @@ fn commit(
     });
 
     let mut beam = Vec::with_capacity(width);
+    // Keep the best leaves for final ranking without spending the live beam
+    // on lines that cannot be expanded past an observation boundary.
+    let mut live = 0;
+    let mut leaves = 0;
     for (_, _, _, index) in order {
         let child = &children[index as usize];
+        let retained = if child.terminal {
+            &mut leaves
+        } else {
+            &mut live
+        };
+        if *retained == width {
+            continue;
+        }
         if let Some(&best) = transposition.get(&child.key) {
             if best >= child.value {
                 continue;
@@ -822,19 +1103,34 @@ fn commit(
             mv: Some(mv),
             first: Some(first),
             board: child.board.clone(),
+            active: child.active,
+            terminal: child.terminal,
+            visible_ceiling: parent.visible_ceiling,
             next: child.next,
             hold: child.hold,
+            can_hold: true,
             context: child.context,
             reward: child.reward,
             value: child.value,
             depth,
         });
         beam.push(id);
-        if beam.len() == width {
+        *retained += 1;
+        if live == width && leaves == width {
             break;
         }
     }
     beam
+}
+
+fn collect_terminal_nodes(arena: &[NodeRecord], beam: &mut Vec<u32>, terminal: &mut Vec<u32>) {
+    beam.retain(|&id| {
+        let finished = arena[id as usize].terminal;
+        if finished {
+            terminal.push(id);
+        }
+        !finished
+    });
 }
 
 /// Collects the root candidates and the best line.
@@ -842,7 +1138,12 @@ fn finish(arena: &[NodeRecord], beam: &[u32], nodes: u64) -> (u64, Vec<Candidate
     assert!(!beam.is_empty(), "the beam always keeps at least the root");
     let mut best_id = beam[0];
     for &id in beam {
-        if arena[id as usize].value > arena[best_id as usize].value {
+        let node = &arena[id as usize];
+        let best = &arena[best_id as usize];
+        if node.value.total_cmp(&best.value).is_gt()
+            || (node.value.total_cmp(&best.value).is_eq()
+                && node.first.as_ref().map(move_key) < best.first.as_ref().map(move_key))
+        {
             best_id = id;
         }
     }
@@ -890,13 +1191,14 @@ fn finish(arena: &[NodeRecord], beam: &[u32], nodes: u64) -> (u64, Vec<Candidate
     (nodes, candidates, line)
 }
 
-fn move_key(mv: &Move) -> (u8, u8, u8, i32, i32) {
+fn move_key(mv: &Move) -> (u8, u8, u8, i32, i32, bool) {
     (
         u8::from(mv.hold),
         mv.piece as u8,
         mv.placement.piece.rotation as u8,
         mv.placement.piece.x,
         mv.placement.piece.y,
+        mv.placement.spin_entry,
     )
 }
 
@@ -914,19 +1216,23 @@ fn state_key(board: &Board, next: usize, hold: Option<PieceKind>, context: &Eval
     let mut hash = FNV_OFFSET;
     for y in 0..Board::HEIGHT {
         hash = fnv(hash, u64::from(board.row(y)));
+        hash = fnv(hash, u64::from(board.garbage_row(y)));
     }
     hash = fnv(hash, next as u64);
     hash = fnv(hash, hold.map_or(7, |piece| piece as u64));
     hash = fnv(hash, u64::from(context.b2b_streak));
     hash = fnv(hash, u64::from(context.combo));
     hash = fnv(hash, u64::from(context.pieces_placed));
+    hash = fnv(hash, u64::from(context.incoming));
+    hash = fnv(hash, u64::from(context.arrived));
+    hash = fnv(hash, u64::from(context.sent_total));
     hash
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intetrigence_core::{ActivePiece, KickOrder, Rotation, SpinType};
+    use intetrigence_core::{KickOrder, Rotation, SpinType};
 
     fn root(board: Board, current: PieceKind, preview: &[PieceKind]) -> RootState {
         RootState {
@@ -960,7 +1266,235 @@ mod tests {
     }
 
     #[test]
-    fn bag_prediction_completes_the_current_bag() {
+    fn search_stops_at_the_observed_queue_horizon() {
+        let mut state = root(
+            Board::new(),
+            PieceKind::S,
+            &[
+                PieceKind::O,
+                PieceKind::J,
+                PieceKind::T,
+                PieceKind::I,
+                PieceKind::Z,
+            ],
+        );
+        for deterministic in [false, true] {
+            let mut searcher = Searcher::new(SearchConfig {
+                depth: 8,
+                deterministic,
+                ..fast_config()
+            });
+            state.hold = None;
+            let result = searcher.search(&state).unwrap();
+            assert_eq!(result.depth, 5, "save one visible piece for empty hold");
+            state.hold = Some(PieceKind::L);
+            let result = searcher.search(&state).unwrap();
+            assert_eq!(result.depth, 6, "occupied hold advances by one piece");
+        }
+    }
+
+    #[test]
+    fn empty_hold_without_a_preview_cannot_place_an_unknown_piece() {
+        let mut board = Board::new();
+        for y in 0..4 {
+            board.set_row(y, Board::FULL_ROW & !(1u16 << 9));
+        }
+        let state = root(board, PieceKind::S, &[]);
+        let mut searcher = Searcher::new(SearchConfig {
+            depth: 1,
+            budget: Duration::ZERO,
+            ..fast_config()
+        });
+        let result = searcher.search(&state).unwrap();
+        assert!(result.fallback);
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| !candidate.first.hold)
+        );
+        assert_eq!(result.best.piece, PieceKind::S);
+    }
+
+    #[test]
+    fn search_from_respects_root_hold_availability() {
+        let state = root(Board::new(), PieceKind::O, &[PieceKind::I]);
+        let mut searcher = Searcher::new(SearchConfig {
+            depth: 1,
+            width: 96,
+            deterministic: true,
+            ..fast_config()
+        });
+        let active = spawn_piece(state.current);
+        let available = searcher.search_from(&state, active, true).unwrap();
+        assert!(
+            available
+                .candidates
+                .iter()
+                .any(|candidate| candidate.first.hold)
+        );
+        let unavailable = searcher.search_from(&state, active, false).unwrap();
+        assert!(
+            unavailable
+                .candidates
+                .iter()
+                .all(|candidate| !candidate.first.hold)
+        );
+    }
+
+    #[test]
+    fn hidden_garbage_insertion_ends_the_speculative_line() {
+        let mut state = root(
+            Board::new(),
+            PieceKind::O,
+            &[PieceKind::J, PieceKind::I, PieceKind::T, PieceKind::L],
+        );
+        state.context.incoming = 3;
+        state.context.arrived = 3;
+        for threads in [1, 4] {
+            let mut searcher = Searcher::new(SearchConfig {
+                threads,
+                deterministic: true,
+                ..fast_config()
+            });
+            let result = searcher.search(&state).unwrap();
+            assert_eq!(result.line.len(), 1);
+            assert_eq!(result.line[0], result.best);
+            assert!(result.value.is_finite());
+        }
+    }
+
+    #[test]
+    fn search_stops_at_the_first_lock_after_a_packet_arrives() {
+        let mut state = root(
+            Board::new(),
+            PieceKind::O,
+            &[PieceKind::J, PieceKind::I, PieceKind::T, PieceKind::L],
+        );
+        state.context.incoming = 3;
+        let mut searcher = Searcher::new(SearchConfig {
+            deterministic: true,
+            ..fast_config()
+        });
+        // Received at frame 12, due at 32. Locks at 24 and 36.
+        let timing = SearchTiming::from_queue(
+            24,
+            12,
+            &[GarbagePacket {
+                amount: 3,
+                arrival_frame: 12,
+            }],
+        );
+        let result = searcher
+            .search_timed_from(&state, spawn_piece(state.current), true, &timing)
+            .unwrap();
+        assert_eq!(result.line.len(), 2);
+        assert_eq!(result.depth, 2);
+    }
+
+    #[test]
+    fn forecast_matches_fifo_cancellation_and_frame_accumulation() {
+        use intetrigence_core::{GarbageMultiplier, GarbageQueue};
+
+        let frame = GARBAGE_MARGIN_FRAMES - 12;
+        let mut queue = GarbageQueue::new(1);
+        queue.receive(3, frame - 20);
+        queue.receive(6, frame + 4);
+        let timing = SearchTiming::from_queue(frame, 12, queue.packets());
+        let input = SearchInput {
+            sequence: PieceSequence::new(PieceKind::O, &[]),
+            locks: timing.forecast(3, GarbageMultiplier::at_frame(frame).value()),
+            initial_incoming: queue.queue_total(),
+        };
+        assert_eq!(queue.cancel(5, 0).sent, 0);
+        for level in 0..=3 {
+            let context = input.context_at(
+                level,
+                EvalContext {
+                    incoming: queue.queue_total(),
+                    ..EvalContext::default()
+                },
+            );
+            let lock_frame = frame + level as u64 * 12;
+            assert_eq!(context.arrived, queue.arrived_total(lock_frame));
+            assert_eq!(
+                context.multiplier.to_bits(),
+                GarbageMultiplier::at_frame(lock_frame).value().to_bits()
+            );
+        }
+        assert_eq!(input.locks[2].eligible, 9);
+        assert!(input.locks[2].multiplier > 1.0);
+    }
+
+    #[test]
+    fn lab_forecast_respects_the_published_current_cap() {
+        let timing = SearchTiming::from_lab(60, 60, 13, 8);
+        let locks = timing.forecast(1, 1.0);
+        assert_eq!(locks[0].eligible, 8);
+        assert_eq!(locks[1].eligible, 13);
+    }
+
+    #[test]
+    fn an_arrived_burst_can_block_the_next_spawn() {
+        let mut board = Board::new();
+        board.set_cell(4, 13, intetrigence_core::Cell::Block);
+        let mut state = root(board, PieceKind::I, &[PieceKind::O, PieceKind::J]);
+        state.context.incoming = 8;
+        state.context.arrived = 8;
+        let mut searcher = Searcher::new(SearchConfig {
+            deterministic: true,
+            ..fast_config()
+        });
+        let result = searcher
+            .search_from(&state, spawn_piece(state.current), false)
+            .unwrap();
+        assert_eq!(result.line.len(), 1);
+        assert_eq!(result.value, f64::NEG_INFINITY);
+        assert_eq!(result.line[0], result.best);
+    }
+
+    #[test]
+    fn line_clear_continues_search_and_a_tanked_branch_remains_a_candidate() {
+        let mut board = Board::new();
+        let gap = spawn_piece(PieceKind::I)
+            .cells()
+            .into_iter()
+            .fold(0, |mask, (x, _)| mask | 1 << x);
+        board.set_row(0, Board::FULL_ROW & !gap);
+        let mut state = root(board, PieceKind::I, &[PieceKind::O, PieceKind::T]);
+        state.context.arrived = 3;
+        state.context.incoming = 3;
+        let mut searcher = Searcher::new(SearchConfig {
+            depth: 2,
+            width: 128,
+            deterministic: true,
+            ..fast_config()
+        });
+        let result = searcher
+            .search_from(&state, spawn_piece(state.current), false)
+            .unwrap();
+        let clears = |mv: Move| {
+            apply_placement(
+                &state.board,
+                &mv.placement,
+                &state.context,
+                &Weights::default(),
+            )
+            .1
+            .lines
+        };
+        assert_eq!(result.depth, 2);
+        assert_eq!(clears(result.best), 1);
+        assert!(
+            result
+                .candidates
+                .iter()
+                .any(|candidate| clears(candidate.first) == 0)
+        );
+    }
+
+    #[test]
+    fn sequence_preserves_observed_pieces_and_ends_at_the_preview() {
         let sequence = PieceSequence::new(
             PieceKind::T,
             &[
@@ -970,31 +1504,11 @@ mod tests {
                 PieceKind::Z,
                 PieceKind::J,
             ],
-            8,
         );
-        assert_eq!(sequence.known(), 6);
-        assert_eq!(sequence.len(), 8);
-        // The missing piece of the first bag is L, then a fresh bag starts.
-        assert_eq!(sequence.get(6), Some(PieceKind::L));
-        assert_eq!(sequence.get(7), Some(PieceKind::I));
-    }
-
-    #[test]
-    fn bag_prediction_handles_a_repeat() {
-        // T appears twice, so a new bag must have started.
-        let sequence = PieceSequence::new(
-            PieceKind::T,
-            &[
-                PieceKind::I,
-                PieceKind::O,
-                PieceKind::S,
-                PieceKind::Z,
-                PieceKind::T,
-            ],
-            8,
-        );
-        assert_eq!(sequence.len(), 8);
-        assert!(sequence.get(6).is_some());
+        assert_eq!(sequence.len(), 6);
+        assert_eq!(sequence.get(0), Some(PieceKind::T));
+        assert_eq!(sequence.get(5), Some(PieceKind::J));
+        assert_eq!(sequence.get(6), None);
     }
 
     #[test]
@@ -1106,7 +1620,12 @@ mod tests {
 
     #[test]
     fn transposition_keeps_one_node_per_state() {
-        let mut arena = vec![root_record(&root(Board::new(), PieceKind::T, &[]))];
+        let mut arena = vec![root_record(
+            &root(Board::new(), PieceKind::T, &[]),
+            spawn_piece(PieceKind::T),
+            true,
+            false,
+        )];
         let board = Board::new();
         let context = EvalContext::default();
         let placement = Placement {
@@ -1129,6 +1648,8 @@ mod tests {
             hold_used: false,
             placement,
             board: board.clone(),
+            active: None,
+            terminal: false,
             next: 1,
             hold: None,
             context,
@@ -1145,5 +1666,42 @@ mod tests {
         );
         assert_eq!(beam.len(), 1);
         assert_eq!(arena[beam[0] as usize].value, 5.0);
+    }
+
+    #[test]
+    fn a_terminal_leaf_does_not_displace_a_live_branch() {
+        let mut arena = vec![root_record(
+            &root(Board::new(), PieceKind::O, &[]),
+            spawn_piece(PieceKind::O),
+            true,
+            false,
+        )];
+        let board = Board::new();
+        let placement = Movegen::new().generate(&board, PieceKind::O)[0];
+        let make = |key, terminal, value| Child {
+            parent: 0,
+            piece: PieceKind::O,
+            hold_used: false,
+            placement,
+            board: board.clone(),
+            active: None,
+            terminal,
+            next: 1,
+            hold: None,
+            context: EvalContext::default(),
+            reward: 0.0,
+            value,
+            key,
+        };
+        let mut beam = commit(
+            &mut arena,
+            vec![make(1, true, 5.0), make(2, false, 3.0)],
+            1,
+            &mut HashMap::new(),
+        );
+        let mut leaves = Vec::new();
+        collect_terminal_nodes(&arena, &mut beam, &mut leaves);
+        assert_eq!(beam.len(), 1);
+        assert_eq!(leaves.len(), 1);
     }
 }

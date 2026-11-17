@@ -1,8 +1,23 @@
 # Evidence files
 
-Each directory holds the raw output of one measurement run: `summary.json`,
-`audit/*.json` (per-game scoring audit), `replays/*.jsonl` (verified replays)
-and `logs/*.jsonl` (opponent transcripts / decision logs).
+Directories here contain historical measurement outputs. Consult the
+[seed registry](../../docs/seed-registry.md) for invalidated runs. The verified
+result of a current run belongs with its exact setup and raw game log. Write
+new runs under `out/` and keep their evidence together when sharing results.
+The Lab runner stores a replayable trace and provenance in each game record.
+
+## Measurement lock
+
+`arena match`, `round run`, the Lab runner and the Bash measurement wrappers
+share one lock directory per user, across checkouts on the same machine. The
+default is `%LOCALAPPDATA%/intetrigence/measurement.lock` on Windows and
+`~/.cache/intetrigence/measurement.lock` elsewhere. Use an absolute
+`MEASUREMENT_LOCK_DIR` when testing the lock in isolation.
+
+The `owner` file identifies the process and start time. If a forced termination
+leaves the lock behind, confirm the owner and its bot processes have stopped,
+then remove `owner` and the empty lock directory. Other applications and
+processes outside the measurement entry points still affect timing.
 
 ## Corrupted evidence (removed 2026-11-15)
 

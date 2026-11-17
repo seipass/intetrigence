@@ -52,7 +52,7 @@ impl RoundConfig {
             sheet,
             turn_cap: 1000,
             frames_per_turn: 12,
-            rules: "docs/s2-spec.md@v1.3.17".into(),
+            rules: "docs/s2-spec.md@v1.3.25".into(),
             protocol: "docs/s2-referee-protocol.md@v1.54".into(),
             deterministic: false,
             threads: 8,
@@ -305,7 +305,7 @@ pub fn run_round(
                 slot as u8,
                 adopted.claimed_spin,
                 applied.spin,
-                applied.declared_attack,
+                adopted.claimed_attack,
                 applied.attack_total,
             );
 
@@ -332,7 +332,7 @@ pub fn run_round(
                 think_ms: round3(suggestion.think_ms),
                 candidate_index: adopted.candidate_index as u32,
                 claimed_spin: adopted.claimed_spin.map(|spin| spin_name(spin).to_string()),
-                declared_attack: applied.declared_attack,
+                declared_attack: adopted.claimed_attack,
             });
             for (amount, arrival_frame) in &applied.packets {
                 garbage_records.push(GarbageRecord {
@@ -585,6 +585,7 @@ fn header(config: &RoundConfig, bots: &[BotRecord; 2], start_garbage: &[u8]) -> 
         slots,
         seats,
         rules: config.rules.clone(),
+        t_immobility_mini: true,
         protocol: config.protocol.clone(),
         bots: bot_map,
         started_at: config.started_at.clone(),
@@ -842,6 +843,7 @@ mod tests {
             candidates: vec![crate::agent::Candidate {
                 piece: PieceKind::I,
                 cells: [(3, 0), (3, 1), (3, 2), (3, 3)],
+                used_hold: None,
                 claimed_spin: None,
                 claimed_attack: None,
             }],

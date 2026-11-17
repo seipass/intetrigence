@@ -36,3 +36,83 @@ index cf3ac59..fa58037 100644
              return {};
          }
      }
+diff --git a/tbp/main.cpp b/tbp/main.cpp
+index 5bb4d0a..e949b2f 100644
+--- a/tbp/main.cpp
++++ b/tbp/main.cpp
+@@ -1,6 +1,9 @@
+ #include <iostream>
+ #include <cstdint>
+ #include <array>
++#include <chrono>
++#include <cstdlib>
++#include <thread>
+ 
+ #include "../lib/nlohmann/json.hpp"
+ #include "../ai/ai.h"
+@@ -128,6 +131,16 @@ void load(eval::Weight& w)
+ 
+ int main()
+ {
++    long think_ms = 0;
++    if (const char* raw = std::getenv("INTETRIGENCE_TBP_THINK_MS")) {
++        char* end = nullptr;
++        think_ms = std::strtol(raw, &end, 10);
++        if (*end != '\0' || think_ms < 1 || think_ms > 10000) {
++            std::cerr << "INTETRIGENCE_TBP_THINK_MS must be an integer between 1 and 10000\n";
++            return 2;
++        }
++    }
++
+     tbp::bot::Info info
+     {
+         .name = "clys",
+@@ -136,7 +149,11 @@ int main()
+         .features {}
+     };
+ 
+-    send_message(BotMessageKind::Info, info);
++    json info_message = info;
++    if (think_ms > 0) {
++        info_message["features"].push_back("intetrigence-request-window-v1:" + std::to_string(think_ms));
++    }
++    send_message(BotMessageKind::Info, info_message);
+ 
+     ai::Engine ai = ai::Engine();
+     std::vector<piece::Type> new_piece;
+@@ -221,13 +238,23 @@ int main()
+ 
+             ai.init(queue, state, Lock(), w);
+ 
+-            ai.search();
++            if (think_ms == 0) {
++                ai.search();
++            }
+ 
+             break;
+         }
+ 
+         case FrontendMessageKind::Suggest:
+         {
++            if (think_ms > 0) {
++                const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(think_ms);
++                if (!ai.search()) {
++                    std::cerr << "Failed to start bounded search\n";
++                    return 2;
++                }
++                std::this_thread::sleep_until(deadline);
++            }
+             auto plan = ai.request(0);
+ 
+             if (!plan.has_value()) {
+@@ -286,7 +313,9 @@ int main()
+ 
+             new_piece.clear();
+ 
+-            ai.search();
++            if (think_ms == 0) {
++                ai.search();
++            }
+ 
+             break;
+         }

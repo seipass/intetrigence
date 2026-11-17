@@ -15,7 +15,7 @@ use intetrigence_core::{Action, ClearInput, Game, GarbageQueue, S2Scoring, Split
 
 use crate::eval::EvalContext;
 use crate::movegen::spawn_piece;
-use crate::search::{RootState, SearchConfig, Searcher};
+use crate::search::{RootState, SearchConfig, SearchTiming, Searcher};
 
 /// What the anytime loop completed for one move.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -180,7 +180,8 @@ pub fn play_game_with_setup(
         let Some(active) = game.active() else {
             break;
         };
-        let frame = u64::from(report.turns) * 12;
+        const FRAMES_PER_LOCK: u64 = 12;
+        let frame = u64::from(report.turns) * FRAMES_PER_LOCK;
         report.max_pending = report.max_pending.max(garbage.queue_total());
         while next_injection < injections.len() && injections[next_injection].0 <= report.turns {
             garbage.receive(injections[next_injection].1, frame);
@@ -189,6 +190,7 @@ pub fn play_game_with_setup(
         let board = game.board().clone();
         let preview = game.preview(5);
         let context = EvalContext {
+            multiplier: intetrigence_core::GarbageMultiplier::at_frame(frame).value(),
             sent_total: report.sent_total,
             received_total: report.garbage_inserted,
             b2b_streak: scoring.state.b2b_streak,
@@ -199,52 +201,36 @@ pub fn play_game_with_setup(
             t_slot: 0,
         };
 
-        let standard = spawn_piece(active.kind);
-        let (hold, placement, spin) = if active == standard {
-            let root = RootState {
-                board,
-                current: active.kind,
-                preview,
-                hold: game.held_piece(),
-                context,
-            };
-            let start = Instant::now();
-            let Some(result) = searcher.search(&root) else {
-                // No legal placement: the game is over.
-                break;
-            };
-            report.think_times.push(start.elapsed());
-            report.search_stats.push(SearchStats {
-                depth: result.depth,
-                width: result.width,
-                nodes: result.nodes,
-                iterations: result.iterations,
-                fallback: result.fallback,
-                aborted: result.aborted,
-                max_level_time: result.max_level_time,
-            });
-            (
-                result.best.hold,
-                result.best.placement,
-                result.best.placement.spin,
-            )
-        } else {
-            // Clutch pushed the spawn up: the search's spawn assumption does
-            // not hold, so drop the piece straight down. Still legal.
-            report.clutch_fallbacks += 1;
-            report.think_times.push(Duration::ZERO);
-            // The standard spawn may be blocked (that is why Clutch pushed the
-            // piece up), so explore from the piece's actual position.
-            let placement = crate::movegen::generate_from(&board, active)
-                .into_iter()
-                .find(|placement| {
-                    placement.piece.rotation == active.rotation && placement.piece.x == active.x
-                })
-                .expect("the active piece always has a resting position");
-            (false, placement, placement.spin)
+        let root = RootState {
+            board,
+            current: active.kind,
+            preview,
+            hold: game.held_piece(),
+            context,
         };
+        let start = Instant::now();
+        let timing = SearchTiming::from_queue(frame, FRAMES_PER_LOCK, garbage.packets());
+        let Some(result) = searcher.search_timed_from(&root, active, game.can_hold(), &timing)
+        else {
+            break;
+        };
+        if result.fallback && active != spawn_piece(active.kind) {
+            report.clutch_fallbacks += 1;
+        }
+        report.think_times.push(start.elapsed());
+        report.search_stats.push(SearchStats {
+            depth: result.depth,
+            width: result.width,
+            nodes: result.nodes,
+            iterations: result.iterations,
+            fallback: result.fallback,
+            aborted: result.aborted,
+            max_level_time: result.max_level_time,
+        });
+        let placement = result.best.placement;
+        let spin = placement.spin;
 
-        if hold {
+        if result.best.hold {
             game.apply(Action::Hold);
             report.actions.push(Action::Hold);
         }

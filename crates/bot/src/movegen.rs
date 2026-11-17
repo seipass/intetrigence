@@ -298,6 +298,7 @@ pub struct Movegen {
     supports_180: bool,
     /// Which I 90-degree kick test order to model (S2 spec U1).
     kick_order: KickOrder,
+    t_immobility_mini: bool,
 }
 
 impl Default for Movegen {
@@ -318,6 +319,7 @@ impl Movegen {
             placements: Vec::with_capacity(64),
             supports_180: true,
             kick_order: KickOrder::SrsPlus,
+            t_immobility_mini: true,
         }
     }
 
@@ -327,6 +329,11 @@ impl Movegen {
     /// [`KickOrder::Srs`] to accept the union of both orders.
     pub fn set_kick_order(&mut self, order: KickOrder) {
         self.kick_order = order;
+    }
+
+    /// Historical replay verification can use the old corner-only T rule.
+    pub fn set_t_immobility_mini(&mut self, enabled: bool) {
+        self.t_immobility_mini = enabled;
     }
 
     /// Fills and returns the placements for `kind` from its standard spawn.
@@ -391,6 +398,14 @@ impl Movegen {
                 x,
                 y,
             };
+            let mut spin = board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some());
+            if !self.t_immobility_mini
+                && kind == PieceKind::T
+                && spin == SpinType::Mini
+                && board.t_spin_corners(rotation, x, y).0 < 3
+            {
+                spin = SpinType::None;
+            }
             self.placements.push(Placement {
                 piece,
                 spin_entry,
@@ -399,7 +414,7 @@ impl Movegen {
                 // core engine's (`docs/s2-spec.md` §4); the bot must not keep
                 // a second copy of the corner table.
                 immobile: board.is_immobile(kind, rotation, x, y),
-                spin: board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some()),
+                spin,
                 actions,
                 kick_order: self.kick_order,
             });
