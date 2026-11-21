@@ -1,0 +1,211 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "common.glsl"
+
+// Single-workgroup GPU Top-K selection + transposition dedup + indirect dispatch update.
+// Supports width up to 512 cleanly in LDS with zero CPU roundtrip between plies.
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly buffer ParamsBuf { SearchParams params; };
+layout(std430, binding = 1) readonly buffer ChildrenBuf { GpuNode children[]; };
+layout(std430, binding = 2) writeonly buffer DstBeamBuf { GpuNode dst_beam[]; };
+layout(std430, binding = 3) buffer StateBuf { RuntimeState state; };
+layout(std430, binding = 4) buffer RootBestBuf { uint root_best[]; };
+layout(std430, binding = 5) buffer HtBuf { uint ht_lo[4096]; uint ht_hi[4096]; };
+
+const uint CAP = 4096u;
+const uint HT_SIZE = 4096u;
+const uint HT_MASK = HT_SIZE - 1u;
+
+shared uint s_hist[256];
+shared uint s_b0;
+shared uint s_b1;
+shared uint s_thresh;
+shared uint s_gt_count;
+shared uint s_gather_count;
+shared uint s_keys[CAP];
+shared uint s_idxs[CAP];
+shared uint s_kept;
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint n = min(state.child_count, MAX_CHILDREN);
+    uint width = min(params.width, MAX_WIDTH);
+    bool final_ply = (state.level + 1u >= params.depth);
+
+    if (n == 0u) {
+        if (tid == 0u) {
+            state.beam_count = 0u;
+            state.child_count = 0u;
+            state.level += 1u;
+            state.dispatch_x = 0u;
+            state.dispatch_y = 1u;
+            state.dispatch_z = 1u;
+        }
+        return;
+    }
+
+    // Fast path: if n <= CAP, gather all directly; else 2-pass radix histogram cutoff.
+    if (tid == 0u) {
+        s_gather_count = 0u;
+        s_thresh = 0u;
+    }
+    barrier();
+
+    if (n <= CAP) {
+        for (uint i = tid; i < n; i += 256u) {
+            s_keys[i] = float_to_sortable(children[i].value);
+            s_idxs[i] = i;
+        }
+        if (tid == 0u) s_gather_count = n;
+        barrier();
+    } else {
+        // Pass 1: top 8 bits
+        s_hist[tid] = 0u;
+        barrier();
+        for (uint i = tid; i < n; i += 256u) {
+            uint k = float_to_sortable(children[i].value);
+            atomicAdd(s_hist[k >> 24u], 1u);
+        }
+        barrier();
+        if (tid == 0u) {
+            uint acc = 0u;
+            uint b = 0u;
+            for (int i = 255; i >= 0; i--) {
+                acc += s_hist[i];
+                if (acc >= CAP) { b = uint(i); break; }
+            }
+            s_b0 = b;
+            s_gt_count = acc - s_hist[b];
+        }
+        barrier();
+
+        // Pass 2: bits 16..23 inside bucket s_b0
+        uint b0 = s_b0;
+        s_hist[tid] = 0u;
+        barrier();
+        for (uint i = tid; i < n; i += 256u) {
+            uint k = float_to_sortable(children[i].value);
+            if ((k >> 24u) == b0) {
+                atomicAdd(s_hist[(k >> 16u) & 0xFFu], 1u);
+            }
+        }
+        barrier();
+        if (tid == 0u) {
+            uint acc = s_gt_count;
+            uint b = 0u;
+            for (int i = 255; i >= 0; i--) {
+                acc += s_hist[i];
+                if (acc >= CAP) { b = uint(i); break; }
+            }
+            s_b1 = b;
+            s_thresh = (b0 << 24u) | (b << 16u);
+        }
+        barrier();
+
+        // Gather items strictly above upper16 threshold first, then equal upper16 up to CAP
+        uint thresh_hi = s_thresh;
+        for (uint i = tid; i < n; i += 256u) {
+            uint k = float_to_sortable(children[i].value);
+            if ((k & 0xFFFF0000u) > thresh_hi) {
+                uint pos = atomicAdd(s_gather_count, 1u);
+                if (pos < CAP) { s_keys[pos] = k; s_idxs[pos] = i; }
+            }
+        }
+        barrier();
+        for (uint i = tid; i < n; i += 256u) {
+            uint k = float_to_sortable(children[i].value);
+            if ((k & 0xFFFF0000u) == thresh_hi) {
+                uint pos = atomicAdd(s_gather_count, 1u);
+                if (pos < CAP) { s_keys[pos] = k; s_idxs[pos] = i; }
+            }
+        }
+        barrier();
+    }
+
+    uint m = min(s_gather_count, CAP);
+    // Pad unused slots up to CAP with 0 so bitonic sort descending puts real items first.
+    for (uint i = m + tid; i < CAP; i += 256u) {
+        s_keys[i] = 0u;
+        s_idxs[i] = 0xFFFFFFFFu;
+    }
+    barrier();
+
+    // Bitonic sort descending on CAP=1024 elements (256 threads => 2 pairs/thread)
+    for (uint size = 2u; size <= CAP; size <<= 1u) {
+        for (uint stride = size >> 1u; stride > 0u; stride >>= 1u) {
+            for (uint pair = tid; pair < (CAP >> 1u); pair += 256u) {
+                uint block = pair / stride;
+                uint off = pair % stride;
+                uint i = block * (stride << 1u) + off;
+                uint j = i + stride;
+                bool desc = ((i & size) == 0u);
+                uint ki = s_keys[i];
+                uint kj = s_keys[j];
+                bool swap = desc ? (ki < kj) : (ki > kj);
+                if (swap) {
+                    s_keys[i] = kj; s_keys[j] = ki;
+                    uint ii = s_idxs[i]; s_idxs[i] = s_idxs[j]; s_idxs[j] = ii;
+                }
+            }
+            barrier();
+        }
+    }
+
+    // Clear transposition hash table
+    for (uint i = tid; i < HT_SIZE; i += 256u) {
+        ht_lo[i] = 0u;
+        ht_hi[i] = 0u;
+    }
+    barrier();
+
+    // Thread 0 deduplicates top m sorted candidates -> writes up to `width` into dst_beam
+    // and updates root_best if final_ply.
+    if (tid == 0u) {
+        uint kept = 0u;
+        for (uint i = 0u; i < m && kept < width; i++) {
+            uint cidx = s_idxs[i];
+            if (cidx == 0xFFFFFFFFu) break;
+            uint klo = children[cidx].key_lo;
+            uint khi = children[cidx].key_hi;
+            if (klo == 0u && khi == 0u) klo = 1u;
+            uint slot = klo & HT_MASK;
+            bool dup = false;
+            for (uint probe = 0u; probe < 16u; probe++) {
+                uint p = (slot + probe) & HT_MASK;
+                if (ht_lo[p] == 0u && ht_hi[p] == 0u) {
+                    ht_lo[p] = klo;
+                    ht_hi[p] = khi;
+                    break;
+                }
+                if (ht_lo[p] == klo && ht_hi[p] == khi) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (dup) continue;
+            s_idxs[kept] = cidx;
+            kept++;
+        }
+        s_kept = kept;
+        state.beam_count = kept;
+        state.child_count = 0u;
+        state.level += 1u;
+        state.dispatch_x = final_ply ? 0u : (kept * 2u);
+        state.dispatch_y = 1u;
+        state.dispatch_z = 1u;
+    }
+    barrier();
+
+    // Cooperative copy of kept nodes to dst_beam (and final root_best update!)
+    uint kept = s_kept;
+    for (uint i = tid; i < kept; i += 256u) {
+        uint cidx = s_idxs[i];
+        GpuNode nd = children[cidx];
+        dst_beam[i] = nd;
+        if (final_ply) {
+            uint ridx = (nd.meta1 >> 16u) & 0xFFu;
+            atomicMax(root_best[ridx], float_to_sortable(nd.value));
+        }
+    }
+}

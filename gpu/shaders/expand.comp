@@ -1,0 +1,477 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "common.glsl"
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) readonly buffer ParamsBuf { SearchParams params; };
+layout(std430, binding = 1) readonly buffer SrcBeamBuf { GpuNode src_beam[]; };
+layout(std430, binding = 2) writeonly buffer ChildrenBuf { GpuNode children[]; };
+layout(std430, binding = 3) buffer StateBuf { RuntimeState state; };
+layout(std430, binding = 4) buffer RootBestBuf { uint root_best[]; };
+
+shared GpuNode s_parent;
+shared uint s_valid[4][45];
+shared uint s_any[4][45];
+shared uint s_rot[4][45];
+shared uint s_fin[4][45];
+shared uint s_rest[128]; // packed: rot(2) | x_off(4) | y_off(6) | spin_entry(1) | fin(1)
+shared uint s_rest_count;
+shared uint s_parent_tslot;
+shared uint s_piece;
+shared uint s_next;
+shared uint s_hold;
+shared uint s_t_avail;
+shared uint s_valid_wg;
+shared uint s_top_yi;
+
+uint shift_x(uint mask, int delta) {
+    if (delta >= 0) return (mask << uint(delta)) & 0x7FFFu;
+    return mask >> uint(-delta);
+}
+
+void insert_garbage_rows(inout uint rows[20], inout uint glo, inout uint ghi, uint count, uint hole, uint proj_mode) {
+    // Shift existing rows up by `count`, discarding >= 40.
+    for (int y = 39; y >= 0; y--) {
+        if (y >= int(count)) {
+            uint src = uint(y) - count;
+            set_row(rows, uint(y), get_row(rows, src));
+            set_gbit(glo, ghi, uint(y), get_gbit(glo, ghi, src));
+        } else {
+            uint h = hole;
+            if (proj_mode == 2u && count >= 6u && uint(y) >= count / 2u) {
+                h = (hole + 5u) % 10u;
+            }
+            set_row(rows, uint(y), FULL_ROW & ~(1u << h));
+            set_gbit(glo, ghi, uint(y), true);
+        }
+    }
+}
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint wg = gl_WorkGroupID.x;
+    uint node_idx = wg >> 1u;
+    uint use_hold = wg & 1u;
+
+    if (tid == 0u) {
+        s_valid_wg = 0u;
+        s_rest_count = 0u;
+        if (node_idx < state.beam_count) {
+            s_parent = src_beam[node_idx];
+            uint p_next = s_parent.meta0 & 0xFFu;
+            uint p_hold = (s_parent.meta0 >> 8u) & 0xFFu;
+            bool can_hold = ((s_parent.meta1 >> 24u) & 2u) != 0u;
+            bool is_term = ((s_parent.meta1 >> 24u) & 1u) != 0u;
+            if (!is_term && p_next < params.seq_len) {
+                if (use_hold == 0u) {
+                    s_piece = params.seq[p_next];
+                    s_next = p_next + 1u;
+                    s_hold = p_hold;
+                    s_valid_wg = 1u;
+                } else if (can_hold) {
+                    if (p_hold < 7u) {
+                        s_piece = p_hold;
+                        s_next = p_next + 1u;
+                        s_hold = params.seq[p_next];
+                        s_valid_wg = 1u;
+                    } else if (p_next + 1u < params.seq_len) {
+                        s_piece = params.seq[p_next + 1u];
+                        s_next = p_next + 2u;
+                        s_hold = params.seq[p_next];
+                        s_valid_wg = 1u;
+                    }
+                }
+            } else if (!is_term && p_next == params.seq_len && use_hold == 1u && can_hold && p_hold < 7u) {
+                s_piece = p_hold;
+                s_next = p_next;
+                s_hold = 255u;
+                s_valid_wg = 1u;
+            }
+            if (s_valid_wg != 0u) {
+                // Count T available after this placement (hold + remaining sequence)
+                uint ta = (s_hold == 2u) ? 1u : 0u;
+                for (uint i = s_next; i < params.seq_len; i++) {
+                    if (params.seq[i] == 2u) ta++;
+                }
+                s_t_avail = ta;
+                // Parent t_slot_lines for wasted_t
+                int ph[10];
+                for (int x = 0; x < 10; x++) ph[x] = 0;
+                uint bh = board_height(s_parent.rows);
+                for (int y = int(bh) - 1; y >= 0; y--) {
+                    uint rv = get_row(s_parent.rows, uint(y));
+                    while (rv != 0u) {
+                        int x = findLSB(rv);
+                        rv &= rv - 1u;
+                        if (ph[x] == 0) ph[x] = y + 1;
+                    }
+                }
+                s_parent_tslot = uint(best_t_slot(s_parent.rows, ph).z);
+                ivec2 sp = spawn_pos(s_piece);
+                int top_y = (bh + 6u >= 40u) ? 40 : min(max(int(bh) + 6, sp.y + 4), 40);
+                s_top_yi = uint(clamp(top_y + 4, 0, 44));
+            }
+        }
+    }
+    barrier();
+    if (s_valid_wg == 0u) return;
+
+    uint kind = s_piece;
+    uint top_yi = s_top_yi;
+
+    // Parallel valid[rot][yi] computation (1 thread per yi)
+    if (tid <= top_yi) {
+        int y = int(tid) - 4;
+        for (uint r = 0u; r < 4u; r++) {
+            uint mask = 0x7FFFu;
+            for (uint ci = 0u; ci < 4u; ci++) {
+                ivec2 c = piece_cell(kind, r, ci);
+                int by = y + c.y;
+                if (by < 0 || by >= 40) { mask = 0u; break; }
+                uint free_c = (~get_row(s_parent.rows, uint(by))) & FULL_ROW;
+                mask &= free_c << uint(4 - c.x);
+            }
+            s_valid[r][tid] = mask;
+            s_any[r][tid] = 0u;
+            s_rot[r][tid] = 0u;
+            s_fin[r][tid] = 0u;
+        }
+    }
+    barrier();
+
+    // Bit-parallel floodfill on thread 0 (exact match to Movegen::generate_for_search_from)
+    if (tid == 0u) {
+        ivec2 sp = spawn_pos(kind);
+        uint sp_yi = uint(sp.y + 4);
+        uint sp_bit = 1u << uint(sp.x + 4);
+        if (sp_yi <= top_yi && (s_valid[0][sp_yi] & sp_bit) != 0u) {
+            s_any[0][sp_yi] = sp_bit;
+            for (uint iter = 0u; iter < 64u; iter++) {
+                bool changed = false;
+                for (int yi = int(top_yi); yi >= 0; yi--) {
+                    for (uint r = 0u; r < 4u; r++) {
+                        uint v = s_valid[r][yi];
+                        uint a = s_any[r][yi];
+                        if (v == 0u || a == 0u) continue;
+                        while (true) {
+                            uint nxt = a | (((a >> 1u) | (a << 1u)) & v);
+                            if (nxt == a) break;
+                            a = nxt;
+                        }
+                        s_any[r][yi] = a;
+                        if (yi > 0) {
+                            s_any[r][yi - 1] |= a & s_valid[r][yi - 1];
+                        }
+                        uint targets[3] = uint[3]((r + 1u) & 3u, (r + 3u) & 3u, (r + 2u) & 3u);
+                        for (uint ti = 0u; ti < 3u; ti++) {
+                            uint to = targets[ti];
+                            uint rem = a;
+                            int k90 = kick90_index(r, to);
+                            int k180 = kick180_index(r, to);
+                            uint klen = (k90 >= 0) ? ((kind == 1u) ? 1u : 5u) : ((kind == 0u) ? 2u : 6u);
+                            for (uint ki = 0u; ki < klen; ki++) {
+                                ivec2 kd = ivec2(0, 0);
+                                if (k90 >= 0) {
+                                    if (kind == 0u) kd = I_K90_SRSP[uint(k90) * 5u + ki];
+                                    else if (kind != 1u) kd = JLSTZ_K90[uint(k90) * 5u + ki];
+                                } else {
+                                    if (kind == 0u) kd = I_K180[uint(k180) * 2u + ki];
+                                    else kd = JLSTZ_K180[uint(k180) * 6u + ki];
+                                }
+                                int nyi = yi + kd.y;
+                                if (nyi < 0 || nyi > int(top_yi)) continue;
+                                uint src_ok = shift_x(s_valid[to][nyi], -kd.x);
+                                uint hit = rem & src_ok;
+                                if (hit != 0u) {
+                                    rem &= ~hit;
+                                    uint dest = shift_x(hit, kd.x);
+                                    if ((dest & ~s_any[to][nyi]) != 0u) {
+                                        s_any[to][nyi] |= dest;
+                                        if (nyi > yi || (nyi == yi && to < r)) changed = true;
+                                    }
+                                    if (is_fin_or_tst(r, to, kd)) s_fin[to][nyi] |= dest;
+                                    else s_rot[to][nyi] |= dest;
+                                    if (rem == 0u) break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!changed) break;
+            }
+        }
+    }
+    barrier();
+
+    // Parallel extraction of resting placements (1 thread per yi)
+    if (tid <= top_yi) {
+        for (uint r = 0u; r < 4u; r++) {
+            uint below = (tid > 0u) ? s_valid[r][tid - 1u] : 0u;
+            uint rest = s_any[r][tid] & ~below;
+            while (rest != 0u) {
+                uint xi = uint(findLSB(rest));
+                rest &= rest - 1u;
+                uint bit = 1u << xi;
+                uint is_fin = ((s_fin[r][tid] & bit) != 0u) ? 1u : 0u;
+                uint spin_e = (is_fin != 0u || ((s_rot[r][tid] & bit) != 0u)) ? 1u : 0u;
+                uint slot = atomicAdd(s_rest_count, 1u);
+                if (slot < 128u) {
+                    s_rest[slot] = r | (xi << 2u) | (tid << 6u) | (spin_e << 12u) | (is_fin << 13u);
+                }
+            }
+        }
+    }
+    barrier();
+
+    uint rcount = min(s_rest_count, 128u);
+    for (uint rslot = tid; rslot < rcount; rslot += 64u) {
+    // Parallel child placement + S2 scoring + leaf evaluation
+    uint packed = s_rest[rslot];
+    uint rot = packed & 3u;
+    int px = int((packed >> 2u) & 0xFu) - 4;
+    int py = int((packed >> 6u) & 0x3Fu) - 4;
+    bool spin_entry = ((packed >> 12u) & 1u) != 0u;
+    bool fin_or_tst = ((packed >> 13u) & 1u) != 0u;
+
+    uint rows[20];
+    for (uint i = 0u; i < 20u; i++) rows[i] = s_parent.rows[i];
+    uint glo = s_parent.gmask_lo;
+    uint ghi = s_parent.gmask_hi;
+
+    uint spin = classify_spin(rows, kind, rot, px, py, spin_entry, fin_or_tst);
+    uint pre_h = board_height(rows);
+
+    // Place 4 cells
+    for (uint ci = 0u; ci < 4u; ci++) {
+        ivec2 c = piece_cell(kind, rot, ci);
+        uint bx = uint(px + c.x);
+        uint by = uint(py + c.y);
+        set_row(rows, by, get_row(rows, by) | (1u << bx));
+    }
+
+    // Clear lines
+    uint cleared = 0u;
+    uint gcleared = 0u;
+    uint wr = 0u;
+    for (uint rd = 0u; rd < 40u; rd++) {
+        uint rv = get_row(rows, rd);
+        if (rv == FULL_ROW) {
+            cleared++;
+            if (get_gbit(glo, ghi, rd)) gcleared++;
+        } else {
+            if (wr != rd) {
+                set_row(rows, wr, rv);
+                set_gbit(glo, ghi, wr, get_gbit(glo, ghi, rd));
+            }
+            wr++;
+        }
+    }
+    for (uint y = wr; y < 40u; y++) {
+        set_row(rows, y, 0u);
+        set_gbit(glo, ghi, y, false);
+    }
+    uint post_h = board_height(rows);
+    bool pc = (cleared > 0u && post_h == 0u);
+
+    // Unpack parent context
+    uint b2b_before = (s_parent.meta0 >> 16u) & 0xFFu;
+    uint combo_before = (s_parent.meta0 >> 24u) & 0xFFu;
+    uint inc = s_parent.meta1 & 0xFFu;
+    uint arr = (s_parent.meta1 >> 8u) & 0xFFu;
+    uint root_idx = (s_parent.meta1 >> 16u) & 0xFFu;
+    uint sent_tot = s_parent.sent_total;
+    uint recv_tot = s_parent.received_total;
+    uint placed_before = s_parent.pieces_placed;
+
+    uint level = state.level;
+    float mult = max(params.locks[level].multiplier, 1.0);
+
+    // S2 attack calculation (matching crates/core/src/scoring.rs)
+    bool difficult = (spin != 0u || cleared >= 4u);
+    uint combo_after = 0u;
+    uint b2b_after = b2b_before;
+    bool broke_b2b = false;
+    if (cleared > 0u) {
+        combo_after = combo_before + 1u;
+        if (pc) { b2b_after = b2b_before + 1u; }
+        else if (difficult) { b2b_after = b2b_before + 1u; }
+        else { b2b_after = 0u; broke_b2b = (b2b_before >= 1u); }
+    }
+
+    float base = float(base_attack_val(spin, cleared));
+    if (cleared > 0u && b2b_after >= 2u) base += 1.0;
+    if (cleared > 0u) {
+        if (combo_before >= 1u) base *= (1.0 + 0.25 * float(combo_before));
+        if (combo_before >= 2u) base = max(base, log(1.25 * float(combo_before) + 1.0));
+    }
+    uint gsb = (gcleared > 0u && difficult) ? 1u : 0u;
+    uint main_att = (base > 0.0 || gsb > 0u) ? uint(floor(base * mult + float(gsb))) : 0u;
+
+    uint events[5];
+    uint nev = 0u;
+    uint surge_amt = 0u;
+    if (broke_b2b && b2b_before > B2B_CHARGE_AT) {
+        surge_amt = uint(floor(float(b2b_before - 1u) * mult));
+        if (surge_amt > 0u) {
+            uint r = uint(floor(float(surge_amt) / 3.0 + 0.5));
+            uint c2 = (surge_amt > 2u * r) ? (surge_amt - 2u * r) : 0u;
+            if (r > 0u) { events[nev++] = r; events[nev++] = r; }
+            if (c2 > 0u) { events[nev++] = c2; }
+        }
+    }
+    if (main_att > 0u) events[nev++] = main_att;
+    if (pc) {
+        uint pca = uint(floor(float(PC_GARBAGE) * mult));
+        if (pca > 0u) events[nev++] = pca;
+    }
+    uint att_total = 0u;
+    for (uint i = 0u; i < nev; i++) att_total += events[i];
+
+    // Immediate placement reward (matching crates/bot/src/eval.rs::apply_placement)
+    EvalWeights w = params.w;
+    uint proj_pre = pre_h + min(arr, GARBAGE_CAP);
+    bool survival = (w.survival_flag > 0.5) && (proj_pre >= SURVIVAL_PROJECTED);
+    float rval = w.attack * float(att_total) + w.clear_w[spin * 5u + cleared];
+    if (survival && cleared > 0u) rval += w.survival_line * float(cleared);
+    if (cleared > 0u && arr >= 1u) {
+        float risk = clamp((float(proj_pre) - 18.0) / 3.0, 0.0, 1.0);
+        rval += w.defense * float(min(arr, GARBAGE_CAP)) * risk;
+    }
+    if (placed_before < OPENER_PIECES && cleared > 0u) rval += w.opener_clear;
+    if (spin == 2u && cleared == 2u) rval += w.tsd_bonus;
+    if (spin == 1u) rval += w.mini_penalty;
+    if (pc) rval += w.perfect_clear;
+    if (broke_b2b) {
+        rval += w.b2b_break * mult * ((surge_amt >= 8u) ? w.b2b_keep_mult : 1.0);
+    }
+    if (kind == 2u && s_parent_tslot > 0u && spin == 0u) rval += w.wasted_t;
+    if (surge_amt > 0u && surge_amt < 8u && proj_pre < 18u) rval += w.surge_hold_penalty;
+    if (surge_amt >= 8u) rval += w.surge_cashout_bonus * float(surge_amt);
+    rval += w.combo * float(combo_after);
+    rval += w.garbage_clear * float(gcleared);
+    if (placed_before < OPENER_PIECES) rval += w.opener_attack * float(att_total);
+
+    // Opener cancel & incoming update
+    uint inc_before = inc;
+    uint total_cancelled = 0u;
+    for (uint i = 0u; i < nev; i++) {
+        uint ev = events[i];
+        uint budget = (placed_before < OPENER_PIECES && inc >= sent_tot) ? ev : 0u;
+        uint cancelled = min(inc, ev + budget);
+        total_cancelled += cancelled;
+        inc -= cancelled;
+        arr = (arr > cancelled) ? (arr - cancelled) : 0u;
+        if (ev > cancelled) sent_tot += (ev - cancelled);
+    }
+    if (total_cancelled > 0u) {
+        float cancel_scale = clamp((float(pre_h + inc_before) - 8.0) / 10.0, 0.25, 1.5);
+        rval += w.cancel_bonus * float(total_cancelled) * cancel_scale;
+    }
+
+    bool topped_out = (post_h > 20u);
+    uint inserted = (cleared == 0u && !topped_out) ? min(min(arr, inc), GARBAGE_CAP) : 0u;
+    inc -= inserted;
+    arr -= inserted;
+    recv_tot += inserted;
+
+    // Advance LockForecast to level + 1
+    uint next_lvl = level + 1u;
+    float next_mult = mult;
+    if (next_lvl < 24u) {
+        LockForecast lf = params.locks[next_lvl];
+        inc += lf.extra;
+        uint tot_in = params.initial_incoming + lf.hypothetical;
+        uint removed = (tot_in > inc) ? (tot_in - inc) : 0u;
+        arr = min((lf.eligible > removed) ? (lf.eligible - removed) : 0u, inc);
+        next_mult = lf.multiplier;
+    }
+
+    float scale = pow(w.discount, float(level));
+    float acc = s_parent.reward + scale * rval;
+    if (post_h > 12u) {
+        acc -= scale * w.stack_exposure * float(post_h - 12u);
+    }
+
+    float leaf = -1e30;
+    if (inserted > 0u) {
+        if (post_h + inserted > 20u) {
+            topped_out = true;
+        } else {
+            // Evaluate 10 hole columns, choose lower-median hole for Straight/SplitBurst
+            float vals[10];
+            for (uint h = 0u; h < 10u; h++) {
+                uint r2[20];
+                for (uint i = 0u; i < 20u; i++) r2[i] = rows[i];
+                uint glo2 = glo; uint ghi2 = ghi;
+                insert_garbage_rows(r2, glo2, ghi2, inserted, h, params.projection_mode);
+                vals[h] = eval_leaf(r2, glo2, ghi2, b2b_after, combo_after, inc, arr, sent_tot, recv_tot, next_mult, s_t_avail, s_hold, w);
+            }
+            if (params.projection_mode == 0u) {
+                float sumv = 0.0;
+                for (uint h = 0u; h < 10u; h++) sumv += vals[h];
+                leaf = sumv * 0.1;
+            } else {
+                // Find index of 5th smallest (lower median)
+                uint cols[10] = uint[10](0u,1u,2u,3u,4u,5u,6u,7u,8u,9u);
+                for (uint i = 1u; i < 10u; i++) {
+                    uint k = cols[i];
+                    float kv = vals[k];
+                    int j = int(i) - 1;
+                    while (j >= 0 && vals[cols[j]] > kv) {
+                        cols[j + 1] = cols[j];
+                        j--;
+                    }
+                    cols[j + 1] = k;
+                }
+                uint q_idx = (post_h + inserted >= 18u) ? 1u : ((post_h + inserted >= 15u) ? 2u : 4u);
+                uint med = cols[q_idx];
+                insert_garbage_rows(rows, glo, ghi, inserted, med, params.projection_mode);
+                leaf = vals[med];
+            }
+        }
+    } else if (!topped_out) {
+        leaf = eval_leaf(rows, glo, ghi, b2b_after, combo_after, inc, arr, sent_tot, recv_tot, next_mult, s_t_avail, s_hold, w);
+    }
+
+    float total_val = topped_out ? -1e30 : (acc + scale * w.discount * leaf);
+    bool is_terminal = topped_out || (inserted > 0u && params.projection_mode == 0u) || (s_next >= params.seq_len && s_hold >= 7u);
+
+    if (is_terminal) {
+        if (!topped_out) {
+            atomicMax(root_best[root_idx], float_to_sortable(total_val));
+        }
+        continue;
+    }
+
+    // Compute 64-bit FNV-1a transposition key
+    uvec2 h = uvec2(0x84222325u, 0xcbf29ce4u);
+    for (uint i = 0u; i < 20u; i++) h = fnv_step(h, rows[i]);
+    h = fnv_step(h, glo);
+    h = fnv_step(h, ghi);
+    h = fnv_step(h, s_next | (s_hold << 8u) | (b2b_after << 16u) | (combo_after << 24u));
+    h = fnv_step(h, inc | (arr << 8u));
+
+    uint out_idx = atomicAdd(state.child_count, 1u);
+    if (out_idx >= MAX_CHILDREN) {
+        atomicAdd(state.overflow, 1u);
+        continue;
+    }
+
+    GpuNode child;
+    for (uint i = 0u; i < 20u; i++) child.rows[i] = rows[i];
+    child.gmask_lo = glo;
+    child.gmask_hi = ghi;
+    child.meta0 = (s_next & 0xFFu) | ((s_hold & 0xFFu) << 8u) | ((min(b2b_after, 255u)) << 16u) | ((min(combo_after, 255u)) << 24u);
+    child.meta1 = (min(inc, 255u)) | (min(arr, 255u) << 8u) | ((root_idx & 0xFFu) << 16u) | (2u << 24u); // can_hold=true
+    child.sent_total = sent_tot;
+    child.received_total = recv_tot;
+    child.pieces_placed = placed_before + 1u;
+    child.reward = acc;
+    child.value = total_val;
+    child.key_lo = h.x;
+    child.key_hi = h.y;
+    child.pad0 = 0u;
+    children[out_idx] = child;
+    }
+}

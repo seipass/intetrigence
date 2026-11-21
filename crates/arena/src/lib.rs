@@ -35,6 +35,8 @@ pub mod referee;
 pub mod render;
 pub mod replay;
 pub mod round;
+pub mod s2lab;
+pub mod s2lab_render;
 pub mod tbp_agent;
 
 /// Content hash of the workspace's Rust sources and dependency manifests,
@@ -70,4 +72,6 @@ pub use harness::{AttaxConfig, MatchConfig, MatchSummary, run_match};
 pub use referee::{RoundConfig, RoundOutcome, RoundReport, run_round};
 pub use render::{RenderOptions, RenderReport, render_replay};
 pub use replay::{ReplayRecord, VerifyReport, verify_replay, write_replay};
+pub use s2lab::read_games as read_s2lab_games;
+pub use s2lab_render::{S2LabRenderOptions, S2LabRenderReport, render_s2lab_games};
 pub use tbp_agent::{TbpAgent, TbpAgentConfig};

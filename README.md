@@ -12,6 +12,7 @@ cargo test --workspace --release --locked
 ## 対戦を実行する
 
 - **Attax** は [s2-bot-lab の手順](adapters/s2lab/README.md)で Rust 版 `c83d339` に接続します。公開 S2 状態・キュー長・Lab の採点規則をそろえ、ロック単位で手と結果を記録します。
+- Attax の s2lab 記録は `arena render-s2lab --games <games.jsonl> --out <video.mp4>` で動画にできます。100局を30fps/480pで連結した例は [Attax との100局リプレイ](docs/attax-100-replay.md) にあります。
 - **Cold Clear 2** と **clys** は、[CC2](docs/cc2-integration.md)と[clys](docs/clys-integration.md)の統合手順でビルドして TBP で接続します。それぞれの互換パッチと計測条件は対戦結果に併記します。
 - **ローカル疎通**は外部ボットのセットアップなしで確認できます。
 

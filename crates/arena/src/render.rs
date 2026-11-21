@@ -203,8 +203,8 @@ pub fn render_replay(
 // ---------------------------------------------------------------------------
 
 #[derive(Clone)]
-struct ColorLayer {
-    cells: [[Option<PieceKind>; 40]; 10],
+pub(crate) struct ColorLayer {
+    pub(crate) cells: [[Option<PieceKind>; 40]; 10],
 }
 
 impl Default for ColorLayer {
@@ -216,7 +216,7 @@ impl Default for ColorLayer {
 }
 
 impl ColorLayer {
-    fn place(&mut self, kind: PieceKind, cells: &[(i32, i32); 4]) {
+    pub(crate) fn place(&mut self, kind: PieceKind, cells: &[(i32, i32); 4]) {
         for &(x, y) in cells {
             if (0..10).contains(&x) && (0..40).contains(&y) {
                 self.cells[x as usize][y as usize] = Some(kind);
@@ -225,7 +225,7 @@ impl ColorLayer {
     }
 
     /// Removes `full` rows and shifts everything above them down.
-    fn clear_rows(&mut self, full: &[usize]) {
+    pub(crate) fn clear_rows(&mut self, full: &[usize]) {
         if full.is_empty() {
             return;
         }
@@ -257,44 +257,44 @@ impl ColorLayer {
 }
 
 #[derive(Clone)]
-struct PlayerState {
-    board: Board,
-    colors: ColorLayer,
-    hold: Option<PieceKind>,
-    preview: Vec<PieceKind>,
-    pending: u32,
-    combo: u32,
-    b2b: u32,
-    sent_total: u32,
-    received_total: u32,
-    pieces: u32,
-    lines: u32,
-    attack_total: u32,
-    think_ms: f64,
+pub(crate) struct PlayerState {
+    pub(crate) board: Board,
+    pub(crate) colors: ColorLayer,
+    pub(crate) hold: Option<PieceKind>,
+    pub(crate) preview: Vec<PieceKind>,
+    pub(crate) pending: u32,
+    pub(crate) combo: u32,
+    pub(crate) b2b: u32,
+    pub(crate) sent_total: u32,
+    pub(crate) received_total: u32,
+    pub(crate) pieces: u32,
+    pub(crate) lines: u32,
+    pub(crate) attack_total: u32,
+    pub(crate) think_ms: f64,
 }
 
 #[derive(Clone)]
-struct PlacementView {
-    piece: PieceKind,
-    cells: [(i32, i32); 4],
-    spin: String,
-    lines: u8,
-    attack: u32,
-    perfect_clear: bool,
-    topped_out: bool,
-    cleared_rows: Vec<usize>,
+pub(crate) struct PlacementView {
+    pub(crate) piece: PieceKind,
+    pub(crate) cells: [(i32, i32); 4],
+    pub(crate) spin: String,
+    pub(crate) lines: u8,
+    pub(crate) attack: u32,
+    pub(crate) perfect_clear: bool,
+    pub(crate) topped_out: bool,
+    pub(crate) cleared_rows: Vec<usize>,
 }
 
-struct TurnSnapshot {
-    turn: u32,
-    before: [PlayerState; 2],
-    after: [PlayerState; 2],
-    placements: [Option<PlacementView>; 2],
+pub(crate) struct TurnSnapshot {
+    pub(crate) turn: u32,
+    pub(crate) before: [PlayerState; 2],
+    pub(crate) after: [PlayerState; 2],
+    pub(crate) placements: [Option<PlacementView>; 2],
 }
 
-struct Simulation {
-    turns: Vec<TurnSnapshot>,
-    result: Option<ResultRecord>,
+pub(crate) struct Simulation {
+    pub(crate) turns: Vec<TurnSnapshot>,
+    pub(crate) result: Option<ResultRecord>,
 }
 
 fn player_state(
@@ -324,7 +324,7 @@ fn player_state(
     }
 }
 
-fn full_rows(board: &Board, cells: &[(i32, i32); 4]) -> Vec<usize> {
+pub(crate) fn full_rows(board: &Board, cells: &[(i32, i32); 4]) -> Vec<usize> {
     let mut masks = [0u16; 40];
     for (y, mask) in masks.iter_mut().enumerate() {
         *mask = board.row(y);
@@ -465,16 +465,16 @@ fn simulate(
 // Drawing
 // ---------------------------------------------------------------------------
 
-const BACKGROUND: [u8; 3] = [14, 16, 24];
-const PANEL: [u8; 3] = [24, 27, 38];
-const GRID: [u8; 3] = [38, 42, 56];
-const TEXT: [u8; 3] = [226, 232, 240];
-const DIM: [u8; 3] = [132, 142, 160];
-const ACCENT: [u8; 3] = [90, 200, 250];
-const WARN: [u8; 3] = [240, 120, 90];
-const GARBAGE: [u8; 3] = [120, 122, 132];
+pub(crate) const BACKGROUND: [u8; 3] = [14, 16, 24];
+pub(crate) const PANEL: [u8; 3] = [24, 27, 38];
+pub(crate) const GRID: [u8; 3] = [38, 42, 56];
+pub(crate) const TEXT: [u8; 3] = [226, 232, 240];
+pub(crate) const DIM: [u8; 3] = [132, 142, 160];
+pub(crate) const ACCENT: [u8; 3] = [90, 200, 250];
+pub(crate) const WARN: [u8; 3] = [240, 120, 90];
+pub(crate) const GARBAGE: [u8; 3] = [120, 122, 132];
 
-fn piece_color(kind: PieceKind) -> [u8; 3] {
+pub(crate) fn piece_color(kind: PieceKind) -> [u8; 3] {
     match kind {
         PieceKind::I => [40, 210, 220],
         PieceKind::O => [230, 220, 60],
@@ -494,14 +494,14 @@ fn dim(color: [u8; 3], factor: f32) -> [u8; 3] {
     ]
 }
 
-struct Canvas {
+pub(crate) struct Canvas {
     width: usize,
     height: usize,
     data: Vec<u8>,
 }
 
 impl Canvas {
-    fn new(width: usize, height: usize) -> Self {
+    pub(crate) fn new(width: usize, height: usize) -> Self {
         Self {
             width,
             height,
@@ -509,10 +509,13 @@ impl Canvas {
         }
     }
 
-    fn clear(&mut self, color: [u8; 3]) {
+    pub(crate) fn clear(&mut self, color: [u8; 3]) {
         for pixel in self.data.chunks_exact_mut(3) {
             pixel.copy_from_slice(&color);
         }
+    }
+    pub(crate) fn bytes(&self) -> &[u8] {
+        &self.data
     }
 
     fn px(&mut self, x: i32, y: i32, color: [u8; 3]) {
@@ -523,7 +526,7 @@ impl Canvas {
         self.data[index..index + 3].copy_from_slice(&color);
     }
 
-    fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 3]) {
+    pub(crate) fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 3]) {
         for dy in 0..h {
             for dx in 0..w {
                 self.px(x + dx, y + dy, color);
@@ -538,7 +541,7 @@ impl Canvas {
         self.rect(x + w - thickness, y, thickness, h, color);
     }
 
-    fn blend(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 3], alpha: f32) {
+    pub(crate) fn blend(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 3], alpha: f32) {
         let alpha = alpha.clamp(0.0, 1.0);
         for dy in 0..h {
             for dx in 0..w {
@@ -557,7 +560,7 @@ impl Canvas {
         }
     }
 
-    fn text(&mut self, x: i32, y: i32, scale: i32, text: &str, color: [u8; 3]) {
+    pub(crate) fn text(&mut self, x: i32, y: i32, scale: i32, text: &str, color: [u8; 3]) {
         let mut cursor = x;
         for c in text.chars() {
             if let Some(glyph) = font::glyph(c) {
@@ -579,7 +582,14 @@ impl Canvas {
         }
     }
 
-    fn text_right(&mut self, right: i32, y: i32, scale: i32, text: &str, color: [u8; 3]) {
+    pub(crate) fn text_right(
+        &mut self,
+        right: i32,
+        y: i32,
+        scale: i32,
+        text: &str,
+        color: [u8; 3],
+    ) {
         let width = font::text_width(text, scale as u32) as i32;
         self.text(right - width, y, scale, text, color);
     }
@@ -603,14 +613,14 @@ fn mini_piece(canvas: &mut Canvas, x: i32, y: i32, cell: i32, kind: PieceKind, c
     }
 }
 
-struct DrawContext<'a> {
-    header: &'a Header,
-    options: &'a RenderOptions,
-    result: Option<&'a ResultRecord>,
+pub(crate) struct DrawContext<'a> {
+    pub(crate) header: &'a Header,
+    pub(crate) options: &'a RenderOptions,
+    pub(crate) result: Option<&'a ResultRecord>,
 }
 
 impl DrawContext<'_> {
-    fn draw_turn(
+    pub(crate) fn draw_turn(
         &self,
         canvas: &mut Canvas,
         snapshot: &TurnSnapshot,
@@ -872,10 +882,15 @@ impl DrawContext<'_> {
             / self.options.fps as f64;
         canvas.text(24, 654, 1, &format!("{:.1} S", seconds), DIM);
         canvas.text_right(1256, 620, 2, &format!("{} FPS", self.options.fps), DIM);
-        canvas.text_right(1256, 654, 1, "VERIFIED REPLAY", DIM);
+        let label = if self.header.protocol == "s2-bot-lab" {
+            "S2 LAB RECORD"
+        } else {
+            "VERIFIED REPLAY"
+        };
+        canvas.text_right(1256, 654, 1, label, DIM);
     }
 
-    fn draw_end_card(&self, canvas: &mut Canvas, frame: u64, total: u64) {
+    pub(crate) fn draw_end_card(&self, canvas: &mut Canvas, frame: u64, total: u64) {
         canvas.clear(BACKGROUND);
         let width = self.options.width as i32;
         let height = self.options.height as i32;

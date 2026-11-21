@@ -20,6 +20,7 @@ use intetrigence_arena::harness::{
 };
 use intetrigence_arena::render::{RenderOptions, render_replay};
 use intetrigence_arena::replay::verify_replay;
+use intetrigence_arena::s2lab_render::{S2LabRenderOptions, render_s2lab_games};
 use intetrigence_bot::SearchConfig;
 
 fn main() {
@@ -33,6 +34,7 @@ fn main() {
         "verify" => cmd_verify(&args[1..]),
         "report" => cmd_report(&args[1..]),
         "render" => cmd_render(&args[1..]),
+        "render-s2lab" => cmd_render_s2lab(&args[1..]),
         "reclassify" => cmd_reclassify(&args[1..]),
         "-h" | "--help" | "help" => {
             usage();
@@ -48,7 +50,7 @@ fn main() {
 
 fn usage() {
     eprintln!(
-        "usage:\n  arena match  [--out DIR] [--seeds 1001,1002,...] [--sheets A,B]\n               [--turns 1000] [--frames 12] [--timeout 30]\n               [--attax DIR] [--bun bun] [--no-attax]\n  arena verify <replay.jsonl | match-dir>\n  arena report <match-dir>"
+        "usage:\n  arena match  [--out DIR] [--seeds 1001,1002,...] [--sheets A,B]\n               [--turns 1000] [--frames 12] [--timeout 30]\n               [--attax DIR] [--bun bun] [--no-attax]\n  arena verify <replay.jsonl | match-dir>\n  arena report <match-dir>\n  arena render --replay <replay.jsonl> --out <video.mp4> [--fps 60]\n  arena render-s2lab --games <games.jsonl> --out <video.mp4>\n               [--fps 30] [--width 854] [--height 480]\n               [--title 1] [--end-card 3] [--max-games N] [--start-game N]\n               [--resume] [--keep-segments] [--segment-dir DIR]"
     );
 }
 
@@ -661,6 +663,102 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
             "reason": report.reason,
             "forfeit_cause": report.forfeit_cause,
             "verified": report.verified,
+        })
+    );
+    Ok(())
+}
+
+fn cmd_render_s2lab(args: &[String]) -> Result<(), String> {
+    let mut games: Option<PathBuf> = None;
+    let mut out: Option<PathBuf> = None;
+    let mut options = S2LabRenderOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].clone();
+        let value = |offset: usize| -> Result<String, String> {
+            args.get(index + offset)
+                .cloned()
+                .ok_or_else(|| format!("{flag} needs a value"))
+        };
+        match flag.as_str() {
+            "--games" => {
+                games = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--out" => {
+                out = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--fps" => {
+                options.fps = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--fps: {error}"))?;
+                index += 2;
+            }
+            "--width" => {
+                options.width = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--width: {error}"))?;
+                index += 2;
+            }
+            "--height" => {
+                options.height = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--height: {error}"))?;
+                index += 2;
+            }
+            "--title" => {
+                options.title_seconds = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--title: {error}"))?;
+                index += 2;
+            }
+            "--end-card" => {
+                options.end_card_seconds = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--end-card: {error}"))?;
+                index += 2;
+            }
+            "--max-games" => {
+                options.max_games = Some(
+                    value(1)?
+                        .parse()
+                        .map_err(|error| format!("--max-games: {error}"))?,
+                );
+                index += 2;
+            }
+            "--start-game" => {
+                options.start_game = value(1)?
+                    .parse()
+                    .map_err(|error| format!("--start-game: {error}"))?;
+                index += 2;
+            }
+            "--segment-dir" => {
+                options.segment_dir = Some(PathBuf::from(value(1)?));
+                index += 2;
+            }
+            "--resume" => {
+                options.resume = true;
+                index += 1;
+            }
+            "--keep-segments" => {
+                options.keep_segments = true;
+                index += 1;
+            }
+            other => return Err(format!("unknown render-s2lab flag `{other}`")),
+        }
+    }
+    let games = games.ok_or_else(|| "render-s2lab needs --games <games.jsonl>".to_string())?;
+    let out = out.ok_or_else(|| "render-s2lab needs --out <video.mp4>".to_string())?;
+    let report = render_s2lab_games(&games, &out, &options)?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "games": report.games,
+            "frames": report.frames,
+            "duration_seconds": report.duration_seconds,
+            "output": report.output.display().to_string(),
+            "segments": report.segments.iter().map(|path| path.display().to_string()).collect::<Vec<_>>(),
         })
     );
     Ok(())

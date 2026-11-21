@@ -311,10 +311,10 @@ impl Movegen {
     pub fn new() -> Self {
         Self {
             root: 0,
-            parent: vec![UNVISITED; STATE_COUNT],
-            input: vec![0u8; STATE_COUNT],
-            order: Vec::with_capacity(STATE_COUNT),
-            expanded: vec![false; POSITION_COUNT],
+            parent: Vec::new(),
+            input: Vec::new(),
+            order: Vec::new(),
+            expanded: Vec::new(),
             resting: Vec::with_capacity(64),
             placements: Vec::with_capacity(64),
             supports_180: true,
@@ -392,39 +392,219 @@ impl Movegen {
 
             let spin_entry = fin_or_tst.is_some() || rotated.is_some();
             let actions = self.path_to(best);
-            let piece = ActivePiece {
+            self.push_placement(
+                board,
                 kind,
                 rotation,
                 x,
                 y,
-            };
-            let mut spin = board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst.is_some());
-            if !self.t_immobility_mini
-                && kind == PieceKind::T
-                && spin == SpinType::Mini
-                && board.t_spin_corners(rotation, x, y).0 < 3
-            {
-                spin = SpinType::None;
-            }
-            self.placements.push(Placement {
-                piece,
                 spin_entry,
-                fin_or_tst: fin_or_tst.is_some(),
-                // The all-spin test and the All-Mini+ classification are the
-                // core engine's (`docs/s2-spec.md` §4); the bot must not keep
-                // a second copy of the corner table.
-                immobile: board.is_immobile(kind, rotation, x, y),
-                spin,
+                fin_or_tst.is_some(),
                 actions,
-                kick_order: self.kick_order,
-            });
+            );
         }
 
         &self.placements
     }
 
+    /// Generates all reachable placements for search without constructing input paths.
+    pub fn generate_for_search_from(&mut self, board: &Board, spawn: ActivePiece) -> &[Placement] {
+        self.generate_for_search_from_with_180(board, spawn, true)
+    }
+
+    /// Bit-parallel movegen for search nodes where input sequences are unused.
+    pub fn generate_for_search_from_with_180(
+        &mut self,
+        board: &Board,
+        spawn: ActivePiece,
+        supports_180: bool,
+    ) -> &[Placement] {
+        self.supports_180 = supports_180;
+        self.placements.clear();
+        if !(X_MIN..=X_MAX).contains(&spawn.x) || !(Y_MIN..=Y_MAX).contains(&spawn.y) {
+            return &self.placements;
+        }
+        let kind = spawn.kind;
+        let top_y = if board.height() + 6 >= Y_MAX as usize {
+            Y_MAX
+        } else {
+            (board.height() as i32 + 6).max(spawn.y + 4).min(Y_MAX)
+        };
+        let top_yi = (top_y - Y_MIN).clamp(0, (Y_COUNT - 1) as i32) as usize;
+        let mut valid = [[0u16; Y_COUNT]; ROTATION_COUNT];
+        for (rot_idx, valid_rows) in valid.iter_mut().enumerate() {
+            let cells = kind.cells(Rotation::ALL[rot_idx]);
+            for (yi, slot) in valid_rows[..=top_yi].iter_mut().enumerate() {
+                let y = Y_MIN + yi as i32;
+                let mut mask = X_MASK;
+                for &(cx, cy) in &cells {
+                    let by = y + cy;
+                    if !(0..Board::HEIGHT as i32).contains(&by) {
+                        mask = 0;
+                        break;
+                    }
+                    let free = (!board.row(by as usize)) & Board::FULL_ROW;
+                    mask &= free << (4 - cx);
+                }
+                *slot = mask;
+            }
+        }
+
+        let spawn_rot = spawn.rotation as usize;
+        let spawn_yi = (spawn.y - Y_MIN) as usize;
+        if spawn_yi > top_yi {
+            return &self.placements;
+        }
+        let spawn_bit = 1u16 << (spawn.x - X_MIN);
+        if (valid[spawn_rot][spawn_yi] & spawn_bit) == 0 {
+            return &self.placements;
+        }
+
+        let mut any = [[0u16; Y_COUNT]; ROTATION_COUNT];
+        let mut rotated = [[0u16; Y_COUNT]; ROTATION_COUNT];
+        let mut fin = [[0u16; Y_COUNT]; ROTATION_COUNT];
+        any[spawn_rot][spawn_yi] = spawn_bit;
+
+        loop {
+            let mut changed = false;
+            for yi in (0..=top_yi).rev() {
+                for rot_idx in 0..ROTATION_COUNT {
+                    let v = valid[rot_idx][yi];
+                    let mut a = any[rot_idx][yi];
+                    if v == 0 || a == 0 {
+                        continue;
+                    }
+                    loop {
+                        let nxt = a | (((a >> 1) | (a << 1)) & v);
+                        if nxt == a {
+                            break;
+                        }
+                        a = nxt;
+                    }
+                    any[rot_idx][yi] = a;
+                    if yi > 0 {
+                        any[rot_idx][yi - 1] |= a & valid[rot_idx][yi - 1];
+                    }
+                    let rot = Rotation::ALL[rot_idx];
+                    for (is_180, to) in [(false, rot.cw()), (false, rot.ccw()), (true, rot.flip())] {
+                        if is_180 && !self.supports_180 {
+                            continue;
+                        }
+                        let to_idx = to as usize;
+                        let mut rem = a;
+                        for &(dx, dy) in kick::kicks_with_order(kind, rot, to, self.kick_order) {
+                            let nyi = yi as i32 + i32::from(dy);
+                            if !(0..=top_yi as i32).contains(&nyi) {
+                                continue;
+                            }
+                            let ny = nyi as usize;
+                            let src_ok = shift_x(valid[to_idx][ny], -i32::from(dx));
+                            let hit = rem & src_ok;
+                            if hit != 0 {
+                                rem &= !hit;
+                                let dest = shift_x(hit, i32::from(dx));
+                                if (dest & !any[to_idx][ny]) != 0 {
+                                    any[to_idx][ny] |= dest;
+                                    if ny > yi || (ny == yi && to_idx < rot_idx) {
+                                        changed = true;
+                                    }
+                                }
+                                if kick::is_fin_or_tst_kick(rot, to, (dx, dy)) {
+                                    fin[to_idx][ny] |= dest;
+                                } else {
+                                    rotated[to_idx][ny] |= dest;
+                                }
+                                if rem == 0 {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        for rot_idx in 0..ROTATION_COUNT {
+            let rotation = Rotation::ALL[rot_idx];
+            for yi in 0..=top_yi {
+                let y = Y_MIN + yi as i32;
+                let below = if yi > 0 { valid[rot_idx][yi - 1] } else { 0 };
+                let mut rest = any[rot_idx][yi] & !below;
+                while rest != 0 {
+                    let xi = rest.trailing_zeros() as usize;
+                    rest &= rest - 1;
+                    let x = X_MIN + xi as i32;
+                    let bit = 1u16 << xi;
+                    let is_fin = (fin[rot_idx][yi] & bit) != 0;
+                    let spin_entry = is_fin || ((rotated[rot_idx][yi] & bit) != 0);
+                    self.push_placement(
+                        board,
+                        kind,
+                        rotation,
+                        x,
+                        y,
+                        spin_entry,
+                        is_fin,
+                        ActionSeq::new(),
+                    );
+                }
+            }
+        }
+        self.placements.sort_unstable_by_key(Placement::key);
+        &self.placements
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push_placement(
+        &mut self,
+        board: &Board,
+        kind: PieceKind,
+        rotation: Rotation,
+        x: i32,
+        y: i32,
+        spin_entry: bool,
+        fin_or_tst: bool,
+        actions: ActionSeq,
+    ) {
+        let piece = ActivePiece {
+            kind,
+            rotation,
+            x,
+            y,
+        };
+        let mut spin = board.spin_type(kind, rotation, x, y, spin_entry, fin_or_tst);
+        if !self.t_immobility_mini
+            && kind == PieceKind::T
+            && spin == SpinType::Mini
+            && board.t_spin_corners(rotation, x, y).0 < 3
+        {
+            spin = SpinType::None;
+        }
+        self.placements.push(Placement {
+            piece,
+            spin_entry,
+            fin_or_tst,
+            // The all-spin test and the All-Mini+ classification are the
+            // core engine's (`docs/s2-spec.md` §4); the bot must not keep
+            // a second copy of the corner table.
+            immobile: board.is_immobile(kind, rotation, x, y),
+            spin,
+            actions,
+            kick_order: self.kick_order,
+        });
+    }
+
     /// Runs the BFS and records the reachable states and resting positions.
     fn explore(&mut self, board: &Board, spawn: ActivePiece) -> bool {
+        if self.parent.len() != STATE_COUNT {
+            self.parent.resize(STATE_COUNT, UNVISITED);
+            self.input.resize(STATE_COUNT, 0);
+            self.order.reserve(STATE_COUNT);
+            self.expanded.resize(POSITION_COUNT, false);
+        }
         let kind = spawn.kind;
         let cells = [
             kind.cells(Rotation::Zero),
@@ -547,7 +727,17 @@ const ARRIVAL_COUNT: usize = 3;
 const ROTATION_COUNT: usize = 4;
 const POSITION_COUNT: usize = ROTATION_COUNT * Y_COUNT * X_COUNT;
 const STATE_COUNT: usize = POSITION_COUNT * ARRIVAL_COUNT;
+const X_MASK: u16 = (1u16 << X_COUNT) - 1;
 const UNVISITED: u16 = u16::MAX;
+
+#[inline]
+fn shift_x(mask: u16, delta: i32) -> u16 {
+    if delta >= 0 {
+        (mask << delta) & X_MASK
+    } else {
+        mask >> (-delta)
+    }
+}
 
 const MOVE_INPUTS: [(Action, i32, i32); 3] = [
     (Action::MoveLeft, -1, 0),
@@ -934,6 +1124,82 @@ mod supports_180 {
             let with = generate_with_180(&board, kind, true).len();
             let without = generate_with_180(&board, kind, false).len();
             assert_eq!(with, without, "{kind:?} on an open board");
+        }
+    }
+}
+
+#[cfg(test)]
+mod search_movegen_equivalence {
+    use super::*;
+    use intetrigence_core::ALL_PIECES;
+
+    fn random_boards() -> Vec<Board> {
+        let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let mut boards = vec![Board::new()];
+        for height in [2, 6, 12, 18, 22, 34] {
+            for _ in 0..8 {
+                let mut b = Board::new();
+                for y in 0..height {
+                    let mut mask = (next() as u16) & Board::FULL_ROW;
+                    if mask == Board::FULL_ROW {
+                        mask &= !(1 << (next() % 10));
+                    }
+                    b.set_row(y, mask);
+                }
+                boards.push(b);
+            }
+        }
+        // Specific overhanging / 180-only / high-well cases.
+        let mut overhang = Board::new();
+        for y in 0..3 {
+            overhang.set_row(y, Board::FULL_ROW & !(1 << 3));
+        }
+        overhang.set_row(3, 0b11_1000_0111);
+        overhang.set_row(4, 0b11_0000_1100);
+        boards.push(overhang);
+        boards
+    }
+
+    #[test]
+    fn search_movegen_matches_exact_bfs() {
+        let mut bfs = Movegen::new();
+        let mut bit = Movegen::new();
+        let boards = random_boards();
+        for (bi, board) in boards.iter().enumerate() {
+            for supports_180 in [true, false] {
+                for kick_order in [KickOrder::SrsPlus, KickOrder::Srs] {
+                    bfs.set_kick_order(kick_order);
+                    bit.set_kick_order(kick_order);
+                    for t_mini in [true, false] {
+                        bfs.set_t_immobility_mini(t_mini);
+                        bit.set_t_immobility_mini(t_mini);
+                        for &kind in &ALL_PIECES {
+                            let spawn = spawn_piece(kind);
+                            let expected: Vec<Placement> = bfs
+                                .generate_from_with_180(board, spawn, supports_180)
+                                .iter()
+                                .map(|p| Placement {
+                                    actions: ActionSeq::new(),
+                                    ..*p
+                                })
+                                .collect();
+                            let actual: Vec<Placement> = bit
+                                .generate_for_search_from_with_180(board, spawn, supports_180)
+                                .to_vec();
+                            assert_eq!(
+                                actual, expected,
+                                "mismatch board={bi} kind={kind:?} 180={supports_180} kick={kick_order:?} t_mini={t_mini}"
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }

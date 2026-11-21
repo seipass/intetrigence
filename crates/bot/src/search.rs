@@ -196,6 +196,7 @@ pub struct SearchTiming {
     frame: u64,
     frames_per_lock: u64,
     arrivals: Vec<(u64, u32)>,
+    forecast_pressure: bool,
 }
 
 impl SearchTiming {
@@ -213,6 +214,7 @@ impl SearchTiming {
             frame,
             frames_per_lock,
             arrivals,
+            forecast_pressure: false,
         }
     }
 
@@ -230,23 +232,46 @@ impl SearchTiming {
                     pending.saturating_sub(due),
                 ),
             ],
+            forecast_pressure: false,
         }
+    }
+
+    /// Include hypothetical attacks during margin to prefer lines that can
+    /// cope with pressure beyond the already observed queue.
+    #[must_use]
+    pub fn with_forecast_pressure(mut self, enabled: bool) -> Self {
+        self.forecast_pressure = enabled;
+        self
     }
 
     fn forecast(&self, depth: usize, root_multiplier: f64) -> Vec<LockForecast> {
         let mut frame = self.frame;
         let mut multiplier = root_multiplier.max(1.0);
         let mut locks = Vec::with_capacity(depth + 1);
-        for _ in 0..=depth {
+        let mut hypothetical = 0u32;
+        for level in 0..=depth {
+            // Allow even the next two moves to see only known garbage.
+            // Later in the line, one attack every four locks approximates
+            // sustained margin pressure without depending on opponent state.
+            let extra =
+                if self.forecast_pressure && frame >= GARBAGE_MARGIN_FRAMES && level % 4 == 3 {
+                    ((3.0 * multiplier).ceil() as u32).min(GARBAGE_CAP)
+                } else {
+                    0
+                };
+            hypothetical += extra;
             let eligible = self
                 .arrivals
                 .iter()
                 .filter(|(due, _)| *due <= frame)
                 .map(|(_, rows)| *rows)
-                .sum();
+                .sum::<u32>()
+                + hypothetical;
             locks.push(LockForecast {
                 eligible,
                 multiplier,
+                hypothetical,
+                extra,
             });
             let next_frame = frame.saturating_add(self.frames_per_lock);
             for _ in frame.max(GARBAGE_MARGIN_FRAMES)..next_frame {
@@ -261,19 +286,24 @@ impl SearchTiming {
 struct LockForecast {
     eligible: u32,
     multiplier: f64,
+    hypothetical: u32,
+    extra: u32,
 }
 
 struct SearchInput {
     sequence: PieceSequence,
     locks: Vec<LockForecast>,
     initial_incoming: u32,
+    garbage_projection: GarbageProjection,
 }
 
 impl SearchInput {
     fn context_at(&self, level: usize, mut context: EvalContext) -> EvalContext {
         if let Some(lock) = self.locks.get(level) {
             // Cancellation and insertion both consume the prefix of the queue.
-            let removed = self.initial_incoming.saturating_sub(context.incoming);
+            context.incoming += lock.extra;
+            let removed =
+                (self.initial_incoming + lock.hypothetical).saturating_sub(context.incoming);
             context.arrived = lock.eligible.saturating_sub(removed).min(context.incoming);
             context.multiplier = lock.multiplier;
         }
@@ -337,6 +367,16 @@ pub struct Searcher {
     config: SearchConfig,
     movegen: Movegen,
     allowed_roots: Option<HashSet<RootMoveKey>>,
+    garbage_projection: GarbageProjection,
+}
+
+/// How search handles an insertion whose holes are unknown.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GarbageProjection {
+    #[default]
+    Stop,
+    Straight,
+    SplitBurst,
 }
 
 /// The observable parts of a placement used by the s2-bot-lab referee.
@@ -348,7 +388,15 @@ impl Searcher {
             config,
             movegen: Movegen::new(),
             allowed_roots: None,
+            garbage_projection: GarbageProjection::Stop,
         }
+    }
+
+    /// Continue across hidden garbage insertion using a representative packet.
+    #[must_use]
+    pub fn with_garbage_projection(mut self, projection: GarbageProjection) -> Self {
+        self.garbage_projection = projection;
+        self
     }
 
     pub fn config(&self) -> &SearchConfig {
@@ -369,7 +417,7 @@ impl Searcher {
         result
     }
 
-    fn retain_allowed_roots(&self, children: &mut Vec<Child>) {
+    fn retain_roots(&self, children: &mut Vec<Child>) {
         if let Some(allowed) = &self.allowed_roots {
             children.retain(|child| {
                 let mut cells = child.placement.cells();
@@ -381,6 +429,14 @@ impl Searcher {
                     cells,
                 ))
             });
+        }
+        // A future top-out may depend on projected holes. If any legal root
+        // survives this lock, avoid roots that already lose on this lock.
+        if children
+            .iter()
+            .any(|child| child.value != f64::NEG_INFINITY)
+        {
+            children.retain(|child| child.value != f64::NEG_INFINITY);
         }
     }
 
@@ -436,6 +492,7 @@ impl Searcher {
                 timing.forecast(max_depth, root.context.multiplier)
             }),
             initial_incoming: root.context.incoming,
+            garbage_projection: self.garbage_projection,
         };
         let mut root = root_record(root, active, can_hold, visible_ceiling);
         root.context = input.context_at(0, root.context);
@@ -599,7 +656,7 @@ impl Searcher {
             &mut children,
         );
         self.movegen = movegen;
-        self.retain_allowed_roots(&mut children);
+        self.retain_roots(&mut children);
         children
             .sort_unstable_by(|a, b| b.value.total_cmp(&a.value).then_with(|| a.key.cmp(&b.key)));
         let child = children.first()?;
@@ -674,7 +731,7 @@ impl Searcher {
                 break;
             }
             if level == 0 {
-                self.retain_allowed_roots(&mut children);
+                self.retain_roots(&mut children);
             }
             let next = commit(&mut arena, children, width, &mut transposition);
             if next.is_empty() {
@@ -803,7 +860,7 @@ impl Searcher {
                 }
                 nodes += beam.len() as u64;
                 if level == 0 {
-                    self.retain_allowed_roots(&mut children);
+                    self.retain_roots(&mut children);
                 }
                 let next = commit(&mut arena, children, width, &mut transposition);
                 if next.is_empty() {
@@ -923,19 +980,30 @@ fn expand_piece(
     } else {
         node.active.unwrap_or_else(|| spawn_piece(piece))
     };
-    let placements = movegen.generate_from(&node.board, spawn);
+    let placements = if node.depth == 0 {
+        movegen.generate_from(&node.board, spawn)
+    } else {
+        movegen.generate_for_search_from(&node.board, spawn)
+    };
     for placement in placements {
-        let (board, reward, mut next_context) =
+        let (mut board, reward, mut next_context) =
             apply_placement(&node.board, placement, &context, weights);
-        let accumulated = node.reward + scale * reward.value;
-        let active = next_kind.and_then(|kind| {
-            if node.visible_ceiling {
-                Some(spawn_piece(kind))
-            } else {
-                ActivePiece::spawn_on(&board, kind, reward.lines > 0)
-            }
-        });
-        let topped_out = if node.visible_ceiling {
+        let mut accumulated = node.reward + scale * reward.value;
+        if node.depth == 0 {
+            accumulated +=
+                weights.root_sent * f64::from(next_context.sent_total - context.sent_total);
+        }
+        let spawn_next = |board: &Board| {
+            next_kind.and_then(|kind| {
+                if node.visible_ceiling {
+                    Some(spawn_piece(kind))
+                } else {
+                    ActivePiece::spawn_on(board, kind, reward.lines > 0)
+                }
+            })
+        };
+        let mut active = spawn_next(&board);
+        let mut topped_out = if node.visible_ceiling {
             board.height() > Board::VISIBLE_HEIGHT
         } else {
             next_kind.is_some() && active.is_none()
@@ -948,26 +1016,50 @@ fn expand_piece(
         } else {
             0
         };
-        let terminal = topped_out || inserted > 0;
         next_context.incoming -= inserted;
         next_context.arrived -= inserted;
         next_context.received_total += inserted;
         next_context = input.context_at(node.depth + 1, next_context);
-        let leaf = if topped_out {
+        let leaf = if inserted > 0 {
+            let inserted = inserted as usize;
+            let mut values = [0.0; Board::WIDTH];
+            for (hole, value) in values.iter_mut().enumerate() {
+                let raised = with_garbage(&board, inserted, hole, input.garbage_projection);
+                // The spawn and ceiling rows lie above the inserted holes.
+                topped_out = if node.visible_ceiling {
+                    board.height() + inserted > Board::VISIBLE_HEIGHT
+                } else {
+                    next_kind.is_some() && spawn_next(&raised).is_none()
+                };
+                if topped_out {
+                    break;
+                }
+                *value = leaf_value(&raised, &next_context, weights, t_available);
+            }
+            if topped_out {
+                f64::NEG_INFINITY
+            } else if input.garbage_projection != GarbageProjection::Stop {
+                // Choose a lower median by static board value before looking
+                // at follow-up moves, so search cannot pick a lucky hole.
+                let mut columns = std::array::from_fn::<_, { Board::WIDTH }, _>(|hole| hole);
+                columns.sort_by(|&left, &right| values[left].total_cmp(&values[right]));
+                let hole = columns[(Board::WIDTH - 1) / 2];
+                board = with_garbage(&board, inserted, hole, input.garbage_projection);
+                active = spawn_next(&board);
+                values[hole]
+            } else {
+                values.iter().sum::<f64>() / Board::WIDTH as f64
+            }
+        } else if topped_out {
             f64::NEG_INFINITY
-        } else if inserted > 0 {
-            inserted_garbage_value(
-                &board,
-                inserted as usize,
-                next_kind,
-                node.visible_ceiling,
-                &next_context,
-                weights,
-                t_available,
-            )
         } else {
             leaf_value(&board, &next_context, weights, t_available)
         };
+        // A high stack can receive more attacks before the end of the line.
+        // Price the turns spent exposed, even if the leaf recovers.
+        const SAFE_HEIGHT: usize = Board::VISIBLE_HEIGHT - GARBAGE_CAP as usize;
+        accumulated -=
+            scale * weights.stack_exposure * board.height().saturating_sub(SAFE_HEIGHT) as f64;
         let value = if leaf == f64::NEG_INFINITY {
             leaf
         } else {
@@ -984,7 +1076,8 @@ fn expand_piece(
             placement: *placement,
             board,
             active,
-            terminal,
+            terminal: topped_out
+                || (inserted > 0 && input.garbage_projection == GarbageProjection::Stop),
             next,
             hold,
             context: next_context,
@@ -995,36 +1088,24 @@ fn expand_piece(
     }
 }
 
-/// Hole columns are hidden. Approximate the board value over all possible
-/// columns of a single packet; the beam stops at this observation boundary.
-fn inserted_garbage_value(
+fn with_garbage(
     board: &Board,
     inserted: usize,
-    next_kind: Option<PieceKind>,
-    visible_ceiling: bool,
-    context: &EvalContext,
-    weights: &Weights,
-    t_available: usize,
-) -> f64 {
-    let mut total = 0.0;
-    for hole in 0..Board::WIDTH as u8 {
-        let mut raised = board.clone();
-        raised
-            .insert_garbage(&[hole; GARBAGE_CAP as usize][..inserted])
-            .expect("legal garbage rows");
-        let topped_out = if visible_ceiling {
-            board.height() + inserted > Board::VISIBLE_HEIGHT
-        } else {
-            next_kind.is_some_and(|kind| ActivePiece::spawn_on(&raised, kind, false).is_none())
-        };
-        if topped_out {
-            // Spawn/ceiling rows are above the inserted holes, so this is
-            // independent of which columns the actual packets use.
-            return f64::NEG_INFINITY;
-        }
-        total += leaf_value(&raised, context, weights, t_available);
+    hole: usize,
+    projection: GarbageProjection,
+) -> Board {
+    let mut holes = [hole as u8; GARBAGE_CAP as usize];
+    if projection == GarbageProjection::SplitBurst && inserted >= 6 {
+        // A full tank can contain more than one packet. Forecast a second
+        // well for large bursts so their value cannot rely on a straight run
+        // of eight rows being cleared by two vertical I pieces.
+        holes[inserted / 2..inserted].fill(((hole + Board::WIDTH / 2) % Board::WIDTH) as u8);
     }
-    total / Board::WIDTH as f64
+    let mut raised = board.clone();
+    raised
+        .insert_garbage(&holes[..inserted])
+        .expect("legal garbage rows");
+    raised
 }
 
 /// Sorts children, drops transpositions that are not an improvement, and
@@ -1061,64 +1142,78 @@ fn commit(
             )
         })
         .collect();
-    order.sort_unstable_by(|a, b| {
+    let cmp = |a: &MergeKey, b: &MergeKey| {
         b.0.total_cmp(&a.0)
             .then_with(|| a.1.cmp(&b.1))
             .then_with(|| a.2.cmp(&b.2))
             .then_with(|| a.3.cmp(&b.3))
-    });
-
+    };
     let mut beam = Vec::with_capacity(width);
     // Keep the best leaves for final ranking without spending the live beam
     // on lines that cannot be expanded past an observation boundary.
     let mut live = 0;
     let mut leaves = 0;
-    for (_, _, _, index) in order {
-        let child = &children[index as usize];
-        let retained = if child.terminal {
-            &mut leaves
-        } else {
-            &mut live
-        };
-        if *retained == width {
-            continue;
-        }
-        if let Some(&best) = transposition.get(&child.key) {
-            if best >= child.value {
+    let mut push_slice = |slice: &[MergeKey]| {
+        for &(_, _, _, index) in slice {
+            let child = &children[index as usize];
+            let retained = if child.terminal {
+                &mut leaves
+            } else {
+                &mut live
+            };
+            if *retained == width {
                 continue;
             }
+            if let Some(&best) = transposition.get(&child.key) {
+                if best >= child.value {
+                    continue;
+                }
+            }
+            transposition.insert(child.key, child.value);
+            let id = arena.len() as u32;
+            let parent = &arena[child.parent as usize];
+            let mv = Move {
+                hold: child.hold_used,
+                piece: child.piece,
+                placement: child.placement,
+            };
+            let first = parent.first.unwrap_or(mv);
+            let depth = parent.depth + 1;
+            arena.push(NodeRecord {
+                parent: child.parent,
+                mv: Some(mv),
+                first: Some(first),
+                board: child.board.clone(),
+                active: child.active,
+                terminal: child.terminal,
+                visible_ceiling: parent.visible_ceiling,
+                next: child.next,
+                hold: child.hold,
+                can_hold: true,
+                context: child.context,
+                reward: child.reward,
+                value: child.value,
+                depth,
+            });
+            beam.push(id);
+            *retained += 1;
+            if live == width && leaves == width {
+                return true;
+            }
         }
-        transposition.insert(child.key, child.value);
-        let id = arena.len() as u32;
-        let parent = &arena[child.parent as usize];
-        let mv = Move {
-            hold: child.hold_used,
-            piece: child.piece,
-            placement: child.placement,
-        };
-        let first = parent.first.unwrap_or(mv);
-        let depth = parent.depth + 1;
-        arena.push(NodeRecord {
-            parent: child.parent,
-            mv: Some(mv),
-            first: Some(first),
-            board: child.board.clone(),
-            active: child.active,
-            terminal: child.terminal,
-            visible_ceiling: parent.visible_ceiling,
-            next: child.next,
-            hold: child.hold,
-            can_hold: true,
-            context: child.context,
-            reward: child.reward,
-            value: child.value,
-            depth,
-        });
-        beam.push(id);
-        *retained += 1;
-        if live == width && leaves == width {
-            break;
+        false
+    };
+    let prefix = (width * 4).min(order.len());
+    if prefix < order.len() {
+        order.select_nth_unstable_by(prefix, cmp);
+        order[..prefix].sort_unstable_by(cmp);
+        if !push_slice(&order[..prefix]) {
+            order[prefix..].sort_unstable_by(cmp);
+            push_slice(&order[prefix..]);
         }
+    } else {
+        order.sort_unstable_by(cmp);
+        push_slice(&order);
     }
     beam
 }
@@ -1365,6 +1460,74 @@ mod tests {
     }
 
     #[test]
+    fn projected_garbage_can_be_searched_beyond_insertion() {
+        let mut state = root(
+            Board::new(),
+            PieceKind::O,
+            &[PieceKind::J, PieceKind::I, PieceKind::T, PieceKind::L],
+        );
+        state.context.incoming = 3;
+        state.context.arrived = 3;
+        for threads in [1, 4] {
+            let mut searcher = Searcher::new(SearchConfig {
+                threads,
+                deterministic: true,
+                ..fast_config()
+            })
+            .with_garbage_projection(GarbageProjection::Straight);
+            let result = searcher.search(&state).unwrap();
+            assert!(result.line.len() > 1);
+            assert_eq!(result.line[0], result.best);
+            assert!(result.value.is_finite());
+        }
+    }
+
+    #[test]
+    fn lab_search_prefers_a_root_that_survives_the_current_lock() {
+        let mut board = Board::new();
+        // The stack is at the ceiling. A held J can clear the row above the
+        // garbage; placements with no clear top out when the due row lands.
+        for y in 0..16 {
+            let row = if y < 8 { 0x3df } else { 0x2ff };
+            board.set_row(y, row);
+            board.set_garbage_row(y, row);
+        }
+        for (y, row) in [0x1ff, 0x37, 0x17, 0x3].into_iter().enumerate() {
+            board.set_row(y + 16, row);
+        }
+        let mut state = root(
+            board,
+            PieceKind::Z,
+            &[PieceKind::O, PieceKind::T, PieceKind::I, PieceKind::L],
+        );
+        state.hold = Some(PieceKind::J);
+        state.context.incoming = 3;
+        state.context.arrived = 1;
+        let timing = SearchTiming::from_lab(2100, 60, 3, 1);
+        let result = Searcher::new(SearchConfig {
+            deterministic: true,
+            ..fast_config()
+        })
+        .with_garbage_projection(GarbageProjection::Straight)
+        .search_position(
+            &state,
+            spawn_piece(state.current),
+            true,
+            true,
+            Some(&timing),
+        )
+        .unwrap();
+        let (_, reward, _) = apply_placement(
+            &state.board,
+            &result.best.placement,
+            &state.context,
+            &Weights::default(),
+        );
+        assert!(result.best.hold);
+        assert_eq!(reward.lines, 1);
+    }
+
+    #[test]
     fn search_stops_at_the_first_lock_after_a_packet_arrives() {
         let mut state = root(
             Board::new(),
@@ -1393,6 +1556,29 @@ mod tests {
     }
 
     #[test]
+    fn margin_pressure_is_future_only_and_is_not_reenqueued_after_cancellation() {
+        let timing =
+            SearchTiming::from_lab(GARBAGE_MARGIN_FRAMES, 60, 3, 1).with_forecast_pressure(true);
+        let input = SearchInput {
+            sequence: PieceSequence::new(PieceKind::O, &[]),
+            locks: timing.forecast(8, 1.0),
+            initial_incoming: 3,
+            garbage_projection: GarbageProjection::Straight,
+        };
+        let mut context = EvalContext {
+            incoming: 3,
+            ..EvalContext::default()
+        };
+        for (level, due) in [1, 3, 3, 7, 2, 2, 2, 6].into_iter().enumerate() {
+            context = input.context_at(level, context);
+            assert_eq!(context.arrived, due, "lock {level}");
+            if level == 3 {
+                context.incoming -= 5;
+            }
+        }
+    }
+
+    #[test]
     fn forecast_matches_fifo_cancellation_and_frame_accumulation() {
         use intetrigence_core::{GarbageMultiplier, GarbageQueue};
 
@@ -1405,6 +1591,7 @@ mod tests {
             sequence: PieceSequence::new(PieceKind::O, &[]),
             locks: timing.forecast(3, GarbageMultiplier::at_frame(frame).value()),
             initial_incoming: queue.queue_total(),
+            garbage_projection: GarbageProjection::Stop,
         };
         assert_eq!(queue.cancel(5, 0).sent, 0);
         for level in 0..=3 {

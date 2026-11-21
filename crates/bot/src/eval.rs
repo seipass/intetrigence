@@ -98,6 +98,14 @@ pub struct Features {
     pub extra_wells: f64,
     /// Rows that still contain garbage. Versus-only: 0 in single play.
     pub garbage_rows: f64,
+    /// Blocks covering the topmost (and 2nd distinct) garbage hole columns.
+    pub garbage_cover: f64,
+    /// Vertical empty/filled transitions across columns.
+    pub col_transitions: f64,
+    /// Tallest column in the spawn zone (columns 3..=6).
+    pub center_height: f64,
+    /// True if the main well is in the spawn zone (columns 3..=6) with depth >= 2.
+    pub well_in_center: bool,
 }
 
 /// Column heights, bottom-up.
@@ -220,10 +228,13 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
         }
     }
 
-    // Row transitions and the garbage rows: walls count as filled, empty rows
-    // are skipped.
-    for y in 0..Board::HEIGHT {
+    // Row transitions, column transitions, and garbage rows + garbage hole cover.
+    let top = board.height();
+    let mut prev_row = Board::FULL_ROW;
+    for y in 0..top {
         let row = board.row(y);
+        features.col_transitions += f64::from((prev_row ^ row).count_ones());
+        prev_row = row;
         if board.garbage_row(y) != 0 {
             features.garbage_rows += 1.0;
         }
@@ -233,6 +244,35 @@ pub fn analyse(board: &Board) -> BoardAnalysis {
         let mask = (row << 1) | 0x801;
         features.row_transitions += f64::from((mask ^ (mask >> 1)).count_ones());
     }
+    if top > 0 {
+        features.col_transitions += f64::from(prev_row.count_ones());
+    }
+    let mut g_hole1: Option<usize> = None;
+    for y in (0..top).rev() {
+        if board.garbage_row(y) == 0 {
+            continue;
+        }
+        let row = board.row(y);
+        if row.count_ones() == 9 {
+            let miss = (!row) & Board::FULL_ROW;
+            let x = miss.trailing_zeros() as usize;
+            let cov = (heights[x] - (y as i32 + 1)).clamp(0, 6) as f64;
+            match g_hole1 {
+                None => {
+                    g_hole1 = Some(x);
+                    features.garbage_cover += cov;
+                }
+                Some(x1) if x != x1 => {
+                    features.garbage_cover += 0.5 * cov;
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+    let center_h = heights[3].max(heights[4]).max(heights[5]).max(heights[6]);
+    features.center_height = f64::from(center_h);
+    features.well_in_center = (3..=6).contains(&well) && features.well_depth >= 2.0;
 
     BoardAnalysis { heights, features }
 }
@@ -307,16 +347,24 @@ pub struct Weights {
     /// `max(0, max_height + incoming - DANGER_BASE)^2`. This is the versus
     /// term that makes a spike visible to the search.
     pub danger_projected: f64,
+    /// Per-ply cost per row of stack above the safe height.
+    pub stack_exposure: f64,
     /// Penalty per row that still contains garbage (uncleared garbage).
     pub garbage_rows: f64,
 
     // Placement rewards.
     /// Value per line of attack sent (before cancelling).
     pub attack: f64,
+    /// Additional value per row that the root move sends after cancellation.
+    pub root_sent: f64,
     /// Extra value by `[spin][lines]`.
     pub clear: [[f64; 5]; 3],
     pub perfect_clear: f64,
     pub b2b_break: f64,
+    /// Leaf value of each difficult clear toward the first Surge charge.
+    pub b2b_stock: f64,
+    /// Additional B2B stock value per unit of active margin multiplier.
+    pub margin_stock: f64,
     /// Penalty for spending a T without a T-spin while a slot was ready.
     pub wasted_t: f64,
     /// Value per line of surge currently charged, scaled by
@@ -362,6 +410,20 @@ pub struct Weights {
 
     /// Per-ply discount.
     pub discount: f64,
+
+    // v3 S2 structural features.
+    pub garbage_cover: f64,
+    pub center_height: f64,
+    pub col_transitions: f64,
+    pub t_slot_open_ratio: f64,
+    pub cancel_bonus: f64,
+    pub hold_t_bonus: f64,
+    pub hold_i_bonus: f64,
+    pub height_mult_scale: f64,
+    pub surge_cashout_bonus: f64,
+    pub well_center_penalty: f64,
+    pub downstack_urgency: f64,
+    pub b2b_keep_mult: f64,
 }
 
 impl Default for Weights {
@@ -393,9 +455,11 @@ impl Default for Weights {
             extra_wells: -14.0,
             t_slot: [0.0, 20.0, 80.0],
             danger_projected: -12.0,
+            stack_exposure: 0.0,
             garbage_rows: -6.0,
 
             attack: 28.0,
+            root_sent: 0.0,
             // `attack/line` is the only lever on attack/piece (lines/piece is
             // pinned by the cell budget), and at combo 0 it is: single 0.00,
             // double 0.50, triple 0.67, quad 1.25, TSS 3.00, TSD 2.50. A TSD
@@ -414,6 +478,8 @@ impl Default for Weights {
             ],
             perfect_clear: 120.0,
             b2b_break: -20.0,
+            b2b_stock: 0.0,
+            margin_stock: 0.0,
             wasted_t: -18.0,
             surge_charge: 1.5,
             surge_exponent: 1.0,
@@ -425,10 +491,22 @@ impl Default for Weights {
             garbage_clear: 10.0,
             survival: true,
             survival_line: 12.0,
-            incoming: -1.0,
+            incoming: 1.0,
             softdrop: -0.05,
 
             discount: 0.97,
+            garbage_cover: 0.0,
+            center_height: 0.0,
+            col_transitions: 0.0,
+            t_slot_open_ratio: 1.0,
+            cancel_bonus: 0.0,
+            hold_t_bonus: 0.0,
+            hold_i_bonus: 0.0,
+            height_mult_scale: 0.0,
+            surge_cashout_bonus: 0.0,
+            well_center_penalty: 0.0,
+            downstack_urgency: 0.0,
+            b2b_keep_mult: 1.0,
         }
     }
 }
@@ -554,16 +632,13 @@ pub fn apply_placement(
     // matters is `height + min(pending, 8)`, not `height + pending`.
     let projected = board.height() as u32 + context.arrived.min(GARBAGE_CAP);
     let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
-    let mut value = weights.attack * f64::from(attack.total);
-    value += if survival {
-        weights.survival_line * f64::from(clear.lines)
-    } else {
-        weights.clear[placement.spin.index()][clear.lines as usize]
-    };
+    let mut value = weights.attack * f64::from(attack.total)
+        + weights.clear[placement.spin.index()][clear.lines as usize];
+    if survival && clear.lines > 0 {
+        value += weights.survival_line * f64::from(clear.lines);
+    }
     if clear.lines > 0 && context.arrived >= 1 {
-        // `risk` keeps the term quiet while the stack is low: stopping an
-        // appearance only matters when one would kill us.
-        let risk = ((board.height() as f64 - 12.0) / 6.0).clamp(0.0, 1.0);
+        let risk = ((f64::from(projected) - 18.0) / 3.0).clamp(0.0, 1.0);
         value += weights.defense * f64::from(context.arrived.min(GARBAGE_CAP)) * risk;
     }
     if context.pieces_placed < OPENER_PIECES && clear.lines > 0 {
@@ -578,20 +653,54 @@ pub fn apply_placement(
     if clear.perfect_clear {
         value += weights.perfect_clear;
     }
+    let mult = context.multiplier.max(1.0);
     if broke_b2b {
-        value += weights.b2b_break;
+        let keep = if attack.surge_amount >= SURGE_LETHAL {
+            weights.b2b_keep_mult
+        } else {
+            1.0
+        };
+        value += weights.b2b_break * mult * keep;
     }
     if wasted_t {
         value += weights.wasted_t;
     }
-    value += weights.surge_charge * f64::from(surge_charged).powf(weights.surge_exponent);
-    if attack.surge_amount > 0 && attack.surge_amount < SURGE_LETHAL {
+    if attack.surge_amount > 0 && attack.surge_amount < SURGE_LETHAL && projected < 18 {
         value += weights.surge_hold_penalty;
+    }
+    if attack.surge_amount >= SURGE_LETHAL {
+        value += weights.surge_cashout_bonus * f64::from(attack.surge_amount);
     }
     value += weights.combo * f64::from(attack.combo_after);
     value += weights.garbage_clear * f64::from(clear.garbage_lines);
     if context.opener() {
         value += weights.opener_attack * f64::from(attack.total);
+    }
+
+    // Attack cancels queued garbage before anything is sent
+    // (`docs/s2-spec.md` §7.3), and the opener phase doubles the budget
+    // (§7.4). Propagating this through the search is what lets it see that a
+    // quad now is worth more than a quad later when a spike is queued.
+    let inc_before = context.incoming;
+    let mut incoming = context.incoming;
+    let mut arrived = context.arrived;
+    let mut total_cancelled = 0u32;
+    let mut opener = intetrigence_core::OpenerPhase {
+        pieces_placed: context.pieces_placed,
+        sent_total: context.sent_total,
+    };
+    for &event in &attack.events {
+        let budget = opener.cancel_budget(event, incoming);
+        let cancelled = incoming.min(event.saturating_add(budget));
+        total_cancelled += cancelled;
+        incoming -= cancelled;
+        arrived = arrived.saturating_sub(cancelled);
+        opener.on_sent(event.saturating_sub(cancelled));
+    }
+    if total_cancelled > 0 {
+        let cancel_scale =
+            ((board.height() as f64 + f64::from(inc_before) - 8.0) / 10.0).clamp(0.25, 1.5);
+        value += weights.cancel_bonus * f64::from(total_cancelled) * cancel_scale;
     }
 
     let reward = Reward {
@@ -607,23 +716,6 @@ pub fn apply_placement(
         b2b_after: attack.b2b_streak_after,
         value,
     };
-    // Attack cancels queued garbage before anything is sent
-    // (`docs/s2-spec.md` §7.3), and the opener phase doubles the budget
-    // (§7.4). Propagating this through the search is what lets it see that a
-    // quad now is worth more than a quad later when a spike is queued.
-    let mut incoming = context.incoming;
-    let mut arrived = context.arrived;
-    let mut opener = intetrigence_core::OpenerPhase {
-        pieces_placed: context.pieces_placed,
-        sent_total: context.sent_total,
-    };
-    for &event in &attack.events {
-        let budget = opener.cancel_budget(event, incoming);
-        let cancelled = incoming.min(event.saturating_add(budget));
-        incoming -= cancelled;
-        arrived = arrived.saturating_sub(cancelled);
-        opener.on_sent(event.saturating_sub(cancelled));
-    }
     let next_context = EvalContext {
         multiplier: context.multiplier,
         sent_total: opener.sent_total,
@@ -648,80 +740,99 @@ pub fn leaf_value(
     weights: &Weights,
     t_available: usize,
 ) -> f64 {
+    leaf_value_with_hold(board, context, weights, t_available, None)
+}
+
+pub fn leaf_value_with_hold(
+    board: &Board,
+    context: &EvalContext,
+    weights: &Weights,
+    t_available: usize,
+    hold: Option<PieceKind>,
+) -> f64 {
     let BoardAnalysis { heights, features } = analyse(board);
-    // Survival is decided by the *projected* height, not by either term alone.
-    // Every spawn's lowest cell is row 21 and `insert_garbage` re-spawns the
-    // active piece, topping out on the spot if it cannot be placed, so the
-    // bot dies exactly when `height + pending >= 21`. The old condition was an
-    // OR (`incoming >= 8 || height >= 15`), which switched to defence at
-    // `height 15 / pending 0` (safe: 15 <= 20) and at `height 5 / pending 8`
-    // (safe: 13 <= 20) -- it threw away attack while still alive.
-    // One appearance inserts at most `GARBAGE_CAP` rows, so the height that
-    // matters is `height + min(pending, 8)`, not `height + pending`.
-    let projected = board.height() as u32 + context.arrived.min(GARBAGE_CAP);
-    let survival = weights.survival && projected >= SURVIVAL_PROJECTED;
-    // `wait_pieces = 21 - height - pending`: how many pieces can be spent on
-    // preparation before a zero-line placement kills. No budget, no
-    // preparation.
     let wait_pieces =
         (SURVIVAL_PROJECTED as i32 - board.height() as i32 - context.incoming as i32).max(0);
     let readiness_scale = (f64::from(wait_pieces) / 4.0).min(1.0);
-    // Height is a *risk*, not a cost: at `height 5` a single is the most
-    // height-efficient clear there is (1 row per piece against a quad's 0.4),
-    // so pricing height at every level makes the bot farm singles forever and
-    // never build a burst. Measured: the TurnCap game sent 373 lines against
-    // the opponent's 715 at `attack/line` 0.53, with 53% of clears singles.
-    //
-    // The floor is 0.1, not 0.0: with zero the bot stops maintaining a low
-    // stack at all and dies to its own height. Measured with 0.0: 17W-3L and
-    // **all three losses had positive net damage** (+48, +7, +19), i.e. the
-    // opponent was out-damaged and the bot still topped out -- and the median
-    // think time went from ~30 ms to 72 ms because the taller board has more
-    // candidates. A floor of 0.2 was too high (TurnCap 1/20, `attack/line`
-    // 1.12); 0.1 is the middle.
     let height_risk = ((features.max_height - weights.risk_base) / weights.risk_span)
         .clamp(weights.risk_floor, 1.0);
+    let multiplier = context.multiplier.max(1.0);
+    let mult_scale = 1.0 + weights.height_mult_scale * (multiplier - 1.0).max(0.0);
+    let c_over = (features.center_height - 10.0).max(0.0);
+
     let mut value = height_risk
+        * mult_scale
         * (weights.max_height * features.max_height
             + weights.height_sq * features.height_sq
             + weights.danger_height * features.danger_height)
-        + readiness_scale * weights.quad_ready * features.quad_ready
-        + if survival {
-            // Survival mode removes the shape terms instead of scaling them:
-            // under a deep queue a hole is worth less than a cleared row.
-            0.0
-        } else {
-            weights.holes * features.holes
-                + weights.hole_cover * features.hole_cover
-                + weights.hole_rows * features.hole_rows
-                + weights.bumpiness * features.bumpiness
-                + weights.bumpiness_sq * features.bumpiness_sq
-                + weights.row_transitions * features.row_transitions
-                + weights.well_depth * features.well_depth
-                + weights.extra_wells * features.extra_wells
-        };
+        + readiness_scale
+            * (weights.quad_ready * features.quad_ready + weights.well_depth * features.well_depth)
+        + weights.holes * features.holes
+        + weights.hole_cover * features.hole_cover
+        + weights.hole_rows * features.hole_rows
+        + weights.bumpiness * features.bumpiness
+        + weights.bumpiness_sq * features.bumpiness_sq
+        + weights.row_transitions * features.row_transitions
+        + weights.col_transitions * features.col_transitions
+        + weights.extra_wells * features.extra_wells
+        + weights.garbage_cover * features.garbage_cover
+        + weights.center_height * c_over * c_over * mult_scale
+        + weights.downstack_urgency
+            * features.garbage_rows
+            * (features.max_height - 8.0).max(0.0)
+            * mult_scale;
 
-    // Versus: the height this stack will have once the pending garbage lands.
+    if features.well_in_center {
+        value += weights.well_center_penalty * readiness_scale;
+    }
+    match hold {
+        Some(PieceKind::T) => value += weights.hold_t_bonus * readiness_scale,
+        Some(PieceKind::I) => value += weights.hold_i_bonus * readiness_scale,
+        _ => {}
+    }
+
     let projected = features.max_height + f64::from(context.incoming);
     let over = (projected - f64::from(DANGER_BASE)).max(0.0);
-    value += weights.danger_projected * over * over;
+    value += weights.danger_projected * over * over * mult_scale;
     value += weights.garbage_rows * features.garbage_rows;
 
+    let t_slot_val = t_slot_cutout_with_heights(board, &heights, t_available, weights);
     let charge = f64::from(surge_charge_from_streak(context.b2b_streak));
-    value += weights.surge_charge * charge.powf(weights.surge_exponent);
+    let convert_prob = ((18.0 - projected) / 8.0).clamp(0.0, 1.0);
+    let growth_gate = ((14.0 - features.max_height) / 6.0).clamp(0.0, 1.0)
+        * ((20.0 - projected) / 6.0).clamp(0.0, 1.0);
+    if charge > 0.0 {
+        value += weights.surge_charge
+            * charge.powf(weights.surge_exponent)
+            * multiplier
+            * convert_prob;
+    }
+    let next_charge = f64::from(surge_charge_from_streak(context.b2b_streak + 1));
+    let delta_surge = (next_charge - charge).max(0.0);
+    if delta_surge > 0.0 && growth_gate > 0.0 {
+        let opportunity = if t_slot_val > 0.0 {
+            1.0
+        } else if features.well_depth >= 4.0 {
+            0.7
+        } else {
+            0.35
+        };
+        value += 0.5 * weights.surge_charge * delta_surge * multiplier * opportunity * growth_gate;
+    }
+    let buildup = f64::from(
+        context
+            .b2b_streak
+            .min(intetrigence_core::constants::B2B_CHARGE_AT),
+    );
+    value += weights.b2b_stock * buildup * multiplier * readiness_scale;
+    value += weights.margin_stock
+        * (multiplier - 1.0).max(0.0)
+        * (buildup + charge)
+        * readiness_scale;
     value += weights.combo * f64::from(context.combo.min(COMBO_CAP));
-    // Capped at COMBO_CAP. Measured over 406 games (s2-spec-lead's
-    // decomposition): attack/piece peaks at combo 3-4 (1.196) and gets *worse*
-    // at combo 5+ (1.084) and 10+ (1.110), because holding a long combo means
-    // clearing singles, whose base is 0 -- only the ln lift applies. Rewarding
-    // combo 5+ therefore pushes the bot to trade TSDs and quads for singles.
     let combo = f64::from(context.combo.min(COMBO_CAP));
-    value += weights.combo_state * (1.25 * combo + 1.0).ln();
-    // Only worth something when the next clear can stop a garbage packet from
-    // appearing: a "one cell short" row is also a single, so pricing it
-    // unconditionally invites singles.
-    // `19` rather than `21`: at exactly 21 there is no guaranteed turn left to
-    // clear, so two rows of slack are needed to build the clear.
+    value += weights.combo_state * (1.25 * combo + 1.0).ln() * multiplier * growth_gate.max(0.25);
+
     let capped = features.max_height + f64::from(context.arrived.min(GARBAGE_CAP));
     if capped >= f64::from(SURVIVAL_PROJECTED - 2) {
         value += weights.combo_potential * features.combo_potential;
@@ -729,7 +840,7 @@ pub fn leaf_value(
     value -= weights.incoming * f64::from(context.incoming);
     let race = i64::from(context.sent_total) - i64::from(context.received_total);
     value += weights.race * race as f64;
-    value += readiness_scale * t_slot_cutout_with_heights(board, &heights, t_available, weights);
+    value += readiness_scale * t_slot_val;
     value
 }
 
@@ -739,7 +850,7 @@ pub fn leaf_value(
 /// form a nub-down T slot are considered, so it is a handful of integer
 /// comparisons per board.
 pub fn t_slot_lines(board: &Board) -> u8 {
-    best_t_slot(board, &heights(board)).map_or(0, |(_, _, lines)| lines)
+    best_t_slot(board, &heights(board)).map_or(0, |(_, _, lines, _)| lines)
 }
 
 /// The T-slot cutout: hypothetically spend up to `available` T pieces on the
@@ -762,24 +873,23 @@ fn t_slot_cutout_with_heights(
     // lines that slot would clear, so no board copy is needed at all. Only the
     // two-T case has to place the first one to find the second, and that is
     // rare enough to keep the clone.
-    let Some((_, _, first)) = best_t_slot(board, heights) else {
+    let Some((x, y, first, oh1)) = best_t_slot(board, heights) else {
         return 0.0;
     };
-    let mut value = weights.t_slot[first as usize];
+    let r1 = if oh1 { 1.0 } else { weights.t_slot_open_ratio };
+    let mut value = weights.t_slot[first as usize] * r1;
     if available < 2 || first == 0 {
         return value;
     }
     let mut board = board.clone();
-    let Some((x, y, _)) = best_t_slot(&board, heights) else {
-        return value;
-    };
     board
         .place(PieceKind::T, Rotation::Two, x, y)
         .expect("the slot scan only returns legal placements");
     let cleared = board.clear_lines();
     let after = crate::eval::heights(&board);
-    if let Some((_, _, second)) = best_t_slot(&board, &after) {
-        value += weights.t_slot[second as usize];
+    if let Some((_, _, second, oh2)) = best_t_slot(&board, &after) {
+        let r2 = if oh2 { 1.0 } else { weights.t_slot_open_ratio };
+        value += weights.t_slot[second as usize] * r2;
     }
     debug_assert_eq!(cleared.lines, first);
     value
@@ -816,14 +926,11 @@ pub fn t_slot_exact(board: &Board) -> u8 {
     best
 }
 
-/// Best nub-down T slot: `(x, y, lines cleared)` for a rotation-2 T.
-fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)> {
-    let mut best: Option<(i32, i32, u8)> = None;
+/// Best nub-down T slot: `(x, y, lines cleared, has_overhang)` for a rotation-2 T.
+fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8, bool)> {
+    let mut best: Option<(i32, i32, u8, bool)> = None;
     for x in 1..COLUMNS - 1 {
         let stem = heights[x];
-        // Cheap filter: the nub column must be at least one row below both
-        // shoulders. The exact geometry is verified with `can_place` below,
-        // because height alone cannot see an overhang hole.
         if stem + 1 > heights[x - 1] || stem + 1 > heights[x + 1] {
             continue;
         }
@@ -835,13 +942,6 @@ fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)
         if board.can_place(PieceKind::T, Rotation::Two, bx, y - 1) {
             continue;
         }
-        // Count the lines the T would complete without cloning the board: a
-        // row clears when the T's cells fill its remaining holes.
-        //
-        // `best_t_slot` only ever scans `Rotation::Two`, whose cells have `cy`
-        // in {0, 1}, so two masks suffice. `Rotation::R` and `Rotation::L`
-        // span three rows and would index out of bounds here -- widen the mask
-        // array before extending the scan to them.
         let mut rows = [0u16; 2];
         for (cx, cy) in PieceKind::T.cells(Rotation::Two) {
             rows[cy as usize] |= 1 << (bx + cx);
@@ -859,8 +959,19 @@ fn best_t_slot(board: &Board, heights: &[i32; COLUMNS]) -> Option<(i32, i32, u8)
         if lines == 0 {
             continue;
         }
-        if best.is_none_or(|(_, _, best_lines)| lines > best_lines) {
-            best = Some((bx, y, lines));
+        let corner_occ = |cx: i32, cy: i32| -> bool {
+            if cx < 0 || cx >= Board::WIDTH as i32 || cy < 0 {
+                return true;
+            }
+            if cy >= Board::HEIGHT as i32 {
+                return false;
+            }
+            (board.row(cy as usize) & (1u16 << cx)) != 0
+        };
+        let has_oh = corner_occ(bx, y + 2) || corner_occ(bx + 2, y + 2);
+        let score = lines * 2 + u8::from(has_oh);
+        if best.is_none_or(|(_, _, bl, boh)| score > bl * 2 + u8::from(boh)) {
+            best = Some((bx, y, lines, has_oh));
         }
     }
     best
@@ -925,6 +1036,10 @@ mod tests {
                 well_depth: 4.0,
                 extra_wells: 0.0,
                 garbage_rows: 0.0,
+                garbage_cover: 0.0,
+                col_transitions: analysis.features.col_transitions,
+                center_height: 20.0,
+                well_in_center: false,
             }
         );
         assert_eq!(analysis.heights, heights(&board));
@@ -1144,7 +1259,7 @@ mod tests {
         let boards = [("tsd", tsd_board()), ("empty", Board::new())];
         for (name, board) in boards {
             let columns = heights(&board);
-            let Some((x, y, _)) = best_t_slot(&board, &columns) else {
+            let Some((x, y, _, _)) = best_t_slot(&board, &columns) else {
                 continue;
             };
             // The scan places its probe at rotation two; if that ever stops

@@ -9,10 +9,11 @@
 //   ATTAX_DIR=/path/to/attax S2_LAB_ROOT=/path/to/s2-bot-lab-ref \
 //     bun adapters/s2lab/run-match.mjs --games 1 --seed 9001 --out /tmp/x.jsonl
 import { appendFile, open, readFile, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { isDeepStrictEqual, parseArgs } from "node:util";
 import { createHash } from "node:crypto";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createIntetrigenceDecider } from "./intetrigence-decider.mjs";
 import { acquireMeasurement } from "./measurement-lock.mjs";
@@ -24,33 +25,9 @@ if (!process.env.ATTAX_DIR || !process.env.S2_LAB_ROOT) {
 const ATTAX_DIR = resolve(process.env.ATTAX_DIR);
 const exe = process.platform === "win32" ? ".exe" : "";
 const BRIDGE = resolve(process.env.S2LAB_BRIDGE ?? `target/release/s2lab_bridge${exe}`);
-const attaxBuild = "c83d3397d458f4af9cfd6fe3ba3468df48bb2877";
+const attaxRustBuild = "c83d3397d458f4af9cfd6fe3ba3468df48bb2877";
 const attaxWidth = 96;
 const git = (...args) => execFileSync("git", ["-C", ATTAX_DIR, ...args], { encoding: "utf8" }).trim();
-if (git("rev-parse", "HEAD") !== attaxBuild || git("status", "--porcelain")) {
-  throw new Error(`ATTAX_DIR must be a clean checkout of ${attaxBuild}`);
-}
-process.env.ATTAX_RUST_CLI ??= resolve(ATTAX_DIR, `rust/target/release/attax-agree${exe}`);
-process.env.ATTAX_ENGINE = "rust";
-process.env.ATTAX_RUST_MODE = "server";
-process.env.ATTAX_S2_STOCK_POTENTIAL = "1";
-process.env.ATTAX_S2_SOLVENCY = "0";
-
-const attaxPlayer = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/attax-player.ts")).href);
-const labModule = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/lab.mjs")).href);
-const { lab, labRoot, parameters, profile } = labModule;
-const { createAttaxDecider, cellKey, engineIdentity, placementCells } = attaxPlayer;
-const identity = engineIdentity();
-if (identity.id !== "rust" || identity.build !== attaxBuild) {
-  throw new Error(`expected Attax Rust ${attaxBuild}, got ${JSON.stringify(identity)}`);
-}
-const { createGame, extendSeededQueue, toS2GuiState } = await lab("cc2-gui/game.mjs");
-const { guiStateToCanonical } = await lab("src-js/gui-state.mjs");
-const { placementGeometry } = await lab("src-js/triangle/placement-geometry.mjs");
-const { generateReachablePlacements } = await lab("src-js/triangle/move-generation.mjs");
-const { matchOutcome, ppsForCc2Parameters } = await lab("src-js/bot-match-options.mjs");
-const { canonicalize } = await lab("src-js/cs1-core.mjs");
-const { controller, applyTransition, createS2AmountOnlyDecisionState, fullStateKey } = labModule;
 
 const { values } = parseArgs({
   options: {
@@ -59,6 +36,8 @@ const { values } = parseArgs({
     "seat-offset": { type: "string", default: "0" },
     "max-locks": { type: "string", default: "2000" },
     "first-to": { type: "string" },
+    "attax-engine": { type: "string", default: "auto" },
+    evaluation: { type: "boolean" },
     resume: { type: "boolean" },
     verify: { type: "boolean" },
     "recorded-runner": { type: "string" },
@@ -66,6 +45,97 @@ const { values } = parseArgs({
   },
 });
 if (!values.out) throw new Error("--out <file.jsonl> is required");
+if (!["auto", "gpu", "rust"].includes(values["attax-engine"])) {
+  throw new Error(`invalid --attax-engine: ${values["attax-engine"]} (expected auto, gpu, or rust)`);
+}
+
+const hasGpu = existsSync(resolve(ATTAX_DIR, "tools/s2-lab/gpu-player.ts"));
+const hasRust = existsSync(resolve(ATTAX_DIR, "tools/s2-lab/attax-player.ts"));
+const attaxMode =
+  values["attax-engine"] === "auto"
+    ? hasGpu && !hasRust
+      ? "gpu"
+      : hasRust
+        ? "rust"
+        : (() => { throw new Error(`no supported s2-lab player found in ${ATTAX_DIR}`); })()
+    : values["attax-engine"];
+
+process.env.ATTAX_S2_STOCK_POTENTIAL = "1";
+process.env.ATTAX_S2_SOLVENCY = "0";
+
+const labModule = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/lab.mjs")).href);
+const { lab, labRoot, parameters, profile } = labModule;
+const { createGame, extendSeededQueue, toS2GuiState } = await lab("cc2-gui/game.mjs");
+const { guiStateToCanonical } = await lab("src-js/gui-state.mjs");
+const { placementGeometry } = await lab("src-js/triangle/placement-geometry.mjs");
+const { generateReachablePlacements } = await lab("src-js/triangle/move-generation.mjs");
+const { matchOutcome, ppsForCc2Parameters } = await lab("src-js/bot-match-options.mjs");
+const { canonicalize } = await lab("src-js/cs1-core.mjs");
+const { controller, applyTransition, createS2AmountOnlyDecisionState, fullStateKey } = labModule;
+
+const sha256 = async (file) => createHash("sha256").update(await readFile(file)).digest("hex");
+
+let createAttax;
+let closeGpuRuntime = () => {};
+let cellKey;
+let placementCells;
+let identity;
+let attaxSha256;
+let attaxShadersSha256 = null;
+
+if (attaxMode === "rust") {
+  if (!hasRust) throw new Error(`attax-player.ts not found in ${ATTAX_DIR}`);
+  if (git("rev-parse", "HEAD") !== attaxRustBuild || git("status", "--porcelain")) {
+    throw new Error(`ATTAX_DIR must be a clean checkout of ${attaxRustBuild}`);
+  }
+  process.env.ATTAX_RUST_CLI ??= resolve(ATTAX_DIR, `rust/target/release/attax-agree${exe}`);
+  process.env.ATTAX_ENGINE = "rust";
+  process.env.ATTAX_RUST_MODE = "server";
+  const attaxPlayer = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/attax-player.ts")).href);
+  const { createAttaxDecider, engineIdentity } = attaxPlayer;
+  cellKey = attaxPlayer.cellKey;
+  placementCells = attaxPlayer.placementCells;
+  identity = engineIdentity();
+  if (identity.id !== "rust" || identity.build !== attaxRustBuild) {
+    throw new Error(`expected Attax Rust ${attaxRustBuild}, got ${JSON.stringify(identity)}`);
+  }
+  attaxSha256 = await sha256(process.env.ATTAX_RUST_CLI);
+  createAttax = () => createAttaxDecider(undefined, { width: attaxWidth });
+} else {
+  if (!hasGpu) throw new Error(`gpu-player.ts not found in ${ATTAX_DIR}`);
+  if (git("status", "--porcelain", "--untracked-files=no")) {
+    throw new Error(`ATTAX_DIR (${ATTAX_DIR}) has uncommitted modifications`);
+  }
+  const attaxHead = git("rev-parse", "HEAD");
+  const attaxPkg = JSON.parse(await readFile(resolve(ATTAX_DIR, "package.json"), "utf8"));
+  const gpuPlayer = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/gpu-player.ts")).href);
+  const labDecision = await import(pathToFileURL(resolve(ATTAX_DIR, "tools/s2-lab/lab-decision.ts")).href);
+  cellKey = labDecision.cellKey;
+  placementCells = labDecision.placementCells;
+  const gpuInfo = await gpuPlayer.gpuEngineInfo();
+  closeGpuRuntime = () => gpuPlayer.closeGpuEngine();
+  if (values.verify) closeGpuRuntime();
+  attaxSha256 = await sha256(gpuInfo.runnerPath);
+  const shaderHash = createHash("sha256");
+  for (const rel of [
+    "gpu/shaders/bpmg_b1.spv",
+    "gpu/shaders/expand_s25_noba.spv",
+    "gpu/shaders/MANIFEST.sha256",
+  ]) {
+    shaderHash.update(`${rel}\0${await sha256(resolve(ATTAX_DIR, rel))}\0`);
+  }
+  attaxShadersSha256 = shaderHash.digest("hex");
+  identity = {
+    id: "gpu",
+    build: attaxHead,
+    binary: basename(gpuInfo.runnerPath),
+    version: String(attaxPkg.version ?? "unknown"),
+    device: gpuInfo.device,
+    tablesSha256: gpuInfo.tablesSha256,
+    ...(process.env.ATTAX_GPU_RUNNER ? { runnerOverride: true } : {}),
+  };
+  createAttax = async () => labDecision.wrapGpuDecider(await gpuPlayer.createDefaultGpuDecider());
+}
 function integer(value, name, minimum, maximum = Number.MAX_SAFE_INTEGER) {
   const number = Number(value);
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(number) || number < minimum || number > maximum) {
@@ -77,25 +147,36 @@ const games = integer(values.games, "--games", 1);
 const seed = integer(values.seed, "--seed", 1, 0x7fffffff);
 const maxLocks = integer(values["max-locks"], "--max-locks", 2, 100_000);
 const firstTo = values["first-to"] === undefined ? null : integer(values["first-to"], "--first-to", 1);
+const evaluation = values.evaluation === true;
+if (evaluation && (games !== 100 || firstTo !== null)) {
+  throw new Error("--evaluation requires --games 100 and no --first-to");
+}
+if (evaluation && seed + games - 1 > 0x7fffffff) {
+  throw new Error("evaluation seed range exhausted");
+}
 if (values.resume && values.verify) throw new Error("--resume and --verify are mutually exclusive");
 if (values["recorded-runner"] && !values.verify) throw new Error("--recorded-runner requires --verify");
 const seatOffset = integer(values["seat-offset"], "--seat-offset", 0, 1);
 for (const [key, fallback, max] of [
-  ["S2LAB_DEPTH", "8", 40],
-  ["S2LAB_WIDTH", "88", 10_000],
+  ["S2LAB_DEPTH", "12", 40],
+  ["S2LAB_WIDTH", "96", 10_000],
   ["S2LAB_THREADS", "8", 8],
 ]) {
   process.env[key] = String(integer(process.env[key] ?? fallback, key, 1, max));
 }
 const pps = ppsForCc2Parameters(parameters);
+const projectGarbage = integer(process.env.S2LAB_PROJECT_GARBAGE ?? "2", "S2LAB_PROJECT_GARBAGE", 0, 2);
+process.env.S2LAB_PROJECT_GARBAGE = String(projectGarbage);
+const attackProfile = integer(process.env.S2LAB_ATTACK_PROFILE ?? "6", "S2LAB_ATTACK_PROFILE", 0, 6);
+process.env.S2LAB_ATTACK_PROFILE = String(attackProfile);
+const useGpu = integer(process.env.S2LAB_GPU ?? "0", "S2LAB_GPU", 0, 1);
+process.env.S2LAB_GPU = String(useGpu);
 const framesPerLock = 60 / pps;
 if (!Number.isSafeInteger(framesPerLock) || framesPerLock < 1) {
   throw new Error(`unsupported fixed Lab lock cadence: ${pps} PPS`);
 }
 const digest = createHash("sha256").update(canonicalize(profile)).digest("hex");
-const sha256 = async (file) => createHash("sha256").update(await readFile(file)).digest("hex");
 const bridgeSha256 = await sha256(BRIDGE);
-const attaxSha256 = await sha256(process.env.ATTAX_RUST_CLI);
 async function hashLabSources() {
   const hash = createHash("sha256");
   async function visit(path) {
@@ -118,6 +199,7 @@ const settings = {
   publicQueueIncludingCurrent: parameters.queueDepth,
   maxLocks,
   firstTo,
+  ...(evaluation ? { plannedGames: games } : {}),
   startSeed: seed,
   seatOffset,
   labSourceSha256: await hashLabSources(),
@@ -129,9 +211,13 @@ const settings = {
     depth: Number(process.env.S2LAB_DEPTH),
     width: Number(process.env.S2LAB_WIDTH),
     threads: Number(process.env.S2LAB_THREADS),
+    ...(projectGarbage ? { projectGarbage: projectGarbage === 1 ? true : "split-burst" } : {}),
+    ...(attackProfile ? { attackProfile } : {}),
+    ...(useGpu ? { gpu: true } : {}),
   },
   attaxEngine: identity,
   attaxSha256,
+  ...(attaxShadersSha256 ? { attaxShadersSha256 } : {}),
   attaxWidth,
   attaxStockPotential: true,
   attaxSolvency: false,
@@ -176,9 +262,9 @@ async function play(gameIndex, expected) {
   try {
     if (!expected) {
       ours = await createIntetrigenceDecider(BRIDGE);
-      attax = createAttaxDecider(undefined, { width: attaxWidth });
+      attax = await createAttax();
     }
-    while (true) {
+    loop: while (true) {
       outcome = matchOutcome(
         match.bots.map((b) => ({
           id: b.id,
@@ -233,7 +319,13 @@ async function play(gameIndex, expected) {
         let reply;
         const recorded = expected?.trace[trace.length];
         if (expected) {
-          if (!recorded) throw new Error("replay trace ended early");
+          if (!recorded) {
+            if (expected.error) {
+              error = expected.error;
+              break loop;
+            }
+            throw new Error("replay trace ended early");
+          }
           checkRecorded({ side, decision }, { side: recorded.side, decision: recorded.decision }, "decision");
           reply = recorded.reply;
         } else if (side === ourSide) {
@@ -329,10 +421,10 @@ async function play(gameIndex, expected) {
     logicalFrames: match.clock.logicalFrame,
     error,
     settings,
-    attaxProfile: attax?.profileId ?? null,
+    attaxProfile: attax?.profileId ?? (attaxMode === "gpu" ? "config-o" : null),
   };
   if (expected) {
-    for (const field of ["winner", "winnerName", "status", "reason", "locks", "stats", "logicalFrames", "trace"]) {
+    for (const field of ["winner", "winnerName", "status", "reason", "error", "locks", "stats", "logicalFrames", "trace"]) {
       checkRecorded(record[field], expected[field], field);
     }
     return record;
@@ -352,17 +444,33 @@ async function play(gameIndex, expected) {
 
 const releaseMeasurement = values.verify ? null : await acquireMeasurement("Attax Lab");
 try {
-  const seedClaims = !values.verify && firstTo !== null ? await labSeedClaims(values.out, settings) : null;
-  if (!values.resume) seedClaims?.check(seed, false);
+  const seedClaims = evaluation || (!values.verify && firstTo !== null)
+    ? await labSeedClaims(values.out, settings)
+    : null;
+  if (evaluation && !values.verify) {
+    // Check the whole range before accepting any result. Reserve it before
+    // play so a canceled evaluation cannot quietly reuse unplayed seeds.
+    for (let offset = 0; offset < games; offset++) {
+      seedClaims.check(seed + offset, values.resume);
+    }
+  } else if (!values.resume && !values.verify) {
+    seedClaims?.check(seed, false);
+  }
   if (!values.resume && !values.verify) await (await open(values.out, "wx")).close();
   const score = { intetrigence: 0, attax: 0 };
+  let errors = 0;
   let index = 0;
+  const isTolerableGpuError = (record) =>
+    attaxMode === "gpu" && record.error === "attax found no move before top-out";
   if (values.resume || values.verify) {
     const lines = (await readFile(values.out, "utf8")).split(/\r?\n/).filter(Boolean);
     if (values.verify && !lines.length) throw new Error("no recorded games");
+    if (evaluation && (lines.length > games || (values.verify && lines.length !== games))) {
+      throw new Error(`expected ${games} evaluation games, found ${lines.length}`);
+    }
     for (const line of lines) {
       const record = JSON.parse(line);
-      if (record.seed !== seed + index || record.schema !== "intetrigence-s2lab/2" || record.error) {
+      if (record.seed !== seed + index || record.schema !== "intetrigence-s2lab/2" || (record.error && !isTolerableGpuError(record))) {
         throw new Error(`invalid or failed replay at index ${index}`);
       }
       checkRecorded(settings, record.settings, "match settings");
@@ -370,18 +478,35 @@ try {
         throw new Error(`recorded evaluation seed ${record.seed} has no original claim`);
       }
       await play(index++, record);
-      if (record.winnerName) score[record.winnerName]++;
+      if (record.error) errors++;
+      else if (record.winnerName) score[record.winnerName]++;
     }
-    console.log(JSON.stringify({ verified: index, score }));
+    const decided = score.intetrigence + score.attax;
+    console.log(JSON.stringify({
+      verified: index,
+      errors,
+      score,
+      ...(evaluation && values.verify ? { plannedGames: games, decidedGames: decided, winRate: score.intetrigence / games } : {}),
+    }));
+  }
+  if (evaluation && !values.verify) {
+    for (let offset = 0; offset < games; offset++) {
+      await seedClaims.claim(seed + offset, values.resume);
+    }
   }
   for (; !values.verify && (firstTo === null ? index < games : Math.max(...Object.values(score)) < firstTo); index++) {
     if (seed + index > 0x7fffffff) throw new Error("seed range exhausted");
-    await seedClaims?.claim(seed + index, values.resume);
+    if (!evaluation) await seedClaims?.claim(seed + index, values.resume);
     const record = await play(index);
-    if (record.error) throw new Error(`seed ${record.seed}: ${record.error}`);
-    if (record.winnerName) score[record.winnerName]++;
-    console.log(JSON.stringify({ score, attempted: index + 1, firstTo }));
+    if (record.error) {
+      if (!isTolerableGpuError(record)) throw new Error(`seed ${record.seed}: ${record.error}`);
+      errors++;
+    } else if (record.winnerName) {
+      score[record.winnerName]++;
+    }
+    console.log(JSON.stringify({ score, errors, attempted: index + 1, firstTo }));
   }
 } finally {
+  closeGpuRuntime();
   await releaseMeasurement?.();
 }

@@ -313,9 +313,14 @@ mod tests {
         // `clear[None]` stopped rewarding singles. The invariant that does
         // hold is that no clear pays more than one attack line per line
         // cleared, plus the surge a B2B break releases.
+        // In S2 a TSD pays up to 5 for 2 lines (2.5x) and a PC adds 5, so
+        // total attack stays bounded by 3*lines + 5*turns + surge.
         assert!(
-            report.attack <= report.lines + report.surge_releases.iter().sum::<u32>(),
-            "attack {} cannot exceed lines {} plus surge",
+            report.attack
+                <= report.lines * 3
+                    + report.turns * 5
+                    + report.surge_releases.iter().sum::<u32>(),
+            "attack {} exceeded S2 upper bound for lines {}",
             report.attack,
             report.lines
         );

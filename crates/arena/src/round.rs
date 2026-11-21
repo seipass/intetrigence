@@ -1408,7 +1408,8 @@ mod tests {
         let registry = include_str!("../../../docs/evaluation-seed-exclusions.txt");
         assert!(reject_reserved_seeds(&HashSet::from([386001, 386056]), registry).is_err());
         assert!(reject_reserved_seeds(&HashSet::from([9001]), registry).is_err());
-        assert!(reject_reserved_seeds(&HashSet::from([30001, 386056]), registry).is_ok());
+        assert!(reject_reserved_seeds(&HashSet::from([30001]), registry).is_err());
+        assert!(reject_reserved_seeds(&HashSet::from([30101, 386056]), registry).is_ok());
     }
 
     #[test]
